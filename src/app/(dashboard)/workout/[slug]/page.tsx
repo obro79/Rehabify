@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Pause, Play, X, Image as ImageIcon } from "lucide-react";
+import { Pause, Play, X, Image as ImageIcon, AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -185,49 +185,148 @@ export default function WorkoutSessionPage() {
         </div>
       </header>
 
-      {/* Main Content - Two Column Layout */}
+      {/* Main Content - Two Column Layout (Controls Left, Vertical Camera Right) */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
-          {/* Left Column: Voice Coach */}
-          <Card className="p-6 flex flex-col">
-            <h2 className="text-sm font-bold text-foreground mb-4">Voice Coach</h2>
-
-            {/* Large Voice Indicator */}
-            <div className="flex-1 flex flex-col items-center justify-center py-8">
-              <VoiceIndicator state={voiceState} size="lg" showLabel />
-            </div>
-
-            {/* Transcript */}
-            <div className="space-y-4">
-              <div className="bg-gradient-to-br from-sage-50 to-sage-100/50 rounded-xl p-4 border border-sage-200/60">
-                <p className="text-sm text-sage-700 italic leading-relaxed">
-                  {transcript}
-                </p>
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-6">
+          {/* Left Column: Coach, Metrics & Info */}
+          <div className="space-y-6">
+            {/* Voice Coach Card */}
+            <Card className="p-6 flex flex-col bg-white/50 backdrop-blur-sm border-sage-200">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-bold text-foreground">Voice Coach</h2>
+                <Badge variant="outlined" className="bg-white/50">
+                  {voiceState === "listening" ? "Listening..." : "Speaking"}
+                </Badge>
               </div>
 
-              <div className="flex items-center justify-center">
-                <p className="text-xs text-muted-foreground">
-                  Press <kbd className="px-2 py-0.5 rounded bg-sage-100 border border-sage-200 font-mono text-xs">SPACE</kbd> to talk
-                </p>
+              {/* Voice Visualization Area */}
+              <div className="flex-1 flex flex-col items-center justify-center py-6 min-h-[160px]">
+                <VoiceIndicator state={voiceState} size="lg" />
               </div>
-            </div>
-          </Card>
 
-          {/* Right Column: Camera + Metrics */}
+              {/* Transcript Bubble */}
+              <div className="space-y-3 mt-4">
+                <div className="relative">
+                  <div className="absolute -top-2 left-6 w-4 h-4 bg-white border-t border-l border-sage-200 transform rotate-45 z-10"></div>
+                  <div className="bg-white rounded-2xl p-4 border border-sage-200 shadow-sm relative z-0">
+                    <p className="text-sm text-sage-800 font-medium leading-relaxed">
+                      "{transcript}"
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-center">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-sage-400 animate-pulse"></span>
+                    AI Coach Active
+                  </p>
+                </div>
+              </div>
+            </Card>
+
+            {/* Metrics Row */}
+            <div className="grid grid-cols-3 gap-4">
+              {/* Rep Counter */}
+              <Card className="p-4 flex items-center justify-center bg-white/80">
+                <RepCounter current={repCount} target={targetReps} size="default" />
+              </Card>
+
+              {/* Form Score */}
+              <Card className="p-4 bg-white/80">
+                <div className="flex flex-col items-center justify-center space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">Form Score</p>
+                  <ProgressRing
+                    value={formScore}
+                    size="default"
+                    color={getFormScoreColor(formScore)}
+                  />
+                  <p
+                    className={cn(
+                      "text-xs font-medium text-center",
+                      formScore >= 70 ? "text-sage-600" : "text-coral-600"
+                    )}
+                  >
+                    {getFormFeedback(formScore)}
+                  </p>
+                </div>
+              </Card>
+
+              {/* Phase Indicator */}
+              <Card className="p-4 bg-white/80">
+                <div className="flex flex-col items-center justify-center space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">Phase</p>
+                  <Badge variant="active" size="default" className="uppercase">
+                    {phase}
+                  </Badge>
+                  {exercise.detection_config?.phases && (
+                    <p className="text-xs text-muted-foreground text-center line-clamp-1">
+                      Next: {exercise.detection_config.phases[(exercise.detection_config.phases.indexOf(phase) + 1) % exercise.detection_config.phases.length]}
+                    </p>
+                  )}
+                </div>
+              </Card>
+            </div>
+
+            {/* Exercise Instructions (Collapsible) */}
+            <Card className="bg-white/50">
+              <Collapsible defaultOpen={false} className="p-4">
+                <CollapsibleTrigger className="flex items-center gap-2 w-full hover:opacity-80">
+                  <span className="text-base font-semibold">Exercise Instructions</span>
+                  <div className="h-px bg-sage-200 flex-1 ml-4" />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="space-y-4 mt-4 pt-2">
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground mb-2">
+                        How to Perform:
+                      </h3>
+                      <ol className="space-y-3">
+                        {exercise.instructions.map((instruction, i) => (
+                          <li key={i} className="flex items-start gap-3 text-sm">
+                            <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-sage-100 text-sage-700 font-bold text-xs border border-sage-200">
+                              {i + 1}
+                            </span>
+                            <span className="text-sage-700 leading-relaxed">{instruction}</span>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+
+                    {exercise.common_mistakes.length > 0 && (
+                      <div className="mt-6 pt-4 border-t border-sage-100">
+                        <h3 className="text-sm font-semibold text-foreground mb-2">
+                          Common Mistakes:
+                        </h3>
+                        <ul className="space-y-2">
+                          {exercise.common_mistakes.map((mistake, i) => (
+                            <li key={i} className="flex items-start gap-2 text-sm bg-coral-50/50 p-2 rounded-lg text-coral-800">
+                              <AlertTriangle className="w-4 h-4 text-coral-500 flex-shrink-0 mt-0.5" />
+                              <span className="leading-relaxed">{mistake}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            </Card>
+          </div>
+
+          {/* Right Column: Vertical Camera */}
           <div className="space-y-4">
-            {/* Camera Feed - Reduced Height */}
             <div className="relative">
-              <Card className="overflow-hidden">
+              <Card className="overflow-hidden shadow-lg border-sage-200">
                 <ExerciseCamera
                   exercise={exercise}
                   isPaused={isPaused}
-                  className="h-[400px]"
+                  className="h-[600px] w-full"
                 >
                   {/* Guide Image Button */}
                   <Button
                     variant="secondary"
                     size="sm"
-                    className="absolute bottom-4 right-4 gap-1.5"
+                    className="absolute bottom-4 right-4 gap-1.5 shadow-sm"
                     onClick={() => setShowGuideImage(!showGuideImage)}
                   >
                     <ImageIcon className="h-4 w-4" />
@@ -264,127 +363,37 @@ export default function WorkoutSessionPage() {
 
               {/* Guide Image Overlay */}
               {showGuideImage && (
-                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm rounded-2xl flex items-center justify-center z-20">
-                  <Card className="max-w-md mx-4 p-6">
-                    <div className="space-y-4">
-                      <div className="flex items-start justify-between">
-                        <h3 className="font-bold text-lg">Reference Guide</h3>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setShowGuideImage(false)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-
-                      <div className="aspect-video bg-gradient-to-br from-sage-100 to-sage-200 rounded-xl flex items-center justify-center">
-                        <p className="text-sage-600 text-sm">
-                          Exercise illustration would appear here
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm rounded-xl flex items-center justify-center z-20">
+                  <Card className="max-w-xs mx-4 p-4 relative">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-2 top-2 h-6 w-6"
+                      onClick={() => setShowGuideImage(false)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                    
+                    <div className="space-y-3 pt-2">
+                      <h3 className="font-bold text-base">Reference Guide</h3>
+                      <div className="aspect-[3/4] bg-gradient-to-br from-sage-100 to-sage-200 rounded-lg flex items-center justify-center">
+                        <p className="text-sage-600 text-xs text-center px-4">
+                          Exercise illustration
                         </p>
                       </div>
-
-                      <div className="space-y-2">
-                        <p className="font-medium text-sm text-foreground">Key Points:</p>
-                        <ul className="space-y-1 text-sm text-muted-foreground">
-                          {exercise.instructions.slice(0, 3).map((instruction, i) => (
-                            <li key={i} className="flex items-start gap-2">
-                              <span className="text-sage-500 font-bold">•</span>
-                              {instruction}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                      <ul className="space-y-1 text-xs text-muted-foreground">
+                        {exercise.instructions.slice(0, 3).map((instruction, i) => (
+                          <li key={i} className="flex items-start gap-1.5">
+                            <span className="text-sage-500 font-bold">•</span>
+                            {instruction}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   </Card>
                 </div>
               )}
             </div>
-
-            {/* Metrics Row */}
-            <div className="grid grid-cols-3 gap-4">
-              {/* Rep Counter */}
-              <Card className="p-4 flex items-center justify-center">
-                <RepCounter current={repCount} target={targetReps} size="default" />
-              </Card>
-
-              {/* Form Score */}
-              <Card className="p-4">
-                <div className="flex flex-col items-center justify-center space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground">Form Score</p>
-                  <ProgressRing
-                    value={formScore}
-                    size="default"
-                    color={getFormScoreColor(formScore)}
-                  />
-                  <p
-                    className={cn(
-                      "text-xs font-medium",
-                      formScore >= 70 ? "text-sage-600" : "text-coral-600"
-                    )}
-                  >
-                    {getFormFeedback(formScore)}
-                  </p>
-                </div>
-              </Card>
-
-              {/* Phase Indicator */}
-              <Card className="p-4">
-                <div className="flex flex-col items-center justify-center space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground">Phase</p>
-                  <Badge variant="active" size="default" className="uppercase">
-                    {phase}
-                  </Badge>
-                  {exercise.detection_config?.phases && (
-                    <p className="text-xs text-muted-foreground">
-                      Next: {exercise.detection_config.phases[(exercise.detection_config.phases.indexOf(phase) + 1) % exercise.detection_config.phases.length]}
-                    </p>
-                  )}
-                </div>
-              </Card>
-            </div>
-
-            {/* Exercise Instructions (Collapsible) */}
-            <Collapsible defaultOpen={false}>
-              <CollapsibleTrigger>
-                <span className="text-base font-semibold">Exercise Instructions</span>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="space-y-4 mt-2">
-                  <div>
-                    <h3 className="text-sm font-semibold text-foreground mb-2">
-                      How to Perform:
-                    </h3>
-                    <ol className="space-y-2">
-                      {exercise.instructions.map((instruction, i) => (
-                        <li key={i} className="flex items-start gap-3 text-sm">
-                          <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-sage-100 text-sage-700 font-bold text-xs">
-                            {i + 1}
-                          </span>
-                          <span className="text-sage-700">{instruction}</span>
-                        </li>
-                      ))}
-                    </ol>
-                  </div>
-
-                  {exercise.common_mistakes.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-foreground mb-2">
-                        Common Mistakes to Avoid:
-                      </h3>
-                      <ul className="space-y-1.5">
-                        {exercise.common_mistakes.map((mistake, i) => (
-                          <li key={i} className="flex items-start gap-2 text-sm text-coral-700">
-                            <span className="text-coral-500 font-bold">•</span>
-                            {mistake}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
           </div>
         </div>
       </main>

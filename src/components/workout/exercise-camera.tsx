@@ -1,12 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Info } from "lucide-react";
 import type { Exercise } from "@/lib/exercises/types";
 import type { Landmark } from "@/types/vision";
 import { cn } from "@/lib/utils";
 import { getPoseLandmarker } from "@/lib/vision/pose-landmarker";
 import { createFormEngine } from "@/lib/vision/form-engine";
+import { getCameraFeedback, type CameraFeedback } from "@/lib/vision/camera-feedback";
 import { useExerciseStore } from "@/stores/exercise-store";
 
 const POSE_CONNECTIONS: Array<[number, number]> = [
@@ -46,8 +47,11 @@ export function ExerciseCamera({
   const streamRef = React.useRef<MediaStream | null>(null);
   const animationRef = React.useRef<number | null>(null);
   const lastEmitRef = React.useRef(0);
+  const lastFeedbackRef = React.useRef(0);
   const engineRef = React.useRef<ReturnType<typeof createFormEngine> | null>(null);
   const [status, setStatus] = React.useState<CameraStatus>("loading");
+  const [feedback, setFeedback] = React.useState<CameraFeedback>(null);
+  const [formFeedback, setFormFeedback] = React.useState<CameraFeedback>(null);
 
   const setPhase = useExerciseStore((state) => state.setPhase);
   const setFormScore = useExerciseStore((state) => state.setFormScore);
@@ -67,7 +71,7 @@ export function ExerciseCamera({
     const setupCamera = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user", width: 1280, height: 720 },
+          video: { facingMode: "user", width: 720, height: 1280 },
           audio: false,
         });
         if (!isMounted) {
@@ -115,8 +119,23 @@ export function ExerciseCamera({
         const now = performance.now();
         const result = landmarker.detectForVideo(video, now);
         const landmarks = result.landmarks?.[0] as Landmark[] | undefined;
+        
         if (landmarks && canvasRef.current) {
           drawSkeleton(canvasRef.current, landmarks);
+        }
+
+        // Camera positioning feedback (throttled)
+        if (isPaused) {
+          setFeedback(null);
+          setFormFeedback(null); // Also clear form feedback when paused
+        } else if (now - lastFeedbackRef.current > 500) {
+          lastFeedbackRef.current = now;
+          if (landmarks) {
+            setFeedback(getCameraFeedback(landmarks));
+          } else {
+            // No landmarks detected
+            setFeedback({ message: "No person detected", type: "warning" });
+          }
         }
 
         if (!isPaused && exercise.form_detection_enabled && landmarks) {
@@ -124,8 +143,19 @@ export function ExerciseCamera({
           if (engine) {
             const analysis = engine(landmarks);
 
+            // Update form feedback
             if (now - lastEmitRef.current > 150) {
               lastEmitRef.current = now;
+              
+              if (analysis.feedback) {
+                setFormFeedback({ 
+                  message: analysis.feedback, 
+                  type: analysis.feedback.includes("Excellent") || analysis.feedback.includes("Good") ? "success" : "info" 
+                });
+              } else {
+                setFormFeedback(null);
+              }
+
               setPhase(analysis.phase);
               setFormScore(analysis.formScore);
               setConfidence(analysis.confidence);
@@ -166,6 +196,8 @@ export function ExerciseCamera({
     updateLastFrame,
   ]);
 
+  const activeFeedback = feedback || formFeedback;
+
   return (
     <div
       className={cn(
@@ -183,6 +215,22 @@ export function ExerciseCamera({
         ref={canvasRef}
         className="absolute inset-0 h-full w-full scale-x-[-1]"
       />
+      
+      {/* Feedback Overlay (Camera Positioning or Exercise Form) */}
+      {activeFeedback && status === "ready" && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+          <div className={cn(
+            "px-4 py-2 rounded-full backdrop-blur-md flex items-center gap-2 shadow-lg transition-all duration-300",
+            activeFeedback.type === "warning" ? "bg-amber-500/80 text-white" : 
+            activeFeedback.type === "success" ? "bg-emerald-500/80 text-white" :
+            "bg-blue-500/80 text-white"
+          )}>
+            {activeFeedback.type === "warning" && <AlertTriangle className="w-4 h-4" />}
+            {activeFeedback.type !== "warning" && <Info className="w-4 h-4" />}
+            <span className="text-sm font-medium">{activeFeedback.message}</span>
+          </div>
+        </div>
+      )}
 
       {status !== "ready" && (
         <div className="absolute inset-0 flex items-center justify-center bg-sage-900/80 text-white">
