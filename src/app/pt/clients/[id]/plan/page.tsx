@@ -74,6 +74,8 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
   const [planName, setPlanName] = useState("");
   const [selectedDay, setSelectedDay] = useState<number>(1); // Default to Monday
   const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [availableAssessment, setAvailableAssessment] = useState<{ id: string; completed: boolean } | null>(null);
 
   // Load existing plan on mount
   useEffect(() => {
@@ -85,6 +87,29 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
       setPlanName("New Treatment Plan");
     }
   }, [clientId, patient, loadDraftPlan, clearDraftPlan]);
+
+  // Fetch available assessments for this patient
+  useEffect(() => {
+    async function fetchAssessments() {
+      try {
+        const response = await fetch(`/api/assessments/${clientId}`);
+        if (!response.ok) {
+          // If 404 or other error, just continue without assessment
+          return;
+        }
+        const { data } = await response.json();
+        // Find the most recent completed assessment
+        const completed = data?.find((a: { completed: boolean }) => a.completed);
+        if (completed) {
+          setAvailableAssessment({ id: completed.id, completed: true });
+        }
+      } catch (err) {
+        // Silently fail - assessment is optional
+        console.error('Failed to fetch assessments:', err);
+      }
+    }
+    fetchAssessments();
+  }, [clientId]);
 
   // Filter exercises based on search and category
   const filteredExercises = useMemo(() => {
@@ -135,10 +160,87 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
     addExerciseToPlan(planExercise);
   };
 
-  // AI Generate Plan - populates with sample exercises
+  // AI Generate Plan from Assessment
   const handleGeneratePlan = async () => {
     setIsGenerating(true);
+    setError(null);
 
+    try {
+      // Check if we have an assessment
+      if (!availableAssessment || !availableAssessment.completed) {
+        // Fallback to mock generation if no assessment
+        await handleMockGeneratePlan();
+        return;
+      }
+
+      // Call the real API
+      const response = await fetch('/api/plans/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          assessmentId: availableAssessment.id,
+          patientId: clientId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Failed to generate plan');
+      }
+
+      const { data } = await response.json();
+
+      // Clear existing draft
+      clearDraftPlan();
+
+      // Convert the 12-week plan structure to the draft plan format
+      // For now, we'll populate the first week's exercises
+      // In a full implementation, you'd want to show all 12 weeks
+      if (data.structure?.weeks && data.structure.weeks.length > 0) {
+        const firstWeek = data.structure.weeks[0];
+
+        firstWeek.exercises.forEach((ex: { exerciseId: string; name: string; sets: number; reps: number; holdSeconds?: number; days: number[] }, index: number) => {
+          // Find exercise in library to get category
+          const exerciseLib = (exerciseData.exercises as Exercise[]).find(e => e.id === ex.exerciseId);
+
+          // Distribute exercises across the days specified
+          ex.days.forEach((day: number) => {
+            const planExercise: PlanExercise = {
+              id: `pe-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${index}-${day}`,
+              exerciseId: ex.exerciseId,
+              name: ex.name,
+              category: exerciseLib?.category || 'mobility',
+              sets: ex.sets,
+              reps: ex.reps,
+              holdSeconds: ex.holdSeconds,
+              order: index,
+              dayOfWeek: day,
+            };
+            addExerciseToPlan(planExercise);
+          });
+        });
+      }
+
+      setPlanName(data.summary ? `AI Plan: ${data.summary.substring(0, 50)}...` : "AI-Generated Recovery Plan");
+
+      // Show success message
+      if (data.recommendations && data.recommendations.length > 0) {
+        console.log('Plan recommendations:', data.recommendations);
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to generate plan';
+      setError(errorMessage);
+      console.error('Plan generation error:', err);
+
+      // Fallback to mock generation on error
+      await handleMockGeneratePlan();
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Fallback mock generation (original logic)
+  const handleMockGeneratePlan = async () => {
     // Simulate AI generation delay
     await new Promise((resolve) => setTimeout(resolve, 1200));
 
@@ -195,7 +297,6 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
     });
 
     setPlanName("AI-Generated Recovery Plan");
-    setIsGenerating(false);
   };
 
   // Handle save plan
@@ -274,13 +375,14 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
               onClick={handleGeneratePlan}
               disabled={isGenerating}
               className="text-sage-600 hover:text-sage-800"
+              title={availableAssessment ? "Generate plan from assessment" : "Generate sample plan (no assessment found)"}
             >
               {isGenerating ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
                 <Sparkles className="w-4 h-4 mr-2" />
               )}
-              {isGenerating ? "Generating..." : "AI Generate"}
+              {isGenerating ? "Generating..." : availableAssessment ? "AI Generate from Assessment" : "AI Generate (Sample)"}
             </Button>
             <Button variant="ghost" size="sm" onClick={handleCancel}>
               Cancel
@@ -300,6 +402,20 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-6">
+        {/* Error Message */}
+        {error && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-sm text-red-800">
+              <strong>Error:</strong> {error}
+            </p>
+            {availableAssessment && (
+              <p className="text-xs text-red-600 mt-1">
+                Falling back to sample plan generation.
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Plan Name Input */}
         <div className="mb-6">
           <label htmlFor="plan-name" className="block text-sm font-medium text-sage-700 mb-2">
