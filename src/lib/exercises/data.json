@@ -230,7 +230,25 @@
       "equipment": "yoga_mat",
       "video_url": null,
       "thumbnail_url": null,
-      "form_detection_enabled": false
+      "form_detection_enabled": true,
+      "detection_config": {
+        "phases": [
+          "start",
+          "hinge",
+          "bottom",
+          "return"
+        ],
+        "key_landmarks": [
+          "hip_angle",
+          "knee_angle"
+        ],
+        "thresholds": {
+          "hinge_angle_start": 160,
+          "hinge_angle_bottom": 130,
+          "hinge_angle_min": 110,
+          "knee_angle_min": 150
+        }
+      }
     },
     {
       "id": "side-plank",

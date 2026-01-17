@@ -260,6 +260,79 @@ function analyzeDeadBug(
   };
 }
 
+function analyzeRomanianDeadlift(
+  landmarks: Landmark[],
+  thresholds: Record<string, number>,
+  state: EngineState
+): FormEngineResult {
+  const leftShoulder = landmarks[LANDMARKS.leftShoulder];
+  const rightShoulder = landmarks[LANDMARKS.rightShoulder];
+  const leftHip = landmarks[LANDMARKS.leftHip];
+  const rightHip = landmarks[LANDMARKS.rightHip];
+  const leftKnee = landmarks[LANDMARKS.leftKnee];
+  const rightKnee = landmarks[LANDMARKS.rightKnee];
+  const leftAnkle = landmarks[LANDMARKS.leftAnkle];
+  const rightAnkle = landmarks[LANDMARKS.rightAnkle];
+
+  const midShoulder = midpoint(leftShoulder, rightShoulder);
+  const midHip = midpoint(leftHip, rightHip);
+  const midKnee = midpoint(leftKnee, rightKnee);
+
+  const hipAngle = angleBetween(midShoulder, midHip, midKnee);
+  const leftKneeAngle = angleBetween(leftHip, leftKnee, leftAnkle);
+  const rightKneeAngle = angleBetween(rightHip, rightKnee, rightAnkle);
+  const kneeAngle = Math.min(leftKneeAngle, rightKneeAngle);
+
+  const hingeStartAngle = thresholds.hinge_angle_start ?? 160;
+  const hingeBottomAngle = thresholds.hinge_angle_bottom ?? 130;
+  const kneeAngleMin = thresholds.knee_angle_min ?? 150;
+  const depthAngleMin = thresholds.hinge_angle_min ?? 110;
+
+  let phase = "start";
+  if (hipAngle < hingeStartAngle) phase = "hinge";
+  if (hipAngle < hingeBottomAngle) phase = "bottom";
+  if (state.lastPhase === "bottom" && hipAngle >= hingeStartAngle) phase = "return";
+
+  const repIncremented = state.lastPhase === "bottom" && phase === "return";
+
+  const formScore = baseFormScore(landmarks);
+  const errors: FormError[] = [];
+
+  if (kneeAngle < kneeAngleMin) {
+    errors.push({
+      type: "knee_bend",
+      message: "Keep knees softly bent; avoid turning this into a squat",
+      severity: "warning",
+      timestamp: Date.now(),
+      bodyPart: "knees",
+    });
+  }
+
+  if (hipAngle < depthAngleMin) {
+    errors.push({
+      type: "hinge_depth",
+      message: "Stop at a comfortable hinge depth",
+      severity: "info",
+      timestamp: Date.now(),
+      bodyPart: "hips",
+    });
+  }
+
+  return {
+    phase,
+    formScore,
+    errors,
+    isCorrect: errors.length === 0,
+    repIncremented,
+    confidence: averageVisibility(landmarks, [
+      LANDMARKS.leftShoulder,
+      LANDMARKS.rightShoulder,
+      LANDMARKS.leftHip,
+      LANDMARKS.rightHip,
+    ]),
+  };
+}
+
 export function createFormEngine(exercise: Exercise) {
   const state: EngineState = {
     lastPhase: "neutral",
@@ -280,6 +353,9 @@ export function createFormEngine(exercise: Exercise) {
         break;
       case "dead-bug":
         result = analyzeDeadBug(landmarks, thresholds, state);
+        break;
+      case "romanian-deadlift":
+        result = analyzeRomanianDeadlift(landmarks, thresholds, state);
         break;
       default:
         result = {
