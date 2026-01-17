@@ -152,6 +152,12 @@ export default function ExercisesPage() {
   const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, filteredExercises.length);
   const paginatedExercises = filteredExercises.slice(startIndex, endIndex);
 
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1);
+    }
+  }, [currentPage, totalPages]);
+
   // Generate page numbers to display (smart range with ellipsis)
   const getPageNumbers = (): (number | string)[] => {
     const pages: (number | string)[] = [];
@@ -284,7 +290,7 @@ export default function ExercisesPage() {
             <>
             <AnimatePresence mode="wait">
               <StaggerContainer
-                key={`${selectedCategory}-${selectedBodyPart}-${selectedDifficulty}-${currentPage}`}
+                key={`${selectedCategory}-${selectedBodyPart}-${selectedDifficulty}-${debouncedSearch}-${currentPage}`}
                 className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-4"
               >
                 {paginatedExercises.map((exercise) => (
