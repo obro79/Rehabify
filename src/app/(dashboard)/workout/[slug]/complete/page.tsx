@@ -250,7 +250,7 @@ export default function SessionCompletePage() {
           onOpenChange={setIsFormBreakdownOpen}
         >
           <CollapsibleTrigger className="w-full">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-1 items-center justify-between mr-2">
               <span className="text-base font-semibold">Form Analysis</span>
               <span className="text-sm text-muted-foreground">
                 {isFormBreakdownOpen ? "Hide" : "Show"} Details
