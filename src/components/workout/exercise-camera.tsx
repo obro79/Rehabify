@@ -124,7 +124,9 @@ export function ExerciseCamera({
         }
 
         // Camera positioning feedback (throttled)
-        if (now - lastFeedbackRef.current > 500) {
+        if (isPaused) {
+          setFeedback(null);
+        } else if (now - lastFeedbackRef.current > 500) {
           lastFeedbackRef.current = now;
           if (landmarks) {
             setFeedback(getCameraFeedback(landmarks));
