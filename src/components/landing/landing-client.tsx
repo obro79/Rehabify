@@ -22,6 +22,7 @@ import exerciseData from "@/lib/exercises/data.json";
 import { mapDifficultyToStars, type Exercise } from "@/lib/exercises/types";
 import { FadeIn, ScrollReveal } from "@/components/motion";
 import { ClinicalTrustSection } from "./clinical-trust-section";
+import { clientEnv } from "@/lib/env";
 
 // Get first 4 exercises for preview
 const previewExercises = exerciseData.exercises.slice(0, 4) as Exercise[];
@@ -47,6 +48,7 @@ const testimonials = [
 
 export function LandingClient() {
   const [currentTestimonial, setCurrentTestimonial] = React.useState(0);
+  const ctaHref = clientEnv.NEXT_PUBLIC_DEMO_MODE ? "/dashboard" : "/register";
 
   // Auto-rotate testimonials
   React.useEffect(() => {
@@ -114,7 +116,7 @@ export function LandingClient() {
                 <FadeIn direction="up" delay={0.3}>
                   <div className="flex flex-col sm:flex-row items-start gap-4 pt-4">
                     <Button size="lg" variant="terracotta" className="text-lg px-8 py-6" asChild>
-                      <Link href="/register">
+                      <Link href={ctaHref}>
                         Start Free Session
                         <ArrowRight className="ml-2 h-5 w-5" />
                       </Link>
@@ -506,7 +508,7 @@ export function LandingClient() {
 
                 <div className="flex flex-col items-center gap-6">
                   <Button size="lg" variant="terracotta" className="text-lg px-10 py-7" asChild>
-                    <Link href="/register">
+                    <Link href={ctaHref}>
                       Start Your Free Session
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Link>

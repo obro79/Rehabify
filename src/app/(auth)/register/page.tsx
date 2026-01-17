@@ -109,6 +109,13 @@ export default function RegisterPage(): React.JSX.Element {
 
   async function handleSubmit(e: React.FormEvent): Promise<void> {
     e.preventDefault();
+
+    // Skip auth in demo mode
+    if (clientEnv.NEXT_PUBLIC_DEMO_MODE) {
+      router.push('/dashboard');
+      return;
+    }
+
     if (!validateForm()) return;
 
     setIsLoading(true);

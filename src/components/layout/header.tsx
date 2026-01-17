@@ -11,6 +11,7 @@ import {
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { clientEnv } from "@/lib/env";
 
 export interface HeaderProps {
   showCTA?: boolean;
@@ -19,12 +20,17 @@ export interface HeaderProps {
 
 export function Header({ showCTA = true, className }: HeaderProps) {
   const [open, setOpen] = React.useState(false);
+  const isDemoMode = clientEnv.NEXT_PUBLIC_DEMO_MODE;
 
   const navLinks = [
     { label: "About", href: "/about" },
     { label: "Exercises", href: "/exercises" },
     { label: "How It Works", href: "#how-it-works" },
   ];
+
+  // In demo mode, link directly to dashboard
+  const loginHref = isDemoMode ? "/dashboard" : "/login";
+  const signupHref = isDemoMode ? "/dashboard" : "/signup";
 
   return (
     <header
@@ -55,11 +61,11 @@ export function Header({ showCTA = true, className }: HeaderProps) {
         {/* Desktop CTA Buttons */}
         <div className="hidden md:flex items-center gap-3">
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/login">Login</Link>
+            <Link href={loginHref}>{isDemoMode ? "Dashboard" : "Login"}</Link>
           </Button>
           {showCTA && (
             <Button variant="secondary" size="sm" asChild>
-              <Link href="/signup">Get Started</Link>
+              <Link href={signupHref}>Get Started</Link>
             </Button>
           )}
         </div>
@@ -95,13 +101,13 @@ export function Header({ showCTA = true, className }: HeaderProps) {
               {/* Mobile CTA Buttons */}
               <div className="flex flex-col gap-3 pt-4 border-t border-sage-200">
                 <Button variant="ghost" asChild>
-                  <Link href="/login" onClick={() => setOpen(false)}>
-                    Login
+                  <Link href={loginHref} onClick={() => setOpen(false)}>
+                    {isDemoMode ? "Dashboard" : "Login"}
                   </Link>
                 </Button>
                 {showCTA && (
                   <Button variant="secondary" asChild>
-                    <Link href="/signup" onClick={() => setOpen(false)}>
+                    <Link href={signupHref} onClick={() => setOpen(false)}>
                       Get Started
                     </Link>
                   </Button>
