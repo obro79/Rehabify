@@ -7,6 +7,7 @@ import type { Landmark } from "@/types/vision";
 import { cn } from "@/lib/utils";
 import { getPoseLandmarker } from "@/lib/vision/pose-landmarker";
 import { createFormEngine } from "@/lib/vision/form-engine";
+import { getCameraFeedback, type CameraFeedback } from "@/lib/vision/camera-feedback";
 import { useExerciseStore } from "@/stores/exercise-store";
 
 const POSE_CONNECTIONS: Array<[number, number]> = [
@@ -46,8 +47,10 @@ export function ExerciseCamera({
   const streamRef = React.useRef<MediaStream | null>(null);
   const animationRef = React.useRef<number | null>(null);
   const lastEmitRef = React.useRef(0);
+  const lastFeedbackRef = React.useRef(0);
   const engineRef = React.useRef<ReturnType<typeof createFormEngine> | null>(null);
   const [status, setStatus] = React.useState<CameraStatus>("loading");
+  const [feedback, setFeedback] = React.useState<CameraFeedback>(null);
 
   const setPhase = useExerciseStore((state) => state.setPhase);
   const setFormScore = useExerciseStore((state) => state.setFormScore);
@@ -115,8 +118,20 @@ export function ExerciseCamera({
         const now = performance.now();
         const result = landmarker.detectForVideo(video, now);
         const landmarks = result.landmarks?.[0] as Landmark[] | undefined;
+        
         if (landmarks && canvasRef.current) {
           drawSkeleton(canvasRef.current, landmarks);
+        }
+
+        // Camera positioning feedback (throttled)
+        if (now - lastFeedbackRef.current > 500) {
+          lastFeedbackRef.current = now;
+          if (landmarks) {
+            setFeedback(getCameraFeedback(landmarks));
+          } else {
+            // No landmarks detected
+            setFeedback({ message: "No person detected", type: "warning" });
+          }
         }
 
         if (!isPaused && exercise.form_detection_enabled && landmarks) {
@@ -183,6 +198,19 @@ export function ExerciseCamera({
         ref={canvasRef}
         className="absolute inset-0 h-full w-full scale-x-[-1]"
       />
+      
+      {/* Camera Feedback Overlay */}
+      {feedback && status === "ready" && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+          <div className={cn(
+            "px-4 py-2 rounded-full backdrop-blur-md flex items-center gap-2 shadow-lg transition-all duration-300",
+            feedback.type === "warning" ? "bg-amber-500/80 text-white" : "bg-emerald-500/80 text-white"
+          )}>
+            {feedback.type === "warning" && <AlertTriangle className="w-4 h-4" />}
+            <span className="text-sm font-medium">{feedback.message}</span>
+          </div>
+        </div>
+      )}
 
       {status !== "ready" && (
         <div className="absolute inset-0 flex items-center justify-center bg-sage-900/80 text-white">
