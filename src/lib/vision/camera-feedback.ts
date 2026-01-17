@@ -26,6 +26,8 @@ export function getCameraFeedback(landmarks: Landmark[]): CameraFeedback {
   const rightShoulder = landmarks[12];
   const leftHip = landmarks[23];
   const rightHip = landmarks[24];
+  const leftKnee = landmarks[25];
+  const rightKnee = landmarks[26];
   const leftAnkle = landmarks[27];
   const rightAnkle = landmarks[28];
 
@@ -58,7 +60,7 @@ export function getCameraFeedback(landmarks: Landmark[]): CameraFeedback {
   // 2. Check visibility of key body parts
   const isHeadVisible = isVisible(nose) || (isVisible(leftShoulder) && isVisible(rightShoulder));
   const isLowerBodyVisible = isVisible(leftHip) || isVisible(rightHip);
-  const areFeetVisible = isVisible(leftAnkle) || isVisible(rightAnkle);
+  const areKneesVisible = isVisible(leftKnee) || isVisible(rightKnee);
 
   // Critical visibility checks (Priority 1)
   
@@ -97,8 +99,8 @@ export function getCameraFeedback(landmarks: Landmark[]): CameraFeedback {
   
   if (isTouchingBottom) {
       // Often means feet are cut off
-      if (!areFeetVisible) {
-           return { message: "Cannot see feet", type: "warning" };
+      if (!areKneesVisible) {
+           return { message: "Cannot see knees", type: "warning" };
       }
       return { message: "Too close to bottom", type: "warning" };
   }
@@ -113,9 +115,9 @@ export function getCameraFeedback(landmarks: Landmark[]): CameraFeedback {
   }
   
   // 5. Specific body part checks for common issues
-  if (!areFeetVisible && height > 0.6) {
-      // If the person is reasonably large but we can't see feet, they are likely cut off
-      return { message: "Cannot see feet", type: "warning" };
+  if (!areKneesVisible && height > 0.6) {
+      // If the person is reasonably large but we can't see knees, legs are likely cut off
+      return { message: "Cannot see knees", type: "warning" };
   }
 
   return null; // Good positioning

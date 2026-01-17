@@ -185,93 +185,10 @@ export default function WorkoutSessionPage() {
         </div>
       </header>
 
-      {/* Main Content - Two Column Layout (Vertical Camera Left, Controls Right) */}
+      {/* Main Content - Two Column Layout (Controls Left, Vertical Camera Right) */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-6">
-          {/* Left Column: Vertical Camera */}
-          <div className="space-y-4">
-            <div className="relative">
-              <Card className="overflow-hidden shadow-lg border-sage-200">
-                <ExerciseCamera
-                  exercise={exercise}
-                  isPaused={isPaused}
-                  className="h-[600px] w-full"
-                >
-                  {/* Guide Image Button */}
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="absolute bottom-4 right-4 gap-1.5 shadow-sm"
-                    onClick={() => setShowGuideImage(!showGuideImage)}
-                  >
-                    <ImageIcon className="h-4 w-4" />
-                    Guide
-                  </Button>
-
-                  {/* Paused Overlay */}
-                  {isPaused && (
-                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center">
-                      <div className="text-center space-y-4">
-                        <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-white/90">
-                          <Pause className="w-12 h-12 text-sage-600" />
-                        </div>
-                        <div>
-                          <p className="text-white font-bold text-xl">Paused</p>
-                          <p className="text-white/80 text-sm mt-1">
-                            Press Resume to continue
-                          </p>
-                        </div>
-                        <Button
-                          variant="secondary"
-                          size="lg"
-                          onClick={handlePauseToggle}
-                          className="gap-2"
-                        >
-                          <Play className="h-5 w-5" />
-                          Resume Workout
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </ExerciseCamera>
-              </Card>
-
-              {/* Guide Image Overlay */}
-              {showGuideImage && (
-                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm rounded-xl flex items-center justify-center z-20">
-                  <Card className="max-w-xs mx-4 p-4 relative">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-2 top-2 h-6 w-6"
-                      onClick={() => setShowGuideImage(false)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                    
-                    <div className="space-y-3 pt-2">
-                      <h3 className="font-bold text-base">Reference Guide</h3>
-                      <div className="aspect-[3/4] bg-gradient-to-br from-sage-100 to-sage-200 rounded-lg flex items-center justify-center">
-                        <p className="text-sage-600 text-xs text-center px-4">
-                          Exercise illustration
-                        </p>
-                      </div>
-                      <ul className="space-y-1 text-xs text-muted-foreground">
-                        {exercise.instructions.slice(0, 3).map((instruction, i) => (
-                          <li key={i} className="flex items-start gap-1.5">
-                            <span className="text-sage-500 font-bold">•</span>
-                            {instruction}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </Card>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right Column: Coach, Metrics & Info */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-6">
+          {/* Left Column: Coach, Metrics & Info */}
           <div className="space-y-6">
             {/* Voice Coach Card */}
             <Card className="p-6 flex flex-col bg-white/50 backdrop-blur-sm border-sage-200">
@@ -394,6 +311,89 @@ export default function WorkoutSessionPage() {
                 </CollapsibleContent>
               </Collapsible>
             </Card>
+          </div>
+
+          {/* Right Column: Vertical Camera */}
+          <div className="space-y-4">
+            <div className="relative">
+              <Card className="overflow-hidden shadow-lg border-sage-200">
+                <ExerciseCamera
+                  exercise={exercise}
+                  isPaused={isPaused}
+                  className="h-[600px] w-full"
+                >
+                  {/* Guide Image Button */}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="absolute bottom-4 right-4 gap-1.5 shadow-sm"
+                    onClick={() => setShowGuideImage(!showGuideImage)}
+                  >
+                    <ImageIcon className="h-4 w-4" />
+                    Guide
+                  </Button>
+
+                  {/* Paused Overlay */}
+                  {isPaused && (
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center">
+                      <div className="text-center space-y-4">
+                        <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-white/90">
+                          <Pause className="w-12 h-12 text-sage-600" />
+                        </div>
+                        <div>
+                          <p className="text-white font-bold text-xl">Paused</p>
+                          <p className="text-white/80 text-sm mt-1">
+                            Press Resume to continue
+                          </p>
+                        </div>
+                        <Button
+                          variant="secondary"
+                          size="lg"
+                          onClick={handlePauseToggle}
+                          className="gap-2"
+                        >
+                          <Play className="h-5 w-5" />
+                          Resume Workout
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </ExerciseCamera>
+              </Card>
+
+              {/* Guide Image Overlay */}
+              {showGuideImage && (
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm rounded-xl flex items-center justify-center z-20">
+                  <Card className="max-w-xs mx-4 p-4 relative">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-2 top-2 h-6 w-6"
+                      onClick={() => setShowGuideImage(false)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                    
+                    <div className="space-y-3 pt-2">
+                      <h3 className="font-bold text-base">Reference Guide</h3>
+                      <div className="aspect-[3/4] bg-gradient-to-br from-sage-100 to-sage-200 rounded-lg flex items-center justify-center">
+                        <p className="text-sage-600 text-xs text-center px-4">
+                          Exercise illustration
+                        </p>
+                      </div>
+                      <ul className="space-y-1 text-xs text-muted-foreground">
+                        {exercise.instructions.slice(0, 3).map((instruction, i) => (
+                          <li key={i} className="flex items-start gap-1.5">
+                            <span className="text-sage-500 font-bold">•</span>
+                            {instruction}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </Card>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </main>
