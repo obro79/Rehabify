@@ -278,6 +278,8 @@ function analyzeRDL(
   const rightKnee = landmarks[LANDMARKS.rightKnee];
   const leftAnkle = landmarks[LANDMARKS.leftAnkle];
   const rightAnkle = landmarks[LANDMARKS.rightAnkle];
+  const leftWrist = landmarks[LANDMARKS.leftWrist];
+  const rightWrist = landmarks[LANDMARKS.rightWrist];
 
   // Midpoints for analysis
   const midEar = midpoint(leftEar, rightEar);
@@ -285,6 +287,7 @@ function analyzeRDL(
   const midHip = midpoint(leftHip, rightHip);
   const midKnee = midpoint(leftKnee, rightKnee);
   const midAnkle = midpoint(leftAnkle, rightAnkle);
+  const midWrist = midpoint(leftWrist, rightWrist);
 
   // 1. Knee Angle (Hip-Knee-Ankle)
   // We want a "soft bend" (approx 150-170 degrees), not locked (180) and not squatting (<140)
@@ -301,6 +304,17 @@ function analyzeRDL(
   const dx = midHip.x - midShoulder.x;
   // Angle in degrees from vertical (0 = upright, 90 = horizontal)
   const trunkLean = Math.abs(Math.atan2(dx, dy) * (180 / Math.PI));
+
+  // 4. Hip Shift (Horizontal distance between Hip and Ankle)
+  // Essential for RDL: Hips must move BACK as torso moves DOWN.
+  const legLength = distance2D(midHip, midAnkle) || 1;
+  const hipShift = Math.abs(midHip.x - midAnkle.x);
+  const normalizedShift = hipShift / legLength;
+
+  // 5. Bar Path (Horizontal distance between Wrist and Knee/Shin)
+  // Weights should stay close to legs.
+  const barDist = Math.abs(midWrist.x - midKnee.x);
+  const normalizedBarDist = barDist / legLength;
 
   const formScore = baseFormScore(landmarks);
   const errors: FormError[] = [];
@@ -332,6 +346,30 @@ function analyzeRDL(
       severity: "warning",
       timestamp: Date.now(),
       bodyPart: "head",
+    });
+  }
+
+  // Detect Rounding / Poor Hinge
+  // If leaning forward but hips haven't shifted back, user is likely rounding the spine.
+  if (trunkLean > 30 && normalizedShift < 0.15) {
+    errors.push({
+      type: "poor_hinge",
+      message: "Push hips back to flatten spine",
+      severity: "warning",
+      timestamp: Date.now(),
+      bodyPart: "hips",
+    });
+  }
+
+  // Detect Bar Drift
+  // If leaning and bar is far from legs, it increases spinal load/rounding risk.
+  if (trunkLean > 30 && normalizedBarDist > 0.2) {
+    errors.push({
+      type: "bar_drift",
+      message: "Keep weights close to legs",
+      severity: "warning",
+      timestamp: Date.now(),
+      bodyPart: "arms",
     });
   }
 
