@@ -1,0 +1,634 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Background & Text */
+  --background: #F5F3EE;
+  --foreground: #3D4A3A;
+
+  /* Sage Green Palette */
+  --sage-50: #F0F4EE;
+  --sage-100: #E1E9DE;
+  --sage-200: #C5CFC0;
+  --sage-300: #A8B9A0;
+  --sage-400: #8B9F82;
+  --sage-500: #7A8E72;
+  --sage-600: #6A7D63;
+  --sage-700: #5A6C54;
+  --sage-800: #4A5B45;
+  --sage-900: #3D4A3A;
+
+  /* Lighter sage for gradients */
+  --sage-light: #9AAF91;
+
+  /* Coral/Terracotta Accent (more orange) */
+  --coral-300: #E8B8A8;
+  --coral-400: #D4907E;
+  --coral-500: #C4806E;
+  --coral-light: #E0A090;
+
+  /* Terracotta Palette - Wellness Sanctuary */
+  --terracotta-50: #FDF8F6;
+  --terracotta-100: #FAEBE6;
+  --terracotta-200: #F5D4C8;
+  --terracotta-300: #E8B8A8;
+  --terracotta-400: #D4907E;
+  --terracotta-500: #C4806E;
+  --terracotta-600: #B06B59;
+
+  /* Earth Tones - Wellness Sanctuary */
+  --sand-100: #F9F6F1;
+  --sand-200: #F0EBE3;
+  --clay-100: #E8DED4;
+
+  /* Muted/Neutral */
+  --muted: #E8E6E1;
+  --muted-dark: #E0DED9;
+  --muted-foreground: #6B7280;
+
+  /* Border */
+  --border: #C5CFC0;
+
+  /* 3D Effect Shadows */
+  --shadow-pillowy-sm: 0 2px 4px rgba(0,0,0,0.06);
+  --shadow-pillowy: 0 4px 8px rgba(0,0,0,0.08);
+  --shadow-pillowy-lg: 0 6px 12px rgba(0,0,0,0.1);
+  --shadow-pillowy-colored: 0 4px 8px rgba(0,0,0,0.15);
+
+  /* Inset highlights for 3D effect */
+  --inset-highlight: inset 0 2px 0 rgba(255,255,255,0.3);
+  --inset-highlight-strong: inset 0 2px 0 rgba(255,255,255,1);
+  --inset-shadow: inset 0 -2px 4px rgba(0,0,0,0.15);
+  --inset-shadow-subtle: inset 0 -2px 4px rgba(0,0,0,0.06);
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-jakarta), system-ui, sans-serif;
+}
+
+/* ===== REUSABLE 3D SURFACE STYLES ===== */
+
+@layer components {
+  /* Light/neutral pillowy surface (for cards, ghost buttons) */
+  .surface-soft {
+    @apply bg-gradient-to-b from-white to-muted-dark rounded-xl;
+    box-shadow: var(--shadow-pillowy), var(--inset-highlight-strong), var(--inset-shadow-subtle);
+  }
+
+  /* Sage green pillowy surface */
+  .surface-sage {
+    @apply bg-gradient-to-b from-sage-light to-sage-500 text-white rounded-xl;
+    box-shadow: var(--shadow-pillowy-colored), var(--inset-highlight), var(--inset-shadow);
+  }
+
+  /* Coral/terracotta pillowy surface */
+  .surface-coral {
+    @apply bg-gradient-to-b from-coral-light to-coral-500 text-white rounded-xl;
+    box-shadow: var(--shadow-pillowy-colored), var(--inset-highlight), var(--inset-shadow);
+  }
+
+  /* Outlined pillowy surface (for primary buttons, outlined cards) */
+  .surface-outlined {
+    @apply bg-gradient-to-b from-white to-sage-50 border border-sage-200 rounded-pill;
+    box-shadow: var(--shadow-pillowy), var(--inset-highlight-strong), var(--inset-shadow-subtle);
+  }
+
+  /* White pillowy surface (for cards with full 3D effect) */
+  .surface-pillowy {
+    @apply bg-white rounded-3xl;
+    box-shadow: var(--shadow-pillowy), var(--inset-highlight-strong), var(--inset-shadow-subtle);
+  }
+
+  /* Flat card surface (less 3D, for containers) */
+  .surface-card {
+    @apply bg-white rounded-3xl;
+    box-shadow: var(--shadow-pillowy-sm);
+  }
+
+  /* Elevated card surface (more lift) */
+  .surface-elevated {
+    @apply bg-white rounded-3xl;
+    box-shadow: var(--shadow-pillowy-lg);
+  }
+
+  /* ===== SIDEBAR NAVIGATION ===== */
+
+  /* Main sidebar container - protruding sage surface */
+  .sidebar-nav {
+    background: linear-gradient(145deg, var(--sage-light) 0%, var(--sage-600) 100%);
+    box-shadow:
+      0 6px 20px rgba(90, 108, 84, 0.3),
+      0 2px 8px rgba(0, 0, 0, 0.1),
+      inset 0 2px 0 rgba(255, 255, 255, 0.25),
+      inset 0 -3px 6px rgba(0, 0, 0, 0.15);
+  }
+
+  /* Subtle noise texture overlay */
+  .sidebar-nav-texture {
+    @apply absolute inset-0 rounded-2xl pointer-events-none;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    opacity: 0.03;
+    mix-blend-mode: overlay;
+  }
+
+  /* Active nav item - white pillowy button */
+  .nav-item-active {
+    @apply absolute inset-0 rounded-xl;
+    background: linear-gradient(145deg, #ffffff 0%, var(--sage-50) 100%);
+    box-shadow:
+      0 3px 8px rgba(0, 0, 0, 0.15),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.08);
+  }
+
+  /* Hover nav item - same pillowy effect */
+  .nav-item-hover {
+    @apply absolute inset-0 rounded-xl transition-all duration-200;
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.95) 0%, rgba(240, 244, 238, 0.95) 100%);
+    box-shadow:
+      0 3px 8px rgba(0, 0, 0, 0.15),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.08);
+  }
+
+  /* ===== CALENDAR ===== */
+
+  /* Calendar container - white pillowy surface */
+  .calendar-container {
+    @apply bg-white;
+    box-shadow:
+      var(--shadow-pillowy),
+      var(--inset-highlight-strong),
+      var(--inset-shadow-subtle);
+  }
+
+  /* Selected day - coral pillowy circle */
+  .calendar-day-selected {
+    @apply absolute inset-0.5 rounded-full;
+    background: linear-gradient(145deg, var(--coral-light) 0%, var(--coral-500) 100%);
+    box-shadow:
+      0 2px 4px rgba(196, 128, 110, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3),
+      inset 0 -1px 2px rgba(0, 0, 0, 0.1);
+  }
+
+  /* ===== SWITCH ===== */
+
+  /* Switch thumb - pillowy white circle */
+  .switch-thumb {
+    @apply pointer-events-none block rounded-full bg-white transition-transform duration-200 ring-0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  }
+
+  /* ===== TABS ===== */
+
+  /* Tab trigger active state */
+  .tab-trigger-active {
+    @apply bg-white text-foreground;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  }
+
+  /* ===== STREAK ===== */
+
+  /* Flame glow effect */
+  .streak-flame-glow {
+    @apply absolute inset-0;
+    background: radial-gradient(circle at 50% 70%, var(--coral-300) 0%, transparent 60%);
+    filter: blur(4px);
+    opacity: 0.6;
+  }
+
+  /* ===== MODAL COMPONENTS ===== */
+
+  /* Modal overlay backdrop */
+  .modal-overlay {
+    @apply fixed inset-0 z-50 bg-black/50 backdrop-blur-sm;
+  }
+
+  /* Close button for modals, alerts, toasts */
+  .close-btn {
+    @apply shrink-0 rounded-full p-1;
+    @apply text-muted-foreground hover:text-foreground;
+    @apply hover:bg-sage-100 transition-colors;
+  }
+
+  /* ===== PILLOWY ALERTS ===== */
+
+  /* Base pillowy alert - 3D raised surface */
+  .alert-pillowy {
+    @apply bg-white;
+    box-shadow:
+      0 4px 12px rgba(0, 0, 0, 0.08),
+      inset 0 2px 0 rgba(255, 255, 255, 0.9),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.04);
+  }
+
+  /* Alert variants with colored left accent */
+  .alert-pillowy-default {
+    border-left: 4px solid var(--sage-400);
+  }
+  .alert-pillowy-success {
+    border-left: 4px solid var(--sage-500);
+  }
+  .alert-pillowy-warning {
+    border-left: 4px solid #f59e0b;
+  }
+  .alert-pillowy-error {
+    border-left: 4px solid #ef4444;
+  }
+
+  /* Icon wrapper with subtle pillowy background */
+  .alert-icon-wrapper {
+    @apply p-1.5 rounded-full;
+    background: linear-gradient(145deg, rgba(255,255,255,0.8) 0%, rgba(0,0,0,0.02) 100%);
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  }
+
+  /* ===== PILLOWY PROGRESS RING ===== */
+
+  /* Track with inset shadow for depth */
+  .progress-ring-track {
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.1));
+  }
+
+  /* Progress arc with pillowy glow */
+  .progress-ring-arc {
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.15));
+  }
+
+  /* ===== PILLOWY LOADING SPINNER ===== */
+
+  .spinner-pillowy {
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15));
+  }
+
+  /* ===== PILLOWY STEP NUMBERS ===== */
+
+  /* Desktop step number */
+  .pillow-step-number {
+    @apply w-16 h-16 rounded-full bg-gradient-to-b from-sage-200 to-sage-400 flex items-center justify-center text-2xl font-bold z-10 relative text-sage-800;
+    box-shadow: inset 0 2px 4px rgba(255,255,255,0.5), inset 0 -2px 4px rgba(0,0,0,0.15), 0 4px 8px rgba(0,0,0,0.1);
+  }
+
+  /* Mobile step number */
+  .pillow-step-number-mobile {
+    @apply w-12 h-12 rounded-full bg-gradient-to-b from-sage-200 to-sage-400 flex items-center justify-center text-xl font-bold flex-shrink-0 text-sage-800;
+    box-shadow: inset 0 2px 4px rgba(255,255,255,0.5), inset 0 -2px 4px rgba(0,0,0,0.15), 0 4px 8px rgba(0,0,0,0.1);
+  }
+
+  /* ===== WELLNESS SANCTUARY SURFACES ===== */
+
+  /* Organic surface - larger border radius with soft shadow */
+  .surface-organic {
+    @apply bg-white rounded-3xl;
+    box-shadow:
+      0 8px 24px rgba(0, 0, 0, 0.06),
+      var(--inset-highlight-strong),
+      var(--inset-shadow-subtle);
+  }
+
+  /* Sanctuary background container - for gradient mesh decoration */
+  .sanctuary-bg {
+    @apply relative overflow-hidden;
+  }
+
+  /* Organic blob base styles */
+  .sanctuary-blob {
+    @apply absolute pointer-events-none -z-10;
+    filter: blur(40px);
+    opacity: 0.6;
+    will-change: transform;
+  }
+
+  /* Floating sidebar container (desktop) */
+  .nav-floating {
+    @apply fixed left-4 top-1/2 -translate-y-1/2 z-40;
+    @apply rounded-3xl backdrop-blur-xl;
+    background: rgba(255, 255, 255, 0.7);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  }
+
+  /* Bottom navigation bar (mobile) */
+  .nav-bottom {
+    @apply fixed bottom-0 left-0 right-0 z-40;
+    @apply backdrop-blur-lg;
+    background: rgba(255, 255, 255, 0.8);
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+  }
+
+  /* Surface with terracotta gradient (for buttons) */
+  .surface-terracotta {
+    @apply bg-gradient-to-b from-terracotta-300 to-terracotta-500 text-white rounded-xl;
+    box-shadow: var(--shadow-pillowy-colored), var(--inset-highlight), var(--inset-shadow);
+  }
+}
+
+/* ===== VOICE INDICATOR ANIMATIONS ===== */
+
+@keyframes glow-pulse {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+
+@keyframes breathe {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+@keyframes speak-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+@keyframes wave-bar {
+  0%, 100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes bounce-dot {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(-6px) scale(1.1);
+    opacity: 1;
+  }
+}
+
+@keyframes listening-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+/* ===== COMPONENT ANIMATIONS ===== */
+
+@keyframes scale-in {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-scale {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes flame-flicker {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  25% {
+    opacity: 0.4;
+    transform: scale(0.95) translateY(1px);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+  75% {
+    opacity: 0.5;
+    transform: scale(0.98) translateY(-1px);
+  }
+}
+
+@keyframes pulse-flame {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+.animate-pulse-flame {
+  animation: pulse-flame 2s ease-in-out infinite;
+}
+
+/* ===== HERO & PAGE TRANSITION ANIMATIONS ===== */
+
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-gradient-shift {
+  animation: gradient-shift 3s ease infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s linear infinite;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+/* ===== WELLNESS SANCTUARY ANIMATIONS ===== */
+
+/* Breathing animation - for ambient wellness feel (4-5 second cycle) */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes sanctuary-breathe {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 0.6;
+    }
+    50% {
+      transform: scale(1.03);
+      opacity: 0.8;
+    }
+  }
+
+  .animate-sanctuary-breathe {
+    animation: sanctuary-breathe 4.5s ease-in-out infinite;
+  }
+}
+
+/* Blob float animation - organic movement (20-30 second cycle) */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes blob-float {
+    0%, 100% {
+      transform: translate(0, 0) rotate(0deg);
+    }
+    33% {
+      transform: translate(10px, -10px) rotate(2deg);
+    }
+    66% {
+      transform: translate(-5px, 5px) rotate(-1deg);
+    }
+  }
+
+  .animate-blob-float {
+    animation: blob-float 25s ease-in-out infinite;
+  }
+
+  /* Celebration Animation */
+  @keyframes celebration-blob {
+    0% {
+      transform: scale(0) translate(0, 0);
+      opacity: 0;
+    }
+    20% {
+      transform: scale(1.2) translate(var(--tx), var(--ty));
+      opacity: 1;
+    }
+    100% {
+      transform: scale(0.5) translate(calc(var(--tx) * 2), calc(var(--ty) * 2));
+      opacity: 0;
+    }
+  }
+
+  @keyframes celebration-scale-in {
+    0% {
+      transform: scale(0);
+      opacity: 0;
+    }
+    50% {
+      transform: scale(1.1);
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes celebration-fade-in-up {
+    0% {
+      transform: translateY(20px);
+      opacity: 0;
+    }
+    100% {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  .animate-celebration-blob {
+    animation: celebration-blob 2s ease-out forwards;
+  }
+
+  .animate-celebration-scale-in {
+    animation: celebration-scale-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+
+  .animate-celebration-fade-in-up {
+    animation: celebration-fade-in-up 0.5s ease-out forwards;
+  }
+}
+
+/* Animation pause system - pauses all sanctuary animations */
+.sanctuary-paused .animate-sanctuary-breathe,
+.sanctuary-paused .animate-blob-float {
+  animation-play-state: paused;
+}
+
+/* Reduced motion alternatives - static states */
+@media (prefers-reduced-motion: reduce) {
+  .animate-sanctuary-breathe,
+  .animate-blob-float,
+  .animate-celebration-blob,
+  .animate-celebration-scale-in,
+  .animate-celebration-fade-in-up {
+    animation: none;
+    transform: none;
+    opacity: 0.6;
+  }
+}
