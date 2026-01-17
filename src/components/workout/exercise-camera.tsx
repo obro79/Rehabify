@@ -48,6 +48,7 @@ export function ExerciseCamera({
   const animationRef = React.useRef<number | null>(null);
   const lastEmitRef = React.useRef(0);
   const lastFeedbackRef = React.useRef(0);
+  const lastTimestampRef = React.useRef(0);
   const engineRef = React.useRef<ReturnType<typeof createFormEngine> | null>(null);
   const [status, setStatus] = React.useState<CameraStatus>("loading");
   const [feedback, setFeedback] = React.useState<CameraFeedback>(null);
@@ -102,6 +103,8 @@ export function ExerciseCamera({
 
   React.useEffect(() => {
     let isActive = true;
+    // Reset timestamp tracking to avoid conflicts with cached landmarker
+    lastTimestampRef.current = performance.now();
 
     const runVision = async () => {
       if (!videoRef.current || status !== "ready") return;
@@ -117,7 +120,19 @@ export function ExerciseCamera({
         }
 
         const now = performance.now();
-        const result = landmarker.detectForVideo(video, now);
+        // Ensure monotonically increasing timestamps for MediaPipe
+        const timestamp = Math.max(now, lastTimestampRef.current + 1);
+        lastTimestampRef.current = timestamp;
+
+        let result;
+        try {
+          result = landmarker.detectForVideo(video, timestamp);
+        } catch (error) {
+          // Skip frame on detection error (e.g., XNNPACK delegate issues)
+          console.warn("Pose detection error, skipping frame:", error);
+          animationRef.current = requestAnimationFrame(processFrame);
+          return;
+        }
         const landmarks = result.landmarks?.[0] as Landmark[] | undefined;
         
         if (landmarks && canvasRef.current) {
