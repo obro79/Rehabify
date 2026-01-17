@@ -6,6 +6,7 @@ interface FormEngineResult {
   phase: string;
   formScore: number;
   errors: FormError[];
+  feedback?: string;
   isCorrect: boolean;
   repIncremented: boolean;
   confidence: number;
@@ -18,6 +19,8 @@ interface EngineState {
 }
 
 const LANDMARKS = {
+  leftEar: 7,
+  rightEar: 8,
   leftShoulder: 11,
   rightShoulder: 12,
   leftElbow: 13,
@@ -260,6 +263,111 @@ function analyzeDeadBug(
   };
 }
 
+function analyzeRDL(
+  landmarks: Landmark[],
+  thresholds: Record<string, number>,
+  state: EngineState
+): FormEngineResult {
+  const leftEar = landmarks[LANDMARKS.leftEar];
+  const rightEar = landmarks[LANDMARKS.rightEar];
+  const leftShoulder = landmarks[LANDMARKS.leftShoulder];
+  const rightShoulder = landmarks[LANDMARKS.rightShoulder];
+  const leftHip = landmarks[LANDMARKS.leftHip];
+  const rightHip = landmarks[LANDMARKS.rightHip];
+  const leftKnee = landmarks[LANDMARKS.leftKnee];
+  const rightKnee = landmarks[LANDMARKS.rightKnee];
+  const leftAnkle = landmarks[LANDMARKS.leftAnkle];
+  const rightAnkle = landmarks[LANDMARKS.rightAnkle];
+
+  // Midpoints for analysis
+  const midEar = midpoint(leftEar, rightEar);
+  const midShoulder = midpoint(leftShoulder, rightShoulder);
+  const midHip = midpoint(leftHip, rightHip);
+  const midKnee = midpoint(leftKnee, rightKnee);
+  const midAnkle = midpoint(leftAnkle, rightAnkle);
+
+  // 1. Knee Angle (Hip-Knee-Ankle)
+  // We want a "soft bend" (approx 150-170 degrees), not locked (180) and not squatting (<140)
+  const kneeAngle = angleBetween(midHip, midKnee, midAnkle);
+
+  // 2. Neck/Head Alignment (Ear-Shoulder-Hip)
+  // Should be roughly 180 (straight line)
+  const neckAngle = angleBetween(midEar, midShoulder, midHip);
+
+  // 3. Trunk Lean (Vertical vs Shoulder-Hip)
+  // Vertical is 0 degrees (upright). Hinging increases this angle.
+  // Calculate angle of torso relative to Y-axis
+  const dy = midHip.y - midShoulder.y; // Positive if standing upright (hip below shoulder)
+  const dx = midHip.x - midShoulder.x;
+  // Angle in degrees from vertical (0 = upright, 90 = horizontal)
+  const trunkLean = Math.abs(Math.atan2(dx, dy) * (180 / Math.PI));
+
+  const formScore = baseFormScore(landmarks);
+  const errors: FormError[] = [];
+  let feedback = "";
+
+  // Feedback Logic
+  if (kneeAngle < 140) {
+    errors.push({
+      type: "knee_bend",
+      message: "Too much knee bend - hinge at hips",
+      severity: "warning",
+      timestamp: Date.now(),
+      bodyPart: "knees",
+    });
+  } else if (kneeAngle > 175) {
+     errors.push({
+      type: "knee_lock",
+      message: "Unlock your knees slightly",
+      severity: "info",
+      timestamp: Date.now(),
+      bodyPart: "knees",
+    });
+  }
+
+  if (neckAngle < 150 || neckAngle > 210) {
+    errors.push({
+      type: "neck_alignment",
+      message: "Keep head neutral with spine",
+      severity: "warning",
+      timestamp: Date.now(),
+      bodyPart: "head",
+    });
+  }
+
+  // If major form points are okay, give positive reinforcement on depth
+  if (errors.length === 0) {
+    if (trunkLean > 45) {
+      feedback = "Excellent depth! Keep back straight.";
+    } else if (trunkLean > 20) {
+      feedback = "Good hinge, go lower if comfortable.";
+    } else {
+      feedback = "Hinge forward from hips.";
+    }
+  }
+
+  // Phase detection (simple hinge logic)
+  let phase = "standing";
+  if (trunkLean > 20) phase = "hinging";
+  if (trunkLean > 60) phase = "bottom";
+
+  const repIncremented = state.lastPhase === "hinging" && phase === "standing";
+
+  return {
+    phase,
+    formScore,
+    errors,
+    feedback,
+    isCorrect: errors.length === 0,
+    repIncremented,
+    confidence: averageVisibility(landmarks, [
+      LANDMARKS.leftShoulder,
+      LANDMARKS.rightShoulder,
+      LANDMARKS.leftHip,
+    ]),
+  };
+}
+
 export function createFormEngine(exercise: Exercise) {
   const state: EngineState = {
     lastPhase: "neutral",
@@ -271,8 +379,9 @@ export function createFormEngine(exercise: Exercise) {
     const thresholds = exercise.detection_config?.thresholds ?? {};
 
     let result: FormEngineResult;
-    switch (exercise.id) {
+    switch (exercise.slug) {
       case "cat-camel":
+      case "cat-cow":
         result = analyzeCatCamel(landmarks, thresholds, state);
         break;
       case "cobra-stretch":
@@ -281,20 +390,39 @@ export function createFormEngine(exercise: Exercise) {
       case "dead-bug":
         result = analyzeDeadBug(landmarks, thresholds, state);
         break;
+      case "romanian-deadlift":
+        result = analyzeRDL(landmarks, thresholds, state);
+        break;
       default:
-        result = {
-          phase: exercise.detection_config?.phases?.[0] ?? "neutral",
-          formScore: baseFormScore(landmarks),
-          errors: [],
-          isCorrect: true,
-          repIncremented: false,
-          confidence: averageVisibility(landmarks, [
-            LANDMARKS.leftShoulder,
-            LANDMARKS.rightShoulder,
-            LANDMARKS.leftHip,
-            LANDMARKS.rightHip,
-          ]),
-        };
+        // Use ID as fallback if slug doesn't match
+        switch (exercise.id) {
+            case "cat-camel":
+                result = analyzeCatCamel(landmarks, thresholds, state);
+                break;
+            case "cobra-stretch":
+                result = analyzeCobra(landmarks, thresholds, state);
+                break;
+            case "dead-bug":
+                result = analyzeDeadBug(landmarks, thresholds, state);
+                break;
+            case "romanian-deadlift":
+                result = analyzeRDL(landmarks, thresholds, state);
+                break;
+            default:
+                result = {
+                    phase: exercise.detection_config?.phases?.[0] ?? "neutral",
+                    formScore: baseFormScore(landmarks),
+                    errors: [],
+                    isCorrect: true,
+                    repIncremented: false,
+                    confidence: averageVisibility(landmarks, [
+                        LANDMARKS.leftShoulder,
+                        LANDMARKS.rightShoulder,
+                        LANDMARKS.leftHip,
+                        LANDMARKS.rightHip,
+                    ]),
+                };
+        }
         break;
     }
 
