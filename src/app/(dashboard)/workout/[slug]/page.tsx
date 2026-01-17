@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Pause, Play, X, Image as ImageIcon, Volume2 } from "lucide-react";
+import { Pause, Play, X, Image as ImageIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,14 @@ import {
 import { VoiceIndicator } from "@/components/ui/voice-indicator";
 import { cn } from "@/lib/utils";
 import exercisesData from "@/lib/exercises/data.json";
+import { ExerciseCamera } from "@/components/workout";
+import { useExerciseStore } from "@/stores/exercise-store";
+import {
+  selectFormScore,
+  selectPhase,
+  selectRepCount,
+} from "@/stores/exercise-store-selectors";
+import type { Exercise } from "@/lib/exercises/types";
 
 type SessionState = "active" | "paused" | "complete";
 type VoiceState = "idle" | "connecting" | "listening" | "thinking" | "speaking";
@@ -28,10 +36,10 @@ export default function WorkoutSessionPage() {
   const slug = params.slug as string;
 
   // Find exercise by slug
-  const exercise = React.useMemo(
-    () => exercisesData.exercises.find((ex) => ex.slug === slug),
-    [slug]
-  );
+  const exercise = React.useMemo(() => {
+    const exercises = exercisesData.exercises as Exercise[];
+    return exercises.find((ex) => ex.slug === slug);
+  }, [slug]);
 
   // Session state
   const [sessionState, setSessionState] = React.useState<SessionState>("active");
@@ -40,67 +48,56 @@ export default function WorkoutSessionPage() {
   const [showGuideImage, setShowGuideImage] = React.useState(false);
   const [startTime] = React.useState(new Date());
 
-  // Mock workout metrics
-  const [currentReps, setCurrentReps] = React.useState(0);
-  const [targetReps] = React.useState(exercise?.default_reps || 10);
-  const [formScore] = React.useState(85);
-  const [phase, setPhase] = React.useState<string>("neutral");
-  const [voiceState, setVoiceState] = React.useState<VoiceState>("listening");
+  const repCount = useExerciseStore(selectRepCount);
+  const formScore = useExerciseStore(selectFormScore);
+  const phase = useExerciseStore(selectPhase);
+  const setExercise = useExerciseStore((state) => state.setExercise);
+  const resetExercise = useExerciseStore((state) => state.reset);
+  const setExercisePhase = useExerciseStore((state) => state.setPhase);
+  const incrementRep = useExerciseStore((state) => state.incrementRep);
+  const targetReps = exercise?.default_reps || 10;
+  const [voiceState] = React.useState<VoiceState>("listening");
   const [transcript] = React.useState(
     "Nice and slow... hold that position... beautiful arch..."
   );
 
-  // Consolidated simulation interval - combines rep counting, phase changes, and voice state
   React.useEffect(() => {
+    if (!exercise) return;
+    setExercise(exercise);
+    return () => resetExercise();
+  }, [exercise, resetExercise, setExercise]);
+
+  React.useEffect(() => {
+    if (sessionState !== "active") return;
+    if (repCount >= targetReps) {
+      setSessionState("complete");
+      router.push(`/workout/${slug}/complete`);
+    }
+  }, [repCount, router, sessionState, slug, targetReps]);
+
+  React.useEffect(() => {
+    if (!exercise || exercise.form_detection_enabled) return;
     if (sessionState !== "active" || isPaused) return;
 
-    // Refs to avoid re-renders for internal counters
-    const phaseIndexRef = { current: 0 };
-    const voiceIndexRef = { current: 0 };
-    const repTickRef = { current: 0 };
-    const phaseTickRef = { current: 0 };
-    const voiceTickRef = { current: 0 };
+    const phases = exercise.detection_config?.phases;
+    let phaseIndex = 0;
 
-    const phases = exercise?.detection_config?.phases;
-    const voiceStates: VoiceState[] = ["listening", "thinking", "speaking"];
-
-    // Single interval running every 500ms
     const interval = setInterval(() => {
-      repTickRef.current += 500;
-      phaseTickRef.current += 500;
-      voiceTickRef.current += 500;
-
-      // Update reps every 3000ms (3 seconds)
-      if (repTickRef.current >= 3000) {
-        repTickRef.current = 0;
-        setCurrentReps((prev) => {
-          if (prev >= targetReps) {
-            clearInterval(interval);
-            setSessionState("complete");
-            router.push(`/workout/${slug}/complete`);
-            return prev;
-          }
-          return prev + 1;
-        });
+      incrementRep();
+      if (phases && phases.length > 0) {
+        phaseIndex = (phaseIndex + 1) % phases.length;
+        setExercisePhase(phases[phaseIndex]);
       }
-
-      // Update phase every 2000ms (2 seconds)
-      if (phases && phaseTickRef.current >= 2000) {
-        phaseTickRef.current = 0;
-        phaseIndexRef.current = (phaseIndexRef.current + 1) % phases.length;
-        setPhase(phases[phaseIndexRef.current]);
-      }
-
-      // Update voice state every 4000ms (4 seconds)
-      if (voiceTickRef.current >= 4000) {
-        voiceTickRef.current = 0;
-        voiceIndexRef.current = (voiceIndexRef.current + 1) % voiceStates.length;
-        setVoiceState(voiceStates[voiceIndexRef.current]);
-      }
-    }, 500);
+    }, 3000);
 
     return () => clearInterval(interval);
-  }, [sessionState, isPaused, targetReps, slug, router, exercise]);
+  }, [
+    exercise,
+    incrementRep,
+    isPaused,
+    sessionState,
+    setExercisePhase,
+  ]);
 
   if (!exercise) {
     return (
@@ -221,26 +218,11 @@ export default function WorkoutSessionPage() {
             {/* Camera Feed - Reduced Height */}
             <div className="relative">
               <Card className="overflow-hidden">
-                <div
-                  className={cn(
-                    "relative bg-gradient-to-br from-sage-100 to-sage-200",
-                    "flex items-center justify-center",
-                    "h-[400px]"
-                  )}
+                <ExerciseCamera
+                  exercise={exercise}
+                  isPaused={isPaused}
+                  className="h-[400px]"
                 >
-                  {/* Placeholder content */}
-                  <div className="text-center space-y-3">
-                    <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white/50 backdrop-blur-sm">
-                      <Volume2 className="w-10 h-10 text-sage-500" />
-                    </div>
-                    <p className="text-sage-700 font-medium">
-                      Camera feed would appear here
-                    </p>
-                    <p className="text-sage-600 text-sm">
-                      MediaPipe skeleton overlay with joint tracking
-                    </p>
-                  </div>
-
                   {/* Guide Image Button */}
                   <Button
                     variant="secondary"
@@ -277,7 +259,7 @@ export default function WorkoutSessionPage() {
                       </div>
                     </div>
                   )}
-                </div>
+                </ExerciseCamera>
               </Card>
 
               {/* Guide Image Overlay */}
@@ -323,7 +305,7 @@ export default function WorkoutSessionPage() {
             <div className="grid grid-cols-3 gap-4">
               {/* Rep Counter */}
               <Card className="p-4 flex items-center justify-center">
-                <RepCounter current={currentReps} target={targetReps} size="default" />
+                <RepCounter current={repCount} target={targetReps} size="default" />
               </Card>
 
               {/* Form Score */}
@@ -412,7 +394,7 @@ export default function WorkoutSessionPage() {
         open={showEndDialog}
         onOpenChange={setShowEndDialog}
         title="End this session?"
-        description={`You've completed ${currentReps}/${targetReps} reps with an ${formScore}% form score.`}
+        description={`You've completed ${repCount}/${targetReps} reps with an ${formScore}% form score.`}
         confirmLabel="End & Save"
         cancelLabel="Cancel"
         onConfirm={handleConfirmEnd}

@@ -6,7 +6,8 @@
 
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import type { FormError, Exercise } from '@/types';
+import type { FormError } from '@/types';
+import type { Exercise } from '@/lib/exercises/types';
 
 export interface ExerciseState {
   currentExercise: Exercise | null;
