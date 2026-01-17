@@ -32,38 +32,58 @@ export function getCameraFeedback(landmarks: Landmark[]): CameraFeedback {
   // Helper to check visibility
   const isVisible = (lm: Landmark) => (lm.visibility ?? 0) > 0.6;
   
-  // 1. Check if user is too far (subject is too small)
-  // Calculate approximate height of the subject
+  // 1. Calculate bounding box of VISIBLE landmarks
+  let minX = 1, maxX = 0;
   let minY = 1, maxY = 0;
+  let hasVisibleLandmarks = false;
+
   landmarks.forEach(lm => {
     if (isVisible(lm)) {
+      hasVisibleLandmarks = true;
+      minX = Math.min(minX, lm.x);
+      maxX = Math.max(maxX, lm.x);
       minY = Math.min(minY, lm.y);
       maxY = Math.max(maxY, lm.y);
     }
   });
+
+  if (!hasVisibleLandmarks) {
+    return { message: "No person detected", type: "warning" };
+  }
   
   const height = maxY - minY;
-  
-  if (height < 0.4) {
-    return { message: "Too far, move closer", type: "warning" };
-  }
+  const width = maxX - minX;
+  const maxDimension = Math.max(height, width);
 
   // 2. Check visibility of key body parts
   const isHeadVisible = isVisible(nose) || (isVisible(leftShoulder) && isVisible(rightShoulder));
   const isLowerBodyVisible = isVisible(leftHip) || isVisible(rightHip);
   const areFeetVisible = isVisible(leftAnkle) || isVisible(rightAnkle);
 
-  // If we can't see the head (and y is low, meaning near top edge)
-  if (!isHeadVisible) {
-     return { message: "Cannot see head", type: "warning" };
-  }
+  // Critical visibility checks (Priority 1)
   
+  // If we see head but no body, they are likely too close or camera is aimed high
+  if (isHeadVisible && !isLowerBodyVisible) {
+    return { message: "Move back to show body", type: "warning" };
+  }
+
   // If hips are not visible, major issue
   if (!isLowerBodyVisible) {
       return { message: "Cannot see body", type: "warning" };
   }
 
-  // 3. Check for "Too Close" (Out of bounds)
+  // If we can't see the head (and y is low, meaning near top edge)
+  if (!isHeadVisible) {
+     return { message: "Cannot see head", type: "warning" };
+  }
+
+  // 3. Check if user is too far (subject is too small)
+  // Use maxDimension to handle standing (height dominant) and lying (width dominant) poses
+  if (maxDimension < 0.4) {
+    return { message: "Too far, move closer", type: "warning" };
+  }
+
+  // 4. Check for "Too Close" (Out of bounds)
   // If visible landmarks are very close to edges
   const margin = 0.02;
   const isTouchingTop = nose && nose.y < margin;
@@ -92,7 +112,7 @@ export function getCameraFeedback(landmarks: Landmark[]): CameraFeedback {
        return { message: "Too close, move back", type: "warning" };
   }
   
-  // 4. Specific body part checks for common issues
+  // 5. Specific body part checks for common issues
   if (!areFeetVisible && height > 0.6) {
       // If the person is reasonably large but we can't see feet, they are likely cut off
       return { message: "Cannot see feet", type: "warning" };
