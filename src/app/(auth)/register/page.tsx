@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Logo } from '@/components/ui/logo';
@@ -12,6 +12,7 @@ import { OrganicBlob } from '@/components/ui/organic-blob';
 import { GradientMesh } from '@/components/ui/gradient-mesh';
 import { cn } from '@/lib/utils';
 import { authClient } from '@/lib/auth/client';
+import { clientEnv } from '@/lib/env';
 
 type PasswordStrength = 'weak' | 'medium' | 'strong';
 
@@ -80,6 +81,13 @@ export default function RegisterPage(): React.JSX.Element {
   const [isLoading, setIsLoading] = useState(false);
 
   const passwordStrength = useMemo(() => calculatePasswordStrength(password), [password]);
+
+  // Auto-redirect to dashboard in demo mode
+  useEffect(() => {
+    if (clientEnv.NEXT_PUBLIC_DEMO_MODE) {
+      router.push('/dashboard');
+    }
+  }, [router]);
 
   function validateForm(): boolean {
     const newErrors: FormErrors = {

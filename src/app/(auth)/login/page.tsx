@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Logo } from '@/components/ui/logo';
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { OrganicBlob } from '@/components/ui/organic-blob';
 import { GradientMesh } from '@/components/ui/gradient-mesh';
 import { authClient } from '@/lib/auth/client';
+import { clientEnv } from '@/lib/env';
 
 interface FormErrors {
   email?: string;
@@ -35,6 +36,13 @@ export default function LoginPage(): React.JSX.Element {
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
+
+  // Auto-redirect to dashboard in demo mode
+  useEffect(() => {
+    if (clientEnv.NEXT_PUBLIC_DEMO_MODE) {
+      router.push('/dashboard');
+    }
+  }, [router]);
 
   function validateForm(): boolean {
     const newErrors: FormErrors = {
