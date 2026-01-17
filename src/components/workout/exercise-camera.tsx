@@ -70,7 +70,7 @@ export function ExerciseCamera({
     const setupCamera = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user", width: 1280, height: 720 },
+          video: { facingMode: "user", width: 720, height: 1280 },
           audio: false,
         });
         if (!isMounted) {
