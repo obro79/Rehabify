@@ -8,7 +8,6 @@ import { Tooltip } from "@/components/ui/tooltip";
 import {
   HomeIcon,
   DumbbellIcon,
-  ActivityIcon,
   ProgressIcon,
   ProfileIcon,
 } from "@/components/ui/icons";
@@ -29,11 +28,6 @@ const navItems: NavItem[] = [
     label: "Exercises",
     href: "/exercises",
     icon: <DumbbellIcon size="md" variant="sage" />,
-  },
-  {
-    label: "Workout",
-    href: "/workout",
-    icon: <ActivityIcon size="md" variant="sage" />,
   },
   {
     label: "Progress",

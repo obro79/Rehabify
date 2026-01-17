@@ -23,7 +23,6 @@ export function Header({ showCTA = true, className }: HeaderProps) {
   const isDemoMode = clientEnv.NEXT_PUBLIC_DEMO_MODE;
 
   const navLinks = [
-    { label: "About", href: "/about" },
     { label: "Exercises", href: "/exercises" },
     { label: "How It Works", href: "#how-it-works" },
   ];

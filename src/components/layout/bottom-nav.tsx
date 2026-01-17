@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Dumbbell, Activity, BarChart3, User } from "lucide-react";
+import { Home, Dumbbell, BarChart3, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface NavItem {
@@ -23,12 +23,6 @@ const navItems: NavItem[] = [
     label: "Exercises",
     href: "/exercises",
     icon: <Dumbbell className="h-6 w-6" />,
-  },
-  {
-    label: "Workout",
-    href: "/workout",
-    icon: <Activity className="h-7 w-7" />,
-    isCenter: true,
   },
   {
     label: "Progress",

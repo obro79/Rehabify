@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { StreakDisplay } from "@/components/ui/streak-display";
@@ -125,9 +126,11 @@ export default function DashboardPage() {
                     <DifficultyStars level={exercise.difficulty} />
                   </div>
 
-                  <Button variant="secondary" size="sm" className="w-full mt-2">
-                    <Play size={14} className="mr-1" />
-                    Start
+                  <Button variant="secondary" size="sm" className="w-full mt-2" asChild>
+                    <Link href={`/workout/${exercise.slug}`}>
+                      <Play size={14} className="mr-1" />
+                      Start
+                    </Link>
                   </Button>
                 </div>
               </Card>
@@ -143,29 +146,32 @@ export default function DashboardPage() {
         </FadeIn>
 
         <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <StaggerItem>
+          <StaggerItem className="h-full">
             <StatsCard
               title="Sessions Completed"
               value="4/7"
               customIcon={<CalendarIcon size="sm" variant="sage" />}
               trend={{ direction: "up", value: "+1 from last week" }}
+              className="h-full"
             />
           </StaggerItem>
-          <StaggerItem>
+          <StaggerItem className="h-full">
             <StatsCard
               title="Total Reps"
               value={120}
               customIcon={<RepsIcon size="sm" variant="sage" />}
               trend={{ direction: "up", value: "+15%" }}
               variant="sage"
+              className="h-full"
             />
           </StaggerItem>
-          <StaggerItem>
+          <StaggerItem className="h-full">
             <StatsCard
               title="Time Exercising"
               value="45 min"
               customIcon={<TimerIcon size="sm" variant="coral" />}
               variant="coral"
+              className="h-full"
             />
           </StaggerItem>
         </StaggerContainer>
