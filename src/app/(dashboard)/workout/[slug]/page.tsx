@@ -22,6 +22,7 @@ import {
   ExerciseCamera,
   WorkoutStatsPanel,
 } from "@/components/workout";
+import { getExerciseVideoUrl } from "@/lib/exercises/video-map";
 import { useExerciseStore } from "@/stores/exercise-store";
 import {
   selectFormScore,
@@ -81,6 +82,9 @@ export default function WorkoutSessionPage() {
   const setExercisePhase = useExerciseStore((state) => state.setPhase);
   const incrementRep = useExerciseStore((state) => state.incrementRep);
   const targetReps = exercise?.default_reps || 10;
+
+  // Check if exercise has a demo video
+  const demoVideoUrl = exercise ? getExerciseVideoUrl(exercise.slug) : null;
 
   // Voice coaching phase
   const [voicePhase, setVoicePhase] = React.useState<VoicePhase>("explaining");
@@ -309,10 +313,42 @@ Keep corrections to 5-15 words max. Focus on what TO do, not what's wrong.`;
         </div>
       </header>
 
-      {/* Main Content - Two Column Layout (Controls Left, Vertical Camera Right) */}
+      {/* Main Content - Layout adapts based on whether demo video exists */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-6">
-          {/* Left Column: Coach, Metrics & Info */}
+        <div className={cn(
+          "grid grid-cols-1 gap-6",
+          demoVideoUrl
+            ? "lg:grid-cols-[280px_1fr_400px]"  // 3-column: Demo Video | Controls | Camera
+            : "lg:grid-cols-[1fr_400px]"         // 2-column: Controls | Camera
+        )}>
+          {/* Demo Video Panel (only shown when video exists) */}
+          {demoVideoUrl && (
+            <div className="hidden lg:block">
+              <Card className="overflow-hidden shadow-lg sticky top-20">
+                <div className="aspect-[3/4] bg-black relative">
+                  <video
+                    src={demoVideoUrl}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute top-3 left-3">
+                    <span className="px-2 py-1 bg-white/90 backdrop-blur-sm rounded-full text-xs font-semibold text-sage-700">
+                      Demo
+                    </span>
+                  </div>
+                </div>
+                <div className="p-3 bg-white">
+                  <p className="text-sm font-medium text-sage-800">{exercise?.name}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Follow along with the video</p>
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {/* Middle Column: Coach, Metrics & Info */}
           <div className="space-y-6">
             {/* Voice Coach Card */}
             <Card className="p-6 flex flex-col bg-white/50 backdrop-blur-sm">
@@ -521,14 +557,14 @@ Keep corrections to 5-15 words max. Focus on what TO do, not what's wrong.`;
                 </ExerciseCamera>
               </Card>
 
-              {/* Guide Image Overlay */}
+              {/* Guide Image/Video Overlay */}
               {showGuideImage && (
                 <div className="absolute inset-0 bg-black/60 backdrop-blur-sm rounded-xl flex items-center justify-center z-20">
                   <Card className="max-w-xs mx-4 p-4 relative">
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="absolute right-2 top-2 h-6 w-6"
+                      className="absolute right-2 top-2 h-6 w-6 z-10"
                       onClick={() => setShowGuideImage(false)}
                     >
                       <X className="h-4 w-4" />
@@ -536,10 +572,21 @@ Keep corrections to 5-15 words max. Focus on what TO do, not what's wrong.`;
 
                     <div className="space-y-3 pt-2">
                       <h3 className="font-bold text-base">Reference Guide</h3>
-                      <div className="aspect-[3/4] bg-gradient-to-br from-sage-100 to-sage-200 rounded-lg flex items-center justify-center">
-                        <p className="text-sage-600 text-xs text-center px-4">
-                          Exercise illustration
-                        </p>
+                      <div className="aspect-[3/4] bg-gradient-to-br from-sage-100 to-sage-200 rounded-lg flex items-center justify-center overflow-hidden">
+                        {getExerciseVideoUrl(exercise.slug) ? (
+                          <video
+                            src={getExerciseVideoUrl(exercise.slug)!}
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <p className="text-sage-600 text-xs text-center px-4">
+                            Exercise illustration
+                          </p>
+                        )}
                       </div>
                       <ul className="space-y-1 text-xs text-muted-foreground">
                         {exercise.instructions.slice(0, 3).map((instruction, i) => (
