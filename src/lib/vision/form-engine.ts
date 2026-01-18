@@ -50,6 +50,12 @@ interface EngineState {
     leftDone: boolean;
     rightDone: boolean;
   };
+  // Lunge rotation tracking
+  lungeRotationState: {
+    inLunge: boolean;
+    rotatedLeft: boolean;
+    rotatedRight: boolean;
+  };
 }
 
 const LANDMARKS = {
@@ -852,6 +858,304 @@ function analyzeRDL(
   };
 }
 
+function analyzeLunge(
+  landmarks: Landmark[],
+  thresholds: Record<string, number>,
+  state: EngineState
+): FormEngineResult {
+  const leftHip = landmarks[LANDMARKS.leftHip];
+  const rightHip = landmarks[LANDMARKS.rightHip];
+  const leftKnee = landmarks[LANDMARKS.leftKnee];
+  const rightKnee = landmarks[LANDMARKS.rightKnee];
+  const leftAnkle = landmarks[LANDMARKS.leftAnkle];
+  const rightAnkle = landmarks[LANDMARKS.rightAnkle];
+  const leftShoulder = landmarks[LANDMARKS.leftShoulder];
+  const rightShoulder = landmarks[LANDMARKS.rightShoulder];
+  const leftWrist = landmarks[LANDMARKS.leftWrist];
+  const rightWrist = landmarks[LANDMARKS.rightWrist];
+
+  // Midpoints
+  const midHip = midpoint(leftHip, rightHip);
+  const midShoulder = midpoint(leftShoulder, rightShoulder);
+
+  // 1. Detect Lunge Position
+  // Stride width (x-axis spread)
+  const strideWidth = Math.abs(leftAnkle.x - rightAnkle.x);
+  
+  // Height check: Hips should be lower than standing.
+  // We can approximate by checking knee angles.
+  const leftKneeAngle = angleBetween(leftHip, leftKnee, leftAnkle);
+  const rightKneeAngle = angleBetween(rightHip, rightKnee, rightAnkle);
+  const minKneeAngle = Math.min(leftKneeAngle, rightKneeAngle);
+
+  // Lunge Thresholds
+  const isInLunge = minKneeAngle < 130 && strideWidth > 0.3; // Normalized stride width
+  const isStanding = minKneeAngle > 150; // Strict threshold for resetting (hysteresis)
+
+  let phase = "standing";
+  let feedback = "Step forward into a lunge";
+
+  // State machine: standing -> lunge_hold -> standing (rep)
+  
+  if (isInLunge) {
+    phase = "lunge_hold";
+    feedback = "Good lunge. Push back to start";
+  } else if (state.lastPhase === "lunge_hold" && !isStanding) {
+    // HYSTERESIS: If we were holding lunge and haven't fully stood up yet (knee angle 130-150),
+    // stay in lunge_hold state to prevent flickering/double counting.
+    phase = "lunge_hold";
+    feedback = "Push back to start";
+  } else {
+    // Fully standing or currently standing
+    phase = "standing";
+  }
+
+  // Count Rep: Transition from lunge_hold back to standing
+  const repIncremented = state.lastPhase === "lunge_hold" && phase === "standing";
+
+  if (repIncremented) {
+      feedback = "Rep complete!";
+  }
+
+  const formScore = baseFormScore(landmarks);
+  const errors: FormError[] = [];
+  
+  // Calculate form metrics (Always calculate for debug visibility)
+  // 1. Trunk Lean
+  const dy = midHip.y - midShoulder.y;
+  const dx = midHip.x - midShoulder.x;
+  const trunkLean = Math.abs(Math.atan2(dx, dy) * (180 / Math.PI));
+
+  // 2. Thigh Angles & Depth
+  const leftThighDx = Math.abs(leftHip.x - leftKnee.x);
+  const leftThighDy = Math.abs(leftHip.y - leftKnee.y);
+  const leftThighAngle = Math.atan2(leftThighDy, leftThighDx) * (180 / Math.PI);
+
+  const rightThighDx = Math.abs(rightHip.x - rightKnee.x);
+  const rightThighDy = Math.abs(rightHip.y - rightKnee.y);
+  const rightThighAngle = Math.atan2(rightThighDy, rightThighDx) * (180 / Math.PI);
+
+  const bestDepthAngle = Math.min(leftThighAngle, rightThighAngle);
+  
+  // Determine front leg (flatter thigh = front leg assumption for depth)
+  const isLeftFront = leftThighAngle < rightThighAngle;
+  const frontKnee = isLeftFront ? leftKnee : rightKnee;
+  const frontAnkle = isLeftFront ? leftAnkle : rightAnkle;
+  const frontHip = isLeftFront ? leftHip : rightHip;
+  
+  // 3. Shin Angle
+  const shinDx = Math.abs(frontKnee.x - frontAnkle.x);
+  const shinDy = Math.abs(frontKnee.y - frontAnkle.y);
+  const shinAngle = Math.atan2(shinDx, shinDy) * (180 / Math.PI);
+
+  // STRICT FORM CHECKS (Only apply during lunge hold)
+  if (isInLunge) {
+      if (trunkLean > 20) {
+          errors.push({
+              type: "trunk_lean",
+              message: "Keep torso upright",
+              severity: "warning",
+              timestamp: Date.now(),
+              bodyPart: "torso"
+          });
+      }
+      
+      // Threshold 15 degrees
+      if (bestDepthAngle > 15) { 
+           errors.push({
+              type: "depth",
+              message: "Lower hips until thigh is parallel",
+              severity: "info",
+              timestamp: Date.now(),
+              bodyPart: "legs"
+          });
+      }
+      
+      if (shinAngle > 20) {
+           errors.push({
+              type: "knee_forward",
+              message: "Keep front knee behind toes",
+              severity: "warning",
+              timestamp: Date.now(),
+              bodyPart: "knee"
+          });
+      }
+      
+      // 4. Hands on Legs
+      const leftHandKneeDist = Math.min(distance2D(leftWrist, leftKnee), distance2D(leftWrist, rightKnee));
+      const rightHandKneeDist = Math.min(distance2D(rightWrist, leftKnee), distance2D(rightWrist, rightKnee));
+      
+      if (leftHandKneeDist < 0.15 || rightHandKneeDist < 0.15) {
+           errors.push({
+              type: "hands_on_legs",
+              message: "Don't rest hands on legs",
+              severity: "warning",
+              timestamp: Date.now(),
+              bodyPart: "arms"
+          });
+      }
+  }
+  
+  return {
+    phase,
+    formScore,
+    errors,
+    feedback,
+    isCorrect: errors.length === 0,
+    repIncremented,
+    confidence: averageVisibility(landmarks, [
+      LANDMARKS.leftShoulder,
+      LANDMARKS.rightShoulder,
+      LANDMARKS.leftHip,
+      LANDMARKS.rightHip,
+    ]),
+    debug: {
+        phase,
+        leftThighAngle,
+        rightThighAngle,
+        bestDepthAngle,
+        trunkLean,
+        shinAngle,
+        queuedErrors: errors.map(e => e.type)
+    }
+  };
+}
+
+
+function analyzeLungeWithRotation(
+  landmarks: Landmark[],
+  thresholds: Record<string, number>,
+  state: EngineState
+): FormEngineResult {
+  const leftHip = landmarks[LANDMARKS.leftHip];
+  const rightHip = landmarks[LANDMARKS.rightHip];
+  const leftKnee = landmarks[LANDMARKS.leftKnee];
+  const rightKnee = landmarks[LANDMARKS.rightKnee];
+  const leftAnkle = landmarks[LANDMARKS.leftAnkle];
+  const rightAnkle = landmarks[LANDMARKS.rightAnkle];
+  const leftShoulder = landmarks[LANDMARKS.leftShoulder];
+  const rightShoulder = landmarks[LANDMARKS.rightShoulder];
+
+  const midHip = midpoint(leftHip, rightHip);
+  const midShoulder = midpoint(leftShoulder, rightShoulder);
+
+  // 1. Detect Lunge Position
+  // Check vertical distance between hip and knee (lunge depth)
+  // And horizontal spread between feet (stride)
+  
+  // Stride width (x-axis spread)
+  const strideWidth = Math.abs(leftAnkle.x - rightAnkle.x);
+  
+  // Height check: Hips should be lower than standing.
+  // We can approximate by checking knee angles.
+  const leftKneeAngle = angleBetween(leftHip, leftKnee, leftAnkle);
+  const rightKneeAngle = angleBetween(rightHip, rightKnee, rightAnkle);
+  const minKneeAngle = Math.min(leftKneeAngle, rightKneeAngle);
+
+  // Lunge Thresholds
+  const isInLunge = minKneeAngle < 130 && strideWidth > 0.3; // Normalized stride width
+
+  let phase = "standing";
+  let feedback = "Step into a lunge position";
+
+  if (isInLunge) {
+    state.lungeRotationState.inLunge = true;
+    phase = "lunge_hold";
+    feedback = "Good lunge. Now rotate torso Left and Right";
+  } else {
+    // If we stood up, reset rotation state for next rep
+    if (state.lungeRotationState.inLunge) {
+       // Reset if we leave lunge
+       // state.lungeRotationState.inLunge = false; // Keep it true? No, reset.
+    }
+    state.lungeRotationState.inLunge = false;
+    // Don't reset rotation flags yet if we are finishing a rep?
+    // Actually, rep counts when we finish rotations AND stand up? 
+    // Or just finish rotations while in lunge?
+    // "Check static lunge... then prompt to rotate".
+    // Usually you do lunge -> rotate -> rotate -> return.
+  }
+
+  // 2. Detect Rotation (Yaw)
+  // Calculate shoulder rotation relative to hips
+  // Vector for shoulders
+  const shoulderDx = rightShoulder.x - leftShoulder.x;
+  const shoulderDz = rightShoulder.z - leftShoulder.z;
+  const shoulderYaw = Math.atan2(shoulderDz, shoulderDx) * (180 / Math.PI);
+
+  // Vector for hips
+  const hipDx = rightHip.x - leftHip.x;
+  const hipDz = rightHip.z - leftHip.z;
+  const hipYaw = Math.atan2(hipDz, hipDx) * (180 / Math.PI);
+
+  // Relative rotation (torsion)
+  let torsion = shoulderYaw - hipYaw;
+  
+  // Normalize torsion to [-180, 180] to handle wrap-around
+  if (torsion > 180) torsion -= 360;
+  if (torsion < -180) torsion += 360;
+
+  // Threshold for rotation (reduced to 15 degrees for better detection)
+  if (state.lungeRotationState.inLunge) {
+    if (torsion < -15) {
+      state.lungeRotationState.rotatedRight = true; 
+      phase = "rotated_right";
+    } else if (torsion > 15) {
+      state.lungeRotationState.rotatedLeft = true;
+      phase = "rotated_left";
+    }
+    
+    if (state.lungeRotationState.rotatedLeft && state.lungeRotationState.rotatedRight) {
+        feedback = "Great! Stand up to finish rep";
+        phase = "rotation_done";
+    } else if (state.lungeRotationState.rotatedLeft) {
+        feedback = "Now rotate Right";
+    } else if (state.lungeRotationState.rotatedRight) {
+        feedback = "Now rotate Left";
+    }
+  }
+
+  // Count Rep: Must have lunged, rotated both ways, and returned to standing
+  let repIncremented = false;
+  if (!isInLunge && state.lungeRotationState.inLunge === false && 
+      state.lungeRotationState.rotatedLeft && state.lungeRotationState.rotatedRight) {
+      
+      repIncremented = true;
+      // Reset flags
+      state.lungeRotationState.rotatedLeft = false;
+      state.lungeRotationState.rotatedRight = false;
+      feedback = "Rep complete!";
+  }
+
+  // Auto-reset flags if we stand up without finishing (optional, or strict form)
+  // For now, let's keep it simple.
+
+  const formScore = baseFormScore(landmarks);
+  const errors: FormError[] = [];
+
+  return {
+    phase,
+    formScore,
+    errors,
+    feedback,
+    isCorrect: errors.length === 0,
+    repIncremented,
+    confidence: averageVisibility(landmarks, [
+      LANDMARKS.leftShoulder,
+      LANDMARKS.rightShoulder,
+      LANDMARKS.leftHip,
+      LANDMARKS.rightHip,
+    ]),
+    debug: {
+        phase,
+        torsion,
+        shoulderYaw,
+        hipYaw,
+        queuedErrors: []
+    }
+  };
+}
+
 
 export function createFormEngine(exercise: Exercise) {
   const state: EngineState = {
@@ -863,6 +1167,11 @@ export function createFormEngine(exercise: Exercise) {
     sideBendState: {
       leftDone: false,
       rightDone: false,
+    },
+    lungeRotationState: {
+      inLunge: false,
+      rotatedLeft: false,
+      rotatedRight: false,
     },
   };
 
@@ -892,6 +1201,12 @@ export function createFormEngine(exercise: Exercise) {
         break;
       case "romanian-deadlift":
         result = analyzeRDL(landmarks, thresholds, state);
+        break;
+      case "lunge":
+        result = analyzeLunge(landmarks, thresholds, state);
+        break;
+      case "lunge-with-rotation":
+        result = analyzeLungeWithRotation(landmarks, thresholds, state);
         break;
       case "bodyweight-squat":
       case "squat":
