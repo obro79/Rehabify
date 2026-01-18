@@ -13,6 +13,7 @@ import { GradientMesh } from '@/components/ui/gradient-mesh';
 import { cn } from '@/lib/utils';
 import { authClient } from '@/lib/auth/client';
 import { clientEnv } from '@/lib/env';
+import { createProfile } from '../actions';
 
 type PasswordStrength = 'weak' | 'medium' | 'strong';
 
@@ -131,6 +132,8 @@ export default function RegisterPage(): React.JSX.Element {
         setErrors({ form: result.error.message || 'Failed to create account' });
         return;
       }
+
+      await createProfile();
       router.push('/dashboard');
     } catch {
       setErrors({ form: 'An unexpected error occurred' });
