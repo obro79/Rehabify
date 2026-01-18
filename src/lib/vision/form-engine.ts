@@ -32,6 +32,17 @@ interface FormEngineResult {
     hipTilt?: number;
     bendingSide?: string;
 
+    // Lunge fields
+    leftThighAngle?: number;
+    rightThighAngle?: number;
+    bestDepthAngle?: number;
+    shinAngle?: number;
+
+    // Rotation fields
+    torsion?: number;
+    shoulderYaw?: number;
+    hipYaw?: number;
+
     phase?: string;
     queuedErrors: string[];
   };
