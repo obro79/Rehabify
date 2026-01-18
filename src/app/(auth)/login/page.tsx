@@ -37,12 +37,17 @@ export default function LoginPage(): React.JSX.Element {
   const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
 
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   // Auto-redirect to dashboard in demo mode
   useEffect(() => {
-    if (clientEnv.NEXT_PUBLIC_DEMO_MODE) {
+    if (isMounted && clientEnv.NEXT_PUBLIC_DEMO_MODE) {
       router.push('/dashboard');
     }
-  }, [router]);
+  }, [router, isMounted]);
 
   function validateForm(): boolean {
     const newErrors: FormErrors = {
