@@ -97,6 +97,8 @@ export default function WorkoutSessionPage() {
   React.useEffect(() => {
     if (isConnected && exercise && !hasInjectedContext.current) {
       hasInjectedContext.current = true;
+
+      // Inject context for LLM
       const context = `CURRENT EXERCISE: ${exercise.name}
 The user is currently doing ${exercise.name} (${exercise.category.replace(/_/g, ' ')}).
 Target: ${targetReps} reps.
@@ -105,13 +107,18 @@ Common mistakes to watch for: ${exercise.common_mistakes.slice(0, 2).join(', ')}
 
       console.log('[WorkoutPage] Injecting exercise context:', context);
       injectContext(context);
+
+      // Also say it directly so assistant definitely knows
+      setTimeout(() => {
+        say(`We're doing ${exercise.name} today. ${targetReps} reps. Let me know when you're ready.`);
+      }, 1500); // Wait for assistant's first message
     }
 
     // Reset when disconnected
     if (!isConnected) {
       hasInjectedContext.current = false;
     }
-  }, [isConnected, exercise, targetReps, injectContext]);
+  }, [isConnected, exercise, targetReps, injectContext, say]);
 
   // Stop voice when session ends
   React.useEffect(() => {
