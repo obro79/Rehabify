@@ -50,6 +50,7 @@ export default function WorkoutSessionPage() {
   const [showEndDialog, setShowEndDialog] = React.useState(false);
   const [showGuideImage, setShowGuideImage] = React.useState(false);
   const [startTime] = React.useState(new Date());
+  const [sessionId] = React.useState(() => `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`);
 
   const repCount = useExerciseStore(selectRepCount);
   const formScore = useExerciseStore(selectFormScore);
@@ -90,6 +91,27 @@ export default function WorkoutSessionPage() {
     }
     return transcriptEntries.slice(-2).map(t => t.content).join(' ');
   }, [transcriptEntries, isConnected]);
+
+  // Inject exercise context when Vapi connects
+  const hasInjectedContext = React.useRef(false);
+  React.useEffect(() => {
+    if (isConnected && exercise && !hasInjectedContext.current) {
+      hasInjectedContext.current = true;
+      const context = `CURRENT EXERCISE: ${exercise.name}
+The user is currently doing ${exercise.name} (${exercise.category.replace(/_/g, ' ')}).
+Target: ${targetReps} reps.
+Instructions: ${exercise.instructions.slice(0, 3).join(' ')}
+Common mistakes to watch for: ${exercise.common_mistakes.slice(0, 2).join(', ')}`;
+
+      console.log('[WorkoutPage] Injecting exercise context:', context);
+      injectContext(context);
+    }
+
+    // Reset when disconnected
+    if (!isConnected) {
+      hasInjectedContext.current = false;
+    }
+  }, [isConnected, exercise, targetReps, injectContext]);
 
   // Stop voice when session ends
   React.useEffect(() => {
@@ -272,7 +294,12 @@ export default function WorkoutSessionPage() {
                     <Button
                       variant="secondary"
                       size="lg"
-                      onClick={() => startVapi()}
+                      onClick={() => startVapi(undefined, {
+                        sessionId,
+                        exerciseId: exercise?.id,
+                        exerciseName: exercise?.name,
+                        targetReps,
+                      })}
                       disabled={connectionState === 'connecting'}
                       className="w-full gap-2"
                     >
