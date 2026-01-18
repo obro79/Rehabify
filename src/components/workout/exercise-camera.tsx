@@ -65,6 +65,12 @@ export function ExerciseCamera({
     baseline?: number;
     baselineSamples?: number;
 
+    // Side bend fields
+    shoulderTilt?: number;
+    shoulderTiltAngle?: number;
+    hipTilt?: number;
+    bendingSide?: string;
+
     phase: string;
     queuedErrors: string[];
   } | null>(null);
@@ -272,11 +278,12 @@ export function ExerciseCamera({
         className="absolute inset-0 h-full w-full scale-x-[-1]"
       />
 
-      {/* Debug Overlay for tuning thresholds - DISABLED */}
-      {/* {debugValues && (
+      {/* Debug Overlay for tuning thresholds */}
+      {debugValues && (
         <div className="absolute top-24 left-2 bg-black/95 text-green-400 p-4 rounded-xl font-mono z-30 space-y-1 min-w-[200px]">
           <div className="text-yellow-400 font-bold text-2xl mb-2 uppercase">{debugValues.phase}</div>
 
+          {/* Squat measurements */}
           {debugValues.trunkLean !== undefined && (
             <>
               <div className="text-xl font-bold">thigh: {debugValues.kneeAngle?.toFixed(0) ?? 'N/A'}°</div>
@@ -287,18 +294,32 @@ export function ExerciseCamera({
             </>
           )}
 
+          {/* Lumbar extension measurements */}
           {debugValues.hipAngle !== undefined && (
             <>
               <div className="text-xl font-bold">hip: {debugValues.hipAngle.toFixed(0)}°</div>
               <div className="text-xl font-bold">knee: {debugValues.kneeAngle?.toFixed(0) ?? 'N/A'}°</div>
               <div className="text-xl font-bold">depth: {debugValues.spineDepth?.toFixed(3) ?? 'N/A'}</div>
-              <div className={`text-xl font-bold ${(debugValues.depthChange ?? 0) <= -0.15 ? 'text-cyan-400' : ''}`}>
+              <div className={`text-xl font-bold ${(debugValues.depthChange ?? 0) <= -0.05 ? 'text-cyan-400' : ''}`}>
                 Δ: {debugValues.depthChange?.toFixed(3) ?? 'N/A'}
               </div>
               <div className="text-sm">base: {debugValues.baseline?.toFixed(3) ?? 'N/A'} ({debugValues.baselineSamples ?? 0})</div>
             </>
           )}
 
+          {/* Side bend measurements */}
+          {debugValues.shoulderTilt !== undefined && (
+            <>
+              <div className="text-xl font-bold">shoulder: {debugValues.shoulderTilt.toFixed(1)}°</div>
+              <div className="text-xl font-bold">angle: {debugValues.shoulderTiltAngle?.toFixed(1) ?? 'N/A'}°</div>
+              <div className="text-xl font-bold">hip: {debugValues.hipTilt?.toFixed(1) ?? 'N/A'}°</div>
+              <div className={`text-xl font-bold ${debugValues.bendingSide !== 'neutral' ? 'text-cyan-400' : ''}`}>
+                side: {debugValues.bendingSide ?? 'N/A'}
+              </div>
+            </>
+          )}
+
+          {/* Queued errors */}
           {debugValues.queuedErrors.length > 0 && (
             <div className="mt-2 pt-2 border-t border-orange-500/50">
               <div className="text-orange-400 text-sm font-bold mb-1">QUEUED:</div>
@@ -308,7 +329,7 @@ export function ExerciseCamera({
             </div>
           )}
         </div>
-      )} */}
+      )}
 
       {/* Feedback Overlay (Camera Positioning or Exercise Form) */}
       {activeFeedback && status === "ready" && (

@@ -25,8 +25,14 @@ interface FormEngineResult {
     depthChange?: number;
     baseline?: number;
     baselineSamples?: number;
-    phase?: string;
 
+    // Side bend fields
+    shoulderTilt?: number;
+    shoulderTiltAngle?: number;
+    hipTilt?: number;
+    bendingSide?: string;
+
+    phase?: string;
     queuedErrors: string[];
   };
 }
@@ -39,6 +45,11 @@ interface EngineState {
   squatState: SquatState;
   // Baseline tracking for lumbar extension
   baselineSpineDepth: number[];
+  // Side bend tracking
+  sideBendState: {
+    leftDone: boolean;
+    rightDone: boolean;
+  };
 }
 
 const LANDMARKS = {
@@ -439,7 +450,8 @@ function analyzeStandingLumbarExtension(
   const absSpineDepth = Math.abs(spineDepth);
 
   // Build baseline over first 60 frames (2 seconds at 30fps)
-  if (state.baselineSpineDepth.length < 60) {
+  const isCalibrating = state.baselineSpineDepth.length < 60;
+  if (isCalibrating) {
     state.baselineSpineDepth.push(absSpineDepth);
   }
 
@@ -487,11 +499,19 @@ function analyzeStandingLumbarExtension(
     console.log(`[LUMBAR_EXT] ✅ REP COUNTED`);
   }
 
+  // Determine feedback message
+  let feedback: string | undefined;
+  if (isCalibrating) {
+    feedback = "Wait for a second, calibrating to your normal stance";
+  } else if (phase === "extension") {
+    feedback = "Hold extension";
+  }
+
   return {
     phase,
     formScore,
     errors,
-    feedback: phase === "extension" ? "Hold extension" : undefined,
+    feedback,
     isCorrect: errors.length === 0,
     repIncremented,
     confidence: averageVisibility(landmarks, [
@@ -500,16 +520,16 @@ function analyzeStandingLumbarExtension(
       LANDMARKS.leftHip,
       LANDMARKS.rightHip,
     ]),
-    debug: {
-      hipAngle,
-      kneeAngle,
-      spineDepth: absSpineDepth,
-      depthChange,
-      baseline,
-      baselineSamples: state.baselineSpineDepth.length,
-      phase,
-      queuedErrors: errors.map(e => e.type),
-    }
+    // debug: {
+    //   hipAngle,
+    //   kneeAngle,
+    //   spineDepth: absSpineDepth,
+    //   depthChange,
+    //   baseline,
+    //   baselineSamples: state.baselineSpineDepth.length,
+    //   phase,
+    //   queuedErrors: errors.map(e => e.type),
+    // }
   };
 }
 
@@ -546,18 +566,64 @@ function analyzeStandingLumbarSideBend(
   // 0 = horizontal.
   const dy = rightShoulder.y - leftShoulder.y;
   const dx = rightShoulder.x - leftShoulder.x;
-  const shoulderTilt = Math.abs(Math.atan2(dy, dx) * (180 / Math.PI));
-  // Adjust so 0 is horizontal. atan2(0, 1) = 0.
-  // If shoulders level, dy=0, angle=0.
-  
-  // Threshold: > 20 degrees tilt
-  const bendThreshold = 20;
-  
-  let phase = "neutral";
-  if (shoulderTilt > bendThreshold) phase = "side_bend";
-  if (state.lastPhase === "side_bend" && shoulderTilt < 10) phase = "return";
+  const shoulderTiltAngle = Math.atan2(dy, dx) * (180 / Math.PI);
+  const shoulderTilt = Math.abs(shoulderTiltAngle);
 
-  const repIncremented = state.lastPhase === "side_bend" && phase === "return";
+  // Determine which side is bending (positive dy = right shoulder lower = bending right)
+  // We use a small threshold (0.02) to avoid noise when near neutral
+  const bendingSide = dy > 0.02 ? "right" : dy < -0.02 ? "left" : "neutral";
+
+  // Calculate hip tilt to ensure bending is happening from the torso
+  const hipDy = rightHip.y - leftHip.y;
+  const hipDx = rightHip.x - leftHip.x;
+  const hipTilt = Math.abs(Math.atan2(hipDy, hipDx) * (180 / Math.PI));
+
+  // Threshold: shoulder angle around 165 degrees indicates good stretch
+  // (measured from horizontal, ~15 degree tilt)
+  const bendThreshold = 168;
+  const returnThreshold = 172; // Closer to neutral (180 degrees = horizontal)
+
+  let phase = "neutral";
+
+  // Check if shoulder tilt is close to 165 degrees (good stretch position)
+  if (shoulderTilt <= bendThreshold && bendingSide !== "neutral") {
+    phase = bendingSide === "left" ? "bend_left" : "bend_right";
+  } else if (state.lastPhase.startsWith("bend_") && shoulderTilt >= returnThreshold) {
+    phase = "neutral";
+  } else if (state.lastPhase.startsWith("bend_")) {
+    // Hold the bend
+    phase = state.lastPhase;
+  }
+
+  // Count rep when returning to neutral from a bend
+  let repIncremented = false;
+  let feedback = phase.startsWith("bend_") ? "Good stretch" : undefined;
+
+  if (state.lastPhase.startsWith("bend_") && phase === "neutral") {
+    if (state.lastPhase === "bend_left") {
+      state.sideBendState.leftDone = true;
+    } else if (state.lastPhase === "bend_right") {
+      state.sideBendState.rightDone = true;
+    }
+
+    if (state.sideBendState.leftDone && state.sideBendState.rightDone) {
+      repIncremented = true;
+      state.sideBendState.leftDone = false;
+      state.sideBendState.rightDone = false;
+      feedback = "Good job! Both sides done";
+    } else {
+      if (state.sideBendState.leftDone) feedback = "Great, now repeat for the right side";
+      if (state.sideBendState.rightDone) feedback = "Great, now repeat for the left side";
+    }
+  }
+
+  if (state.lastPhase !== phase) {
+    console.log(`[SIDE_BEND] 🔄 PHASE CHANGE: ${state.lastPhase} → ${phase} | tilt=${shoulderTilt.toFixed(1)}°`);
+  }
+
+  if (repIncremented) {
+    console.log(`[SIDE_BEND] ✅ REP COUNTED (${state.lastPhase} → ${phase})`);
+  }
 
   const formScore = baseFormScore(landmarks);
 
@@ -565,7 +631,7 @@ function analyzeStandingLumbarSideBend(
     phase,
     formScore,
     errors,
-    feedback: phase === "side_bend" ? "Good stretch" : undefined,
+    feedback,
     isCorrect: errors.length === 0,
     repIncremented,
     confidence: averageVisibility(landmarks, [
@@ -574,6 +640,14 @@ function analyzeStandingLumbarSideBend(
       LANDMARKS.leftHip,
       LANDMARKS.rightHip,
     ]),
+    // debug: {
+    //   shoulderTilt,
+    //   shoulderTiltAngle,
+    //   hipTilt,
+    //   bendingSide,
+    //   phase,
+    //   queuedErrors: errors.map(e => e.type),
+    // }
   };
 }
 
@@ -786,6 +860,10 @@ export function createFormEngine(exercise: Exercise) {
     lastExtendedSide: null,
     squatState: createSquatState(),
     baselineSpineDepth: [],
+    sideBendState: {
+      leftDone: false,
+      rightDone: false,
+    },
   };
 
   return (landmarks: Landmark[]): FormEngineResult => {
