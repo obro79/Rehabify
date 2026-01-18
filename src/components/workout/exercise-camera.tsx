@@ -272,7 +272,7 @@ export function ExerciseCamera({
     >
       <video
         ref={videoRef}
-        className="absolute inset-0 h-full w-full object-cover scale-x-[-1]"
+        className="absolute inset-0 h-full w-full object-contain scale-x-[-1]"
         playsInline
         muted
       />

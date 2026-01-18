@@ -4311,7 +4311,10 @@
       "equipment": "none",
       "video_url": null,
       "thumbnail_url": null,
-      "form_detection_enabled": true
+      "form_detection_enabled": true,
+      "detection_config": {
+        "phases": ["standing", "lunge_hold"]
+      }
     },
     {
       "id": "lunge-with-rotation",
