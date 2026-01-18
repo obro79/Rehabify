@@ -969,8 +969,8 @@ function analyzeLunge(
   if (isInLunge) {
       if (trunkLean > 20) {
           errors.push({
-              type: "trunk_lean",
-              message: "Keep torso upright",
+              type: "forward_lean",
+              message: "Keep chest up",
               severity: "warning",
               timestamp: Date.now(),
               bodyPart: "torso"
@@ -980,7 +980,7 @@ function analyzeLunge(
       // Threshold 15 degrees
       if (bestDepthAngle > 15) { 
            errors.push({
-              type: "depth",
+              type: "insufficient_depth",
               message: "Lower hips until thigh is parallel",
               severity: "info",
               timestamp: Date.now(),

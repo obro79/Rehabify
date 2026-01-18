@@ -34,8 +34,12 @@ export interface SquatResult {
 }
 
 const LANDMARKS = {
+  leftEar: 7,
+  rightEar: 8,
   leftShoulder: 11,
   rightShoulder: 12,
+  leftWrist: 15,
+  rightWrist: 16,
   leftHip: 23,
   rightHip: 24,
   leftKnee: 25,
@@ -51,6 +55,24 @@ function midpoint(a: Landmark, b: Landmark): Landmark {
     z: (a.z + b.z) / 2,
     visibility: (a.visibility + b.visibility) / 2,
   };
+}
+
+function distance2D(a: Landmark, b: Landmark) {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function angleBetween(a: Landmark, b: Landmark, c: Landmark) {
+  const abx = a.x - b.x;
+  const aby = a.y - b.y;
+  const cbx = c.x - b.x;
+  const cby = c.y - b.y;
+  const dot = abx * cbx + aby * cby;
+  const mag = Math.sqrt(abx * abx + aby * aby) * Math.sqrt(cbx * cbx + cby * cby);
+  if (mag === 0) return 0;
+  const cos = Math.min(1, Math.max(-1, dot / mag));
+  return Math.acos(cos) * (180 / Math.PI);
 }
 
 function averageVisibility(landmarks: Landmark[], indices: number[]) {
@@ -91,8 +113,12 @@ export function analyzeSquat(
   thresholds: Record<string, number>,
   state: SquatState
 ): SquatResult {
+  const leftEar = landmarks[LANDMARKS.leftEar];
+  const rightEar = landmarks[LANDMARKS.rightEar];
   const leftShoulder = landmarks[LANDMARKS.leftShoulder];
   const rightShoulder = landmarks[LANDMARKS.rightShoulder];
+  const leftWrist = landmarks[LANDMARKS.leftWrist];
+  const rightWrist = landmarks[LANDMARKS.rightWrist];
   const leftHip = landmarks[LANDMARKS.leftHip];
   const rightHip = landmarks[LANDMARKS.rightHip];
   const leftKnee = landmarks[LANDMARKS.leftKnee];
@@ -101,6 +127,7 @@ export function analyzeSquat(
   const rightAnkle = landmarks[LANDMARKS.rightAnkle];
 
   // Midpoints for analysis
+  const midEar = midpoint(leftEar, rightEar);
   const midShoulder = midpoint(leftShoulder, rightShoulder);
   const midHip = midpoint(leftHip, rightHip);
   const midKnee = midpoint(leftKnee, rightKnee);
@@ -117,10 +144,20 @@ export function analyzeSquat(
   const trunkDx = midHip.x - midShoulder.x;
   const trunkLean = Math.abs(Math.atan2(trunkDx, trunkDy) * (180 / Math.PI));
 
-  // 3. Knee position relative to ankle (X axis)
-  const kneeForward = midKnee.x - midAnkle.x;
+  // 3. Shin Angle - angle of shin from vertical
+  const shinDx = midKnee.x - midAnkle.x;
+  const shinDy = midKnee.y - midAnkle.y;
+  const shinAngle = Math.abs(Math.atan2(shinDx, -shinDy) * (180 / Math.PI));
 
-  // 4. Speed detection - hip Y velocity
+  // 4. Neck/Head Alignment (Ear-Shoulder-Hip)
+  const neckAngle = angleBetween(midEar, midShoulder, midHip);
+
+  // 5. Hands on Legs
+  const leftHandKneeDist = Math.min(distance2D(leftWrist, leftKnee), distance2D(leftWrist, rightKnee));
+  const rightHandKneeDist = Math.min(distance2D(rightWrist, leftKnee), distance2D(rightWrist, rightKnee));
+  const isHandOnLeg = leftHandKneeDist < 0.15 || rightHandKneeDist < 0.15;
+
+  // 6. Speed detection - hip Y velocity
   const now = Date.now();
   let descentSpeed = 0;
   if (state.lastHipY !== null && state.lastHipTimestamp !== null) {
@@ -141,9 +178,11 @@ export function analyzeSquat(
   const standingAngle = thresholds.standing_angle ?? 20;
   const minDepthAngle = thresholds.min_depth_angle ?? 70;
   const minRepAngle = thresholds.min_rep_angle ?? 40; // Minimum depth to count as a rep attempt
-  const maxTrunkLean = thresholds.max_trunk_lean ?? 30;
-  const maxKneeForward = thresholds.max_knee_forward ?? 0.12;
-  const maxDescentSpeed = thresholds.max_descent_speed ?? 5.0;
+  const maxTrunkLean = thresholds.max_trunk_lean ?? 60; // Relaxed from 45
+  const maxShinAngle = thresholds.max_shin_angle ?? 45; // Relaxed from 25
+  const maxDescentSpeed = thresholds.max_descent_speed ?? 10.0; // Relaxed from 5.0
+  const minNeckAngle = thresholds.min_neck_angle ?? 120; // Relaxed from 150
+  const handsOnLegThreshold = thresholds.hands_on_legs_distance ?? 0.08; // Relaxed from 0.15
 
   // Phase detection using thigh angle (higher = deeper squat)
   let phase = "standing";
@@ -159,22 +198,9 @@ export function analyzeSquat(
   }
 
   // Rep counts when coming back to standing from ascending OR descending (shallow rep)
-  // But only if we reached minRepAngle (40°) - otherwise it's just noise
   const isRepTransition = (state.lastPhase === "ascending" || state.lastPhase === "descending") && phase === "standing";
   const reachedMinDepth = state.maxThighAngle >= minRepAngle;
   const repIncremented = isRepTransition && reachedMinDepth;
-  const wasShallowRep = state.lastPhase === "descending" && phase === "standing" && reachedMinDepth;
-
-  // Debug logging
-  if (state.lastPhase !== phase) {
-    console.log(`[SQUAT] ${state.lastPhase} → ${phase} | thigh=${thighAngle.toFixed(0)}° (stand<${standingAngle}, depth≥${minDepthAngle})`);
-  }
-  if (isRepTransition && !reachedMinDepth) {
-    console.log(`[SQUAT] ✗ Ignored (max ${state.maxThighAngle.toFixed(0)}° < ${minRepAngle}° min)`);
-  }
-  if (repIncremented) {
-    console.log(`[SQUAT] ✓ REP COUNTED${wasShallowRep ? " (shallow - not deep enough)" : ""}`);
-  }
 
   const formScore = baseFormScore(landmarks);
   const errors: FormError[] = [];
@@ -188,7 +214,7 @@ export function analyzeSquat(
     state.repAngles = []; // Reset DTW recording
   }
 
-  // Track maximum thigh angle during rep (higher = deeper squat)
+  // Track maximum thigh angle during rep
   if (phase !== "standing" && thighAngle > state.maxThighAngle) {
     state.maxThighAngle = thighAngle;
   }
@@ -198,38 +224,10 @@ export function analyzeSquat(
     state.repAngles.push(thighAngle);
   }
 
-  // Queue errors during rep
+  // Real-time checks during rep
   if (phase !== "standing") {
     if (trunkLean > maxTrunkLean) {
       state.repErrors.add("forward_lean");
-    }
-    if (kneeForward > maxKneeForward) {
-      state.repErrors.add("knee_forward");
-    }
-  }
-
-  // Check peak speed when transitioning out of descent
-  if (state.lastPhase === "descending" && phase !== "descending") {
-    if (state.peakDescentSpeed > maxDescentSpeed) {
-      state.repErrors.add("speed_too_fast");
-      console.log(`[SQUAT] Peak speed: ${state.peakDescentSpeed.toFixed(2)} > ${maxDescentSpeed}`);
-    }
-  }
-
-  // Depth feedback at bottom
-  if (phase === "bottom") {
-    feedback = `Depth: ${state.maxThighAngle.toFixed(0)}° - Good!`;
-  }
-
-  // Emit errors when rep completes
-  if (repIncremented) {
-    if (state.maxThighAngle < minDepthAngle) {
-      state.repErrors.add("insufficient_depth");
-    }
-
-    console.log(`[SQUAT] Rep complete! Max depth: ${state.maxThighAngle.toFixed(0)}° (target: ≥${minDepthAngle}°) | Errors: ${Array.from(state.repErrors).join(", ") || "none"}`);
-
-    if (state.repErrors.has("forward_lean")) {
       errors.push({
         type: "forward_lean",
         message: "Keep your chest up",
@@ -238,15 +236,71 @@ export function analyzeSquat(
         bodyPart: "torso",
       });
     }
-    if (state.repErrors.has("knee_forward")) {
+    if (shinAngle > maxShinAngle) {
+      state.repErrors.add("knee_forward");
       errors.push({
         type: "knee_forward",
-        message: "Sit back more, keep knees over ankles",
+        message: "Sit back more, keep knees behind toes",
         severity: "warning",
         timestamp: Date.now(),
         bodyPart: "knees",
       });
     }
+    if (neckAngle < minNeckAngle) {
+      state.repErrors.add("upper_back_round");
+      errors.push({
+        type: "upper_back_round",
+        message: "Don't round your upper back",
+        severity: "warning",
+        timestamp: Date.now(),
+        bodyPart: "head",
+      });
+    }
+    if (leftHandKneeDist < handsOnLegThreshold || rightHandKneeDist < handsOnLegThreshold) {
+      state.repErrors.add("hands_on_legs");
+      errors.push({
+        type: "hands_on_legs",
+        message: "Don't rest your hands on your legs",
+        severity: "warning",
+        timestamp: Date.now(),
+        bodyPart: "arms",
+      });
+    }
+  }
+
+  // Check peak speed when transitioning out of descent
+  if (state.lastPhase === "descending" && phase !== "descending") {
+    if (state.peakDescentSpeed > maxDescentSpeed) {
+      state.repErrors.add("speed_too_fast");
+    }
+  }
+
+  // Dynamic feedback
+  if (phase === "descending" || phase === "ascending") {
+    if (state.maxThighAngle < minDepthAngle) {
+      feedback = "Squat a bit deeper";
+    } else {
+      feedback = "Great depth! Now stand up";
+    }
+  } else if (phase === "bottom") {
+    feedback = "Good depth, hold it!";
+  } else if (phase === "standing" && state.lastPhase === "ascending") {
+    feedback = "Rep complete!";
+  }
+
+  // Emit summary errors and run DTW when rep completes
+  if (repIncremented) {
+    if (state.maxThighAngle < minDepthAngle) {
+      state.repErrors.add("insufficient_depth");
+      errors.push({
+        type: "insufficient_depth",
+        message: "Try to squat a bit deeper next time",
+        severity: "info",
+        timestamp: Date.now(),
+        bodyPart: "legs",
+      });
+    }
+
     if (state.repErrors.has("speed_too_fast")) {
       errors.push({
         type: "speed_too_fast",
@@ -254,15 +308,6 @@ export function analyzeSquat(
         severity: "info",
         timestamp: Date.now(),
         bodyPart: "overall",
-      });
-    }
-    if (state.repErrors.has("insufficient_depth")) {
-      errors.push({
-        type: "insufficient_depth",
-        message: "Try to squat a bit deeper",
-        severity: "info",
-        timestamp: Date.now(),
-        bodyPart: "legs",
       });
     }
 
@@ -275,7 +320,12 @@ export function analyzeSquat(
     if (errorList.length === 0) {
       feedback = `${dtwResult.feedback} ${dtwResult.score}% ${depthInfo}`;
     } else {
-      feedback = `${dtwResult.feedback} ${dtwResult.score}% - ${errorList.map(e => e.replace(/_/g, " ")).join(", ")} ${depthInfo}`;
+      // Prioritize depth error in feedback
+      if (state.repErrors.has("insufficient_depth")) {
+        feedback = `Shallow squat ${depthInfo}. Try to go deeper.`;
+      } else {
+        feedback = `${dtwResult.feedback} ${dtwResult.score}% - Check your form ${depthInfo}`;
+      }
     }
   }
 
@@ -300,10 +350,12 @@ export function analyzeSquat(
     debug: {
       kneeAngle: thighAngle,
       trunkLean,
-      kneeForward,
+      kneeForward: shinAngle, // Use shin angle in debug for consistency
       descentSpeed: state.peakDescentSpeed,
       minDepth: state.maxThighAngle,
       queuedErrors: Array.from(state.repErrors),
     },
   };
 }
+
+

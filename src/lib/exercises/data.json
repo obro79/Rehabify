@@ -213,6 +213,7 @@
         "Knees caving inward",
         "Excessive forward lean of the torso",
         "Knees drifting too far past toes",
+        "Rounding the upper back",
         "Dropping too quickly without control",
         "Rising onto toes instead of pressing through heels"
       ],
@@ -243,14 +244,16 @@
         "key_landmarks": [
           "knee_angle",
           "trunk_lean",
-          "knee_position"
+          "shin_angle",
+          "neck_angle"
         ],
         "thresholds": {
           "min_depth_angle": 70,
-          "max_trunk_lean": 30,
-          "max_knee_forward": 0.12,
-          "max_descent_speed": 5.0,
-          "standing_angle": 20
+          "max_trunk_lean": 60,
+          "max_shin_angle": 45,
+          "max_descent_speed": 10.0,
+          "standing_angle": 20,
+          "min_neck_angle": 120
         }
       }
     },

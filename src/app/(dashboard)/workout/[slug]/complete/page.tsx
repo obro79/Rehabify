@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle2, Play, Home, RotateCcw, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,10 +17,10 @@ import {
 import { RepsIcon, TimerIcon, TrophyIcon } from "@/components/ui/icons";
 import { CelebrationAnimation } from "@/components/ui/celebration-animation";
 import { SanctuaryBackground } from "@/components/ui/sanctuary-background";
+import { getExerciseBySlug } from "@/lib/exercises";
 
 // Mock data - in production this would come from session state/API
 const MOCK_SESSION_DATA = {
-  exerciseName: "Cat-Camel",
   userName: "Sarah",
   formScore: 85,
   repsCompleted: 10,
@@ -34,13 +34,13 @@ const MOCK_SESSION_DATA = {
   currentStreak: 6,
   bestStreak: 12,
   formBreakdown: [
-    { metric: "Spine Curvature", score: 95, feedback: "Excellent!" },
+    { metric: "Range of Motion", score: 95, feedback: "Excellent!" },
     { metric: "Head Position", score: 82, feedback: "Good" },
-    { metric: "Hip Alignment", score: 78, feedback: "Try keeping hips more stable" },
+    { metric: "Alignment", score: 78, feedback: "Maintain stability" },
     { metric: "Movement Pace", score: 88, feedback: "Great control" },
   ],
   coachSummary:
-    "Excellent session! Your spine mobility is improving. Focus on keeping your hips more stable during the camel phase next time. Overall, this was a great workout!",
+    "Excellent session! Your form is improving significantly. Focus on maintaining control throughout the entire range of motion next time. Overall, this was a great workout!",
   nextExercise: {
     name: "Lunge",
     slug: "lunge",
@@ -60,16 +60,52 @@ function getFormScoreColor(score: number): "sage" | "coral" {
 }
 
 export default function SessionCompletePage() {
+  return (
+    <React.Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sage-500"></div>
+      </div>
+    }>
+      <SessionCompleteContent />
+    </React.Suspense>
+  );
+}
+
+function SessionCompleteContent() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const slug = params.slug as string;
   const [isFormBreakdownOpen, setIsFormBreakdownOpen] = React.useState(false);
   const [showCelebration, setShowCelebration] = React.useState(true);
+  const [user, setUser] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    async function fetchUser() {
+      try {
+        const response = await fetch("/api/auth/me");
+        if (response.ok) {
+          const result = await response.json();
+          setUser(result.data || result);
+        }
+      } catch (error) {
+        console.error("Failed to fetch user in completion page:", error);
+      }
+    }
+    fetchUser();
+  }, []);
+
+  const exercise = getExerciseBySlug(slug);
+  const exerciseName = exercise?.name || "Exercise";
+  const userName = user?.displayName || user?.name || "there";
+
+  // Get score and reps from query params, fallback to mock
+  const urlScore = searchParams.get("score");
+  const urlReps = searchParams.get("reps");
+  
+  const formScore = urlScore ? parseInt(urlScore) : MOCK_SESSION_DATA.formScore;
+  const repsCompleted = urlReps ? parseInt(urlReps) : MOCK_SESSION_DATA.repsCompleted;
 
   const {
-    exerciseName,
-    userName,
-    formScore,
-    repsCompleted,
     targetReps,
     duration,
     xpEarned,
