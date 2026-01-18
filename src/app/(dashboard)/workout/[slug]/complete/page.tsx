@@ -106,6 +106,23 @@ function SessionCompleteContent() {
   const formScore = urlScore ? parseInt(urlScore) : MOCK_SESSION_DATA.formScore;
   const repsCompleted = urlReps ? parseInt(urlReps) : MOCK_SESSION_DATA.repsCompleted;
 
+  // Determine the next exercise based on the completed slug for the demo flow
+  const nextExerciseForDemo = React.useMemo(() => {
+    if (slug === "bodyweight-squat") {
+      return {
+        name: "Lunge",
+        slug: "lunge",
+        duration: "5 min", // Mock duration
+      };
+    }
+    // Default to dashboard if not squat or other specific next exercises
+    return {
+      name: "Dashboard",
+      slug: "/dashboard",
+      duration: "",
+    };
+  }, [slug]);
+
   const {
     targetReps,
     duration,
@@ -118,7 +135,6 @@ function SessionCompleteContent() {
     bestStreak,
     formBreakdown,
     coachSummary,
-    nextExercise,
   } = MOCK_SESSION_DATA;
 
   const formScoreMessage = getFormScoreMessage(formScore);
@@ -362,12 +378,14 @@ function SessionCompleteContent() {
               className="h-auto flex-col gap-2 py-4 rounded-3xl"
               asChild
             >
-              <Link href={`/workout/${nextExercise.slug}`}>
+              <Link href={nextExerciseForDemo.slug.startsWith('/') ? nextExerciseForDemo.slug : `/workout/${nextExerciseForDemo.slug}`}>
                 <ArrowRight size={24} />
                 <span className="font-medium">Next Exercise</span>
-                <span className="text-xs opacity-90">
-                  {nextExercise.name}
-                </span>
+                {nextExerciseForDemo.name !== "Dashboard" && (
+                  <span className="text-xs opacity-90">
+                    {nextExerciseForDemo.name}
+                  </span>
+                )}
               </Link>
             </Button>
 

@@ -161,8 +161,8 @@ export default function DashboardPage() {
         if (slug) {
           setFirstExerciseSlug(slug);
         } else {
-          // Fallback to cat-camel if slug not found
-          setFirstExerciseSlug('cat-camel');
+          // Fallback to bodyweight-squat if slug not found
+          setFirstExerciseSlug('bodyweight-squat');
         }
       } catch (error) {
         console.error("[Dashboard] Failed to fetch plan:", error);
@@ -178,16 +178,16 @@ export default function DashboardPage() {
         });
 
         if (response.ok) {
-          // Default plan created, set slug to cat-camel
-          setFirstExerciseSlug('cat-camel');
+          // Default plan created, set slug to bodyweight-squat
+          setFirstExerciseSlug('bodyweight-squat');
         } else {
-          // If creation fails, still set to cat-camel as fallback
-          setFirstExerciseSlug('cat-camel');
+          // If creation fails, still set to squat as fallback
+          setFirstExerciseSlug('squat');
         }
       } catch (error) {
         console.error("[Dashboard] Failed to create default plan:", error);
-        // Still set to cat-camel as fallback
-        setFirstExerciseSlug('cat-camel');
+        // Still set to bodyweight-squat as fallback
+        setFirstExerciseSlug('bodyweight-squat');
       }
     }
 
@@ -195,8 +195,8 @@ export default function DashboardPage() {
   }, []);
 
   const handleStartRoutine = () => {
-    // Use first exercise slug if available, otherwise default to cat-camel
-    const slug = firstExerciseSlug || 'cat-camel';
+    // Use first exercise slug if available, otherwise default to bodyweight-squat
+    const slug = firstExerciseSlug || 'bodyweight-squat';
     router.push(`/workout/${slug}`);
   };
 

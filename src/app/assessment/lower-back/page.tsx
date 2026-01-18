@@ -601,6 +601,13 @@ export default function LowerBackAssessmentPage() {
     return lastAssistant?.content || "Listening...";
   }, [transcriptEntries, isConnected]);
 
+  // Auto-start Vapi when component mounts
+  React.useEffect(() => {
+    if (!isConnected) {
+      startVapi();
+    }
+  }, [isConnected, startVapi]);
+
   // Handle start/stop
   const handleStartStop = async () => {
     if (isConnected) {
