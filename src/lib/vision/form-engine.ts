@@ -403,6 +403,12 @@ export function analyzeStandingLumbarFlexion(
       LANDMARKS.leftHip,
       LANDMARKS.rightHip,
     ]),
+    debug: {
+      hipAngle,
+      kneeAngle: kneeAngle,
+      phase,
+      queuedErrors: errors.map(e => e.type),
+    }
   };
 }
 
@@ -537,16 +543,16 @@ function analyzeStandingLumbarExtension(
       LANDMARKS.leftHip,
       LANDMARKS.rightHip,
     ]),
-    // debug: {
-    //   hipAngle,
-    //   kneeAngle,
-    //   spineDepth: absSpineDepth,
-    //   depthChange,
-    //   baseline,
-    //   baselineSamples: state.baselineSpineDepth.length,
-    //   phase,
-    //   queuedErrors: errors.map(e => e.type),
-    // }
+    debug: {
+      hipAngle,
+      kneeAngle,
+      spineDepth: absSpineDepth,
+      depthChange,
+      baseline,
+      baselineSamples: state.baselineSpineDepth.length,
+      phase,
+      queuedErrors: errors.map(e => e.type),
+    }
   };
 }
 
@@ -657,14 +663,14 @@ function analyzeStandingLumbarSideBend(
       LANDMARKS.leftHip,
       LANDMARKS.rightHip,
     ]),
-    // debug: {
-    //   shoulderTilt,
-    //   shoulderTiltAngle,
-    //   hipTilt,
-    //   bendingSide,
-    //   phase,
-    //   queuedErrors: errors.map(e => e.type),
-    // }
+    debug: {
+      shoulderTilt,
+      shoulderTiltAngle,
+      hipTilt,
+      bendingSide,
+      phase,
+      queuedErrors: errors.map(e => e.type),
+    }
   };
 }
 

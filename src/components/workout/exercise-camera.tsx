@@ -71,9 +71,24 @@ export function ExerciseCamera({
     hipTilt?: number;
     bendingSide?: string;
 
+    // Lunge fields
+    leftThighAngle?: number;
+    rightThighAngle?: number;
+    bestDepthAngle?: number;
+    shinAngle?: number;
+
+    // Rotation fields
+    torsion?: number;
+    shoulderYaw?: number;
+    hipYaw?: number;
+
     phase: string;
     queuedErrors: string[];
   } | null>(null);
+
+  // Debug console log capture
+  const [consoleLogs, setConsoleLogs] = React.useState<string[]>([]);
+  const maxLogs = 15;
 
   const setPhase = useExerciseStore((state) => state.setPhase);
   const setFormScore = useExerciseStore((state) => state.setFormScore);
@@ -89,6 +104,30 @@ export function ExerciseCamera({
       filterRef.current = createLandmarkFilter();
     }
   }, [exercise]);
+
+  // Intercept console.log for debug overlay
+  React.useEffect(() => {
+    const originalLog = console.log;
+    console.log = (...args: unknown[]) => {
+      originalLog.apply(console, args);
+      const message = args.map(arg =>
+        typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+      ).join(' ');
+      // Only capture exercise-related logs
+      if (message.includes('[SQUAT]') || message.includes('[LUMBAR') ||
+          message.includes('[SIDE_BEND]') || message.includes('[FORM_ENGINE]') ||
+          message.includes('[LUNGE]') || message.includes('[DTW]') ||
+          message.includes('[BODY_DETECT]')) {
+        setConsoleLogs(prev => {
+          const newLogs = [...prev, message];
+          return newLogs.slice(-maxLogs);
+        });
+      }
+    };
+    return () => {
+      console.log = originalLog;
+    };
+  }, []);
 
   React.useEffect(() => {
     let isMounted = true;
@@ -187,6 +226,13 @@ export function ExerciseCamera({
           if (engine) {
             const analysis = engine(landmarks);
 
+            // Periodic debug logging (every 2 seconds)
+            if (now - lastEmitRef.current > 2000) {
+              const keyPoints = [11, 12, 23, 24, 25, 26, 27, 28]; // shoulders, hips, knees, ankles
+              const avgVis = keyPoints.reduce((sum, i) => sum + (landmarks[i]?.visibility ?? 0), 0) / keyPoints.length;
+              console.log(`[BODY_DETECT] vis=${(avgVis*100).toFixed(0)}% phase=${analysis.phase} conf=${(analysis.confidence*100).toFixed(0)}% score=${analysis.formScore}`);
+            }
+
             // Rep counting and rep errors must happen immediately (not throttled)
             // because repIncremented is only true for one frame
             if (analysis.repIncremented) {
@@ -282,53 +328,98 @@ export function ExerciseCamera({
       />
 
       {/* Debug Overlay for tuning thresholds */}
-      {/* {debugValues && (
-        <div className="absolute top-24 left-2 bg-black/95 text-green-400 p-4 rounded-xl font-mono z-30 space-y-1 min-w-[200px]">
-          <div className="text-yellow-400 font-bold text-2xl mb-2 uppercase">{debugValues.phase}</div>
-
-          {debugValues.trunkLean !== undefined && (
+      {(debugValues || consoleLogs.length > 0) && (
+        <div className="absolute top-20 left-2 right-2 bg-black/90 text-green-400 p-3 rounded-xl font-mono z-30 space-y-1 text-xs max-h-[60%] overflow-y-auto">
+          {debugValues && (
             <>
-              <div className="text-xl font-bold">thigh: {debugValues.kneeAngle?.toFixed(0) ?? 'N/A'}°</div>
-              <div className="text-xl font-bold">lean: {debugValues.trunkLean.toFixed(0)}°</div>
-              <div className="text-xl font-bold">fwd: {debugValues.kneeForward?.toFixed(2) ?? 'N/A'}</div>
-              <div className="text-xl font-bold">spd: {debugValues.descentSpeed?.toFixed(2) ?? 'N/A'}</div>
-              <div className="text-cyan-400 font-bold">max: {debugValues.minDepth?.toFixed(0) ?? 'N/A'}°</div>
+              <div className="text-yellow-400 font-bold text-lg mb-2 uppercase">{debugValues.phase}</div>
+
+              {/* Squat metrics */}
+              {debugValues.trunkLean !== undefined && debugValues.kneeAngle !== undefined && (
+                <div className="grid grid-cols-2 gap-x-4 text-sm">
+                  <div>thigh: <span className="text-white">{debugValues.kneeAngle?.toFixed(0) ?? 'N/A'}°</span></div>
+                  <div>lean: <span className="text-white">{debugValues.trunkLean.toFixed(0)}°</span></div>
+                  <div>kneeFwd: <span className="text-white">{debugValues.kneeForward?.toFixed(2) ?? 'N/A'}</span></div>
+                  <div>speed: <span className="text-white">{debugValues.descentSpeed?.toFixed(2) ?? 'N/A'}</span></div>
+                  <div className="col-span-2 text-cyan-400">maxDepth: {debugValues.minDepth?.toFixed(0) ?? 'N/A'}°</div>
+                </div>
+              )}
+
+              {/* Lumbar extension metrics */}
+              {debugValues.hipAngle !== undefined && (
+                <div className="grid grid-cols-2 gap-x-4 text-sm">
+                  <div>hip: <span className="text-white">{debugValues.hipAngle.toFixed(0)}°</span></div>
+                  <div>knee: <span className="text-white">{debugValues.kneeAngle?.toFixed(0) ?? 'N/A'}°</span></div>
+                  <div>depth: <span className="text-white">{debugValues.spineDepth?.toFixed(3) ?? 'N/A'}</span></div>
+                  <div className={`${(debugValues.depthChange ?? 0) <= -0.05 ? 'text-cyan-400' : ''}`}>
+                    Δ: <span className="text-white">{debugValues.depthChange?.toFixed(3) ?? 'N/A'}</span>
+                  </div>
+                  <div className="col-span-2 text-xs">base: {debugValues.baseline?.toFixed(3) ?? 'N/A'} ({debugValues.baselineSamples ?? 0})</div>
+                </div>
+              )}
+
+              {/* Side bend metrics */}
+              {debugValues.shoulderTilt !== undefined && (
+                <div className="grid grid-cols-2 gap-x-4 text-sm">
+                  <div>shoulder: <span className="text-white">{debugValues.shoulderTilt.toFixed(1)}°</span></div>
+                  <div>angle: <span className="text-white">{debugValues.shoulderTiltAngle?.toFixed(1) ?? 'N/A'}°</span></div>
+                  <div>hipTilt: <span className="text-white">{debugValues.hipTilt?.toFixed(1) ?? 'N/A'}°</span></div>
+                  <div className={`${debugValues.bendingSide !== 'neutral' ? 'text-cyan-400' : ''}`}>
+                    side: <span className="text-white">{debugValues.bendingSide ?? 'N/A'}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Lunge metrics */}
+              {debugValues.leftThighAngle !== undefined && (
+                <div className="grid grid-cols-2 gap-x-4 text-sm">
+                  <div>L thigh: <span className="text-white">{debugValues.leftThighAngle?.toFixed(0) ?? 'N/A'}°</span></div>
+                  <div>R thigh: <span className="text-white">{debugValues.rightThighAngle?.toFixed(0) ?? 'N/A'}°</span></div>
+                  <div>depth: <span className="text-white">{debugValues.bestDepthAngle?.toFixed(0) ?? 'N/A'}°</span></div>
+                  <div>shin: <span className="text-white">{debugValues.shinAngle?.toFixed(0) ?? 'N/A'}°</span></div>
+                  <div>lean: <span className="text-white">{debugValues.trunkLean?.toFixed(0) ?? 'N/A'}°</span></div>
+                </div>
+              )}
+
+              {/* Rotation metrics */}
+              {debugValues.torsion !== undefined && (
+                <div className="grid grid-cols-2 gap-x-4 text-sm">
+                  <div>torsion: <span className={`${Math.abs(debugValues.torsion) > 15 ? 'text-cyan-400' : 'text-white'}`}>{debugValues.torsion?.toFixed(0) ?? 'N/A'}°</span></div>
+                  <div>shYaw: <span className="text-white">{debugValues.shoulderYaw?.toFixed(0) ?? 'N/A'}°</span></div>
+                  <div>hipYaw: <span className="text-white">{debugValues.hipYaw?.toFixed(0) ?? 'N/A'}°</span></div>
+                </div>
+              )}
+
+              {debugValues.queuedErrors && debugValues.queuedErrors.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-orange-500/50">
+                  <div className="text-orange-400 text-xs font-bold mb-1">ERRORS:</div>
+                  {debugValues.queuedErrors.map((err, i) => (
+                    <div key={i} className="text-orange-500 text-xs">{err}</div>
+                  ))}
+                </div>
+              )}
             </>
           )}
 
-          {debugValues.hipAngle !== undefined && (
-            <>
-              <div className="text-xl font-bold">hip: {debugValues.hipAngle.toFixed(0)}°</div>
-              <div className="text-xl font-bold">knee: {debugValues.kneeAngle?.toFixed(0) ?? 'N/A'}°</div>
-              <div className="text-xl font-bold">depth: {debugValues.spineDepth?.toFixed(3) ?? 'N/A'}</div>
-              <div className={`text-xl font-bold ${(debugValues.depthChange ?? 0) <= -0.05 ? 'text-cyan-400' : ''}`}>
-                Δ: {debugValues.depthChange?.toFixed(3) ?? 'N/A'}
+          {/* Console log output */}
+          {consoleLogs.length > 0 && (
+            <div className="mt-2 pt-2 border-t border-blue-500/50">
+              <div className="text-blue-400 text-xs font-bold mb-1">CONSOLE:</div>
+              <div className="space-y-0.5">
+                {consoleLogs.map((log, i) => (
+                  <div key={i} className={`text-xs ${
+                    log.includes('✓') || log.includes('✅') ? 'text-green-400' :
+                    log.includes('✗') || log.includes('⚠') || log.includes('🚫') ? 'text-orange-400' :
+                    log.includes('🔄') ? 'text-yellow-400' : 'text-gray-300'
+                  }`}>
+                    {log}
+                  </div>
+                ))}
               </div>
-              <div className="text-sm">base: {debugValues.baseline?.toFixed(3) ?? 'N/A'} ({debugValues.baselineSamples ?? 0})</div>
-            </>
-          )}
-
-          {debugValues.shoulderTilt !== undefined && (
-            <>
-              <div className="text-xl font-bold">shoulder: {debugValues.shoulderTilt.toFixed(1)}°</div>
-              <div className="text-xl font-bold">angle: {debugValues.shoulderTiltAngle?.toFixed(1) ?? 'N/A'}°</div>
-              <div className="text-xl font-bold">hip: {debugValues.hipTilt?.toFixed(1) ?? 'N/A'}°</div>
-              <div className={`text-xl font-bold ${debugValues.bendingSide !== 'neutral' ? 'text-cyan-400' : ''}`}>
-                side: {debugValues.bendingSide ?? 'N/A'}
-              </div>
-            </>
-          )}
-
-          {debugValues.queuedErrors.length > 0 && (
-            <div className="mt-2 pt-2 border-t border-orange-500/50">
-              <div className="text-orange-400 text-sm font-bold mb-1">QUEUED:</div>
-              {debugValues.queuedErrors.map((err, i) => (
-                <div key={i} className="text-orange-500 text-sm font-bold">{err}</div>
-              ))}
             </div>
           )}
         </div>
-      )} */}
+      )}
 
       {/* Feedback Overlay (Camera Positioning or Exercise Form) */}
       {activeFeedback && status === "ready" && (
