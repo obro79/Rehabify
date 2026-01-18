@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { getExerciseById } from "@/lib/exercises";
 import type { PlanStructure } from "@/lib/gemini/types";
@@ -41,6 +42,7 @@ import {
   getExerciseIconOrCategory,
   getCategoryBadgeVariant,
   getScoreBadgeVariant,
+  getExerciseImage,
 } from "@/lib/exercise-utils";
 import { FadeIn, StaggerContainer, StaggerItem } from "@/components/motion";
 
@@ -239,9 +241,19 @@ export default function DashboardPage() {
                 variant="organic"
                 className="group p-4 hover:shadow-lg transition-all cursor-pointer hover:scale-[1.02]"
               >
-                {/* Icon area */}
-                <div className="flex items-center justify-center h-24 bg-sage-50 rounded-2xl mb-3 group-hover:bg-sage-100 transition-colors">
-                  {getExerciseIconOrCategory(exercise.id, exercise.category, "md")}
+                {/* Image/Icon area */}
+                <div className="flex items-center justify-center h-24 bg-sage-50 rounded-2xl mb-3 group-hover:bg-sage-100 transition-colors relative overflow-hidden">
+                  {getExerciseImage(exercise.slug) ? (
+                    <Image
+                      src={getExerciseImage(exercise.slug)!}
+                      alt={exercise.name}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                    />
+                  ) : (
+                    getExerciseIconOrCategory(exercise.id, exercise.category, "md")
+                  )}
                 </div>
 
                 {/* Content */}
