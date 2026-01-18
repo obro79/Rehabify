@@ -189,6 +189,72 @@
       }
     },
     {
+      "id": "bodyweight-squat",
+      "name": "Bodyweight Squat",
+      "slug": "bodyweight-squat",
+      "tier": 1,
+      "body_region": "lower_body",
+      "category": "strengthening",
+      "target_area": "quadriceps",
+      "difficulty": "beginner",
+      "description": "A fundamental lower body exercise that strengthens the quadriceps, glutes, and core while improving mobility. Performed with bodyweight only, focusing on proper form and depth.",
+      "instructions": [
+        "Stand with feet shoulder-width apart, toes slightly turned out",
+        "Keep your chest up and core engaged",
+        "Initiate the movement by pushing your hips back",
+        "Bend your knees and lower your body as if sitting into a chair",
+        "Keep your knees tracking over your toes",
+        "Lower until thighs are parallel to the floor or as low as comfortable",
+        "Press through your heels to return to standing",
+        "Maintain a neutral spine throughout the movement"
+      ],
+      "common_mistakes": [
+        "Not reaching parallel depth",
+        "Knees caving inward",
+        "Excessive forward lean of the torso",
+        "Knees drifting too far past toes",
+        "Dropping too quickly without control",
+        "Rising onto toes instead of pressing through heels"
+      ],
+      "modifications": {
+        "easier": "Use a chair for support, reduce depth",
+        "harder": "Add pause at bottom, slow tempo, single leg progression"
+      },
+      "contraindications": [
+        "Acute knee injury",
+        "Severe hip arthritis",
+        "Balance issues (use support)"
+      ],
+      "default_reps": 10,
+      "default_sets": 3,
+      "default_hold_seconds": 0,
+      "rep_type": "standard",
+      "equipment": "none",
+      "video_url": null,
+      "thumbnail_url": null,
+      "form_detection_enabled": true,
+      "detection_config": {
+        "phases": [
+          "standing",
+          "descending",
+          "bottom",
+          "ascending"
+        ],
+        "key_landmarks": [
+          "knee_angle",
+          "trunk_lean",
+          "knee_position"
+        ],
+        "thresholds": {
+          "min_depth_angle": 70,
+          "max_trunk_lean": 30,
+          "max_knee_forward": 0.12,
+          "max_descent_speed": 5.0,
+          "standing_angle": 20
+        }
+      }
+    },
+    {
       "id": "bird-dog",
       "name": "Bird Dog",
       "slug": "bird-dog",

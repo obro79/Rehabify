@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Pause, Play, X, Image as ImageIcon, AlertTriangle } from "lucide-react";
+import { Pause, Play, X, Image as ImageIcon, AlertTriangle, Volume2, Mic, MicOff } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +26,8 @@ import {
   selectRepCount,
 } from "@/stores/exercise-store-selectors";
 import type { Exercise } from "@/lib/exercises/types";
+import { useVapi } from "@/hooks/use-vapi";
+import { useVoiceStore } from "@/stores/voice-store";
 
 type SessionState = "active" | "paused" | "complete";
 type VoiceState = "idle" | "connecting" | "listening" | "thinking" | "speaking";
@@ -56,10 +58,37 @@ export default function WorkoutSessionPage() {
   const setExercisePhase = useExerciseStore((state) => state.setPhase);
   const incrementRep = useExerciseStore((state) => state.incrementRep);
   const targetReps = exercise?.default_reps || 10;
-  const [voiceState] = React.useState<VoiceState>("listening");
-  const [transcript] = React.useState(
-    "Nice and slow... hold that position... beautiful arch..."
-  );
+
+  // Real Vapi voice integration
+  const { start: startVapi, stop: stopVapi, isConnected, setMuted } = useVapi();
+  const { connectionState, speakingStatus, transcript: transcriptEntries, isMuted } = useVoiceStore();
+
+  // Map connection state to VoiceIndicator state
+  const voiceState = React.useMemo((): VoiceState => {
+    if (connectionState === 'connecting') return 'connecting';
+    if (connectionState === 'error') return 'idle';
+    if (connectionState === 'disconnected') return 'idle';
+    if (speakingStatus === 'speaking') return 'speaking';
+    if (speakingStatus === 'thinking') return 'thinking';
+    return 'listening';
+  }, [connectionState, speakingStatus]);
+
+  // Get latest transcript
+  const transcript = React.useMemo(() => {
+    if (transcriptEntries.length === 0) {
+      return isConnected ? "Listening..." : "Click 'Start Voice Coach' to begin";
+    }
+    return transcriptEntries.slice(-2).map(t => t.content).join(' ');
+  }, [transcriptEntries, isConnected]);
+
+  // Stop voice when session ends
+  React.useEffect(() => {
+    return () => {
+      if (isConnected) {
+        stopVapi();
+      }
+    };
+  }, [isConnected, stopVapi]);
 
   React.useEffect(() => {
     if (!exercise) return;
@@ -194,9 +223,21 @@ export default function WorkoutSessionPage() {
             <Card className="p-6 flex flex-col bg-white/50 backdrop-blur-sm border-sage-200">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-bold text-foreground">Voice Coach</h2>
-                <Badge variant="outlined" className="bg-white/50">
-                  {voiceState === "listening" ? "Listening..." : "Speaking"}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  {isConnected && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setMuted(!isMuted)}
+                      className="h-8 w-8 p-0"
+                    >
+                      {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                    </Button>
+                  )}
+                  <Badge variant="outlined" className="bg-white/50">
+                    {voiceState === "listening" ? "Listening..." : voiceState === "speaking" ? "Speaking" : voiceState}
+                  </Badge>
+                </div>
               </div>
 
               {/* Voice Visualization Area */}
@@ -215,11 +256,30 @@ export default function WorkoutSessionPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-center">
-                  <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-sage-400 animate-pulse"></span>
-                    AI Coach Active
-                  </p>
+                {/* Voice Control Button */}
+                <div className="flex flex-col items-center gap-2 pt-2">
+                  {!isConnected ? (
+                    <Button
+                      variant="secondary"
+                      size="lg"
+                      onClick={() => startVapi()}
+                      disabled={connectionState === 'connecting'}
+                      className="w-full gap-2"
+                    >
+                      <Volume2 className="h-4 w-4" />
+                      {connectionState === 'connecting' ? 'Connecting...' : 'Start Voice Coach'}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="lg"
+                      onClick={() => stopVapi()}
+                      className="w-full gap-2"
+                    >
+                      <X className="h-4 w-4" />
+                      Stop Voice Coach
+                    </Button>
+                  )}
                 </div>
               </div>
             </Card>

@@ -1,6 +1,7 @@
 import type { FormError } from "@/types";
 import type { Exercise } from "@/lib/exercises/types";
 import type { Landmark } from "@/types/vision";
+import { analyzeSquat, createSquatState, type SquatState } from "./exercises/squat";
 
 interface FormEngineResult {
   phase: string;
@@ -10,12 +11,22 @@ interface FormEngineResult {
   isCorrect: boolean;
   repIncremented: boolean;
   confidence: number;
+  debug?: {
+    kneeAngle: number;
+    trunkLean: number;
+    kneeForward: number;
+    descentSpeed: number;
+    minDepth: number;
+    queuedErrors: string[];
+  };
 }
 
 interface EngineState {
   lastPhase: string;
   lastRepPhase: string;
   lastExtendedSide: "left" | "right" | null;
+  // Exercise-specific states
+  squatState: SquatState;
 }
 
 const LANDMARKS = {
@@ -373,6 +384,7 @@ export function createFormEngine(exercise: Exercise) {
     lastPhase: "neutral",
     lastRepPhase: "",
     lastExtendedSide: null,
+    squatState: createSquatState(),
   };
 
   return (landmarks: Landmark[]): FormEngineResult => {
@@ -393,6 +405,10 @@ export function createFormEngine(exercise: Exercise) {
       case "romanian-deadlift":
         result = analyzeRDL(landmarks, thresholds, state);
         break;
+      case "bodyweight-squat":
+      case "squat":
+        result = analyzeSquat(landmarks, thresholds, state.squatState);
+        break;
       default:
         // Use ID as fallback if slug doesn't match
         switch (exercise.id) {
@@ -407,6 +423,10 @@ export function createFormEngine(exercise: Exercise) {
                 break;
             case "romanian-deadlift":
                 result = analyzeRDL(landmarks, thresholds, state);
+                break;
+            case "bodyweight-squat":
+            case "squat":
+                result = analyzeSquat(landmarks, thresholds, state.squatState);
                 break;
             default:
                 result = {

@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      1eurofilter:
+        specifier: ^1.2.2
+        version: 1.2.2
       '@dnd-kit/core':
         specifier: ^6.0.0
         version: 6.3.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -53,6 +56,9 @@ importers:
       drizzle-orm:
         specifier: ^0.38.0
         version: 0.38.4(@neondatabase/serverless@0.10.4)(@opentelemetry/api@1.9.0)(@supabase/pg@0.0.3)(@types/pg@8.11.6)(@types/react@19.2.8)(kysely@0.28.9)(react@19.2.3)
+      dynamic-time-warping:
+        specifier: ^1.0.0
+        version: 1.0.0
       framer-motion:
         specifier: ^12.23.26
         version: 12.23.26(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -149,6 +155,9 @@ importers:
         version: 4.0.15(@opentelemetry/api@1.9.0)(@types/node@20.19.27)(jiti@1.21.7)(jsdom@27.4.0)(yaml@2.8.2)
 
 packages:
+
+  1eurofilter@1.2.2:
+    resolution: {integrity: sha512-Yr9Zr1xpGs75a3grHjmGytXmq96uMa0GTx9bU6T0d3ZSkpt5eDJozTBt+ep0YI725+eWkNhHtvvUUUS3F2879A==}
 
   '@acemir/cssom@0.9.30':
     resolution: {integrity: sha512-9CnlMCI0LmCIq0olalQqdWrJHPzm0/tw3gzOA9zJSgvFX7Xau3D24mAGa4BtwxwY69nsuJW6kQqqCzf/mEcQgg==}
@@ -3452,6 +3461,9 @@ packages:
     resolution: {integrity: sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==}
     engines: {node: '>= 0.4'}
 
+  dynamic-time-warping@1.0.0:
+    resolution: {integrity: sha512-/fswVcF+sfm4N2atCwpXR/C21fTEskZ0XVMCTLktjR4eW0toXuTl58sP01DxNBpsllrRMPG5PyD40WJyNHZ4zg==}
+
   electron-to-chromium@1.5.267:
     resolution: {integrity: sha512-0Drusm6MVRXSOJpGbaSVgcQsuB4hEkMpHXaVstcPmhu5LIedxs1xNK/nIxmQIU/RPC0+1/o0AVZfBTkTNJOdUw==}
 
@@ -5688,6 +5700,8 @@ packages:
         optional: true
 
 snapshots:
+
+  1eurofilter@1.2.2: {}
 
   '@acemir/cssom@0.9.30': {}
 
@@ -8890,6 +8904,8 @@ snapshots:
       call-bind-apply-helpers: 1.0.2
       es-errors: 1.3.0
       gopd: 1.2.0
+
+  dynamic-time-warping@1.0.0: {}
 
   electron-to-chromium@1.5.267: {}
 
