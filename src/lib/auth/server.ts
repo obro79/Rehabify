@@ -13,11 +13,6 @@ const DEMO_USER = {
  * In demo mode, returns a mock user for development.
  */
 export async function requireAuth() {
-  // Bypass auth in demo mode
-  if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') {
-    return DEMO_USER;
-  }
-
   const { user } = await neonAuth();
   if (!user) {
     throw new Error('Unauthorized');
