@@ -101,3 +101,39 @@ export {
   selectHasAllPermissions,
   selectProgressPercentage,
 } from './onboarding-store-selectors';
+
+// Assessment Store
+export { useAssessmentStore } from './assessment-store';
+export type {
+  AssessmentState,
+  AssessmentActions,
+  AssessmentData,
+  ChiefComplaint,
+  PainProfile,
+  FunctionalImpact,
+  MedicalHistory,
+  MovementScreen,
+} from './assessment-store';
+
+// Assessment Store Selectors
+export {
+  selectCurrentPhase,
+  selectCurrentNode,
+  selectIsComplete as selectAssessmentIsComplete,
+  selectHasRedFlag,
+  selectChiefComplaint,
+  selectPainProfile,
+  selectFunctionalImpact,
+  selectMedicalHistory,
+  selectMovementScreen,
+  selectIsInMovementPhase,
+  selectIsInInterviewPhase,
+  selectIsInSummaryPhase,
+  selectShouldShowCamera,
+  selectPainLevel,
+  selectBodyPart,
+  selectDirectionalPreference,
+  selectAssessmentDuration,
+  selectTranscript as selectAssessmentTranscript,
+  selectLastTranscriptEntry,
+} from './assessment-selectors';

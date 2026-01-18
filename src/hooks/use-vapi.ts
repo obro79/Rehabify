@@ -21,6 +21,8 @@ export interface UseVapiOptions {
   onError?: (error: Error) => void;
   /** Called when user confirms they are ready (says "ready", "yes", etc.) */
   onUserReady?: () => void;
+  /** Called when a function call is received from the LLM */
+  onFunctionCall?: (name: string, args: Record<string, unknown>) => void;
 }
 
 export interface UseVapiReturn {
@@ -61,7 +63,7 @@ export interface UseVapiReturn {
  * ```
  */
 export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
-  const { assistantId, onConnectionChange, onError, onUserReady } = options;
+  const { assistantId, onConnectionChange, onError, onUserReady, onFunctionCall } = options;
 
   // Phrases that indicate user is ready to start
   const READY_PHRASES = ['ready', 'yes', "let's go", 'start', 'begin', 'ok', 'okay', 'yep', 'sure', 'go ahead'];
@@ -89,9 +91,11 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
   const onConnectionChangeRef = useRef(onConnectionChange);
   const onErrorRef = useRef(onError);
   const onUserReadyRef = useRef(onUserReady);
+  const onFunctionCallRef = useRef(onFunctionCall);
   onConnectionChangeRef.current = onConnectionChange;
   onErrorRef.current = onError;
   onUserReadyRef.current = onUserReady;
+  onFunctionCallRef.current = onFunctionCall;
 
   // Check if voice is enabled
   const isVoiceEnabled = clientEnv.NEXT_PUBLIC_ENABLE_VOICE ?? true;
@@ -172,9 +176,15 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
           }
         }
 
-        // Handle function calls if needed
+        // Handle function calls from the LLM
         if (message.type === 'function-call') {
           console.log('[useVapi] 🔧 Function call:', message);
+          const functionName = message.functionCall?.name;
+          const functionArgs = message.functionCall?.parameters || {};
+          if (functionName) {
+            console.log(`[useVapi] 📝 Calling ${functionName} with:`, functionArgs);
+            onFunctionCallRef.current?.(functionName, functionArgs as Record<string, unknown>);
+          }
         }
       });
 
