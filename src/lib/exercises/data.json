@@ -2791,7 +2791,7 @@
       "equipment": "dumbbell",
       "video_url": null,
       "thumbnail_url": null,
-      "form_detection_enabled": false
+      "form_detection_enabled": true
     },
     {
       "id": "single-leg-rdl",

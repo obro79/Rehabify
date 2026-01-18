@@ -1,4 +1,4 @@
-# Rehabify
+1# Rehabify
 
 **AI-powered physical therapy coaching with real-time form correction**
 
