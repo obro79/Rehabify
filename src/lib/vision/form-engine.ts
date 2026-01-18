@@ -304,8 +304,8 @@ function analyzeStandingLumbarFlexion(
   const kneeAngle = angleBetween3D(midHip, midKnee, midAnkle);
   // const spineDepth = midShoulder.z - midHip.z; // Less reliable than angle
 
-  const flexionPhaseAngle = 135; // Stricter threshold (was 150)
-  const neutralAngle = 165;
+  const flexionPhaseAngle = 145; // Relaxed threshold (was 135)
+  const neutralAngle = 160; // Relaxed return threshold
   const kneeAngleMin = 160; // Keep legs relatively straight
 
   let phase = "neutral";
@@ -407,7 +407,7 @@ function analyzeStandingLumbarExtension(
   // Simple heuristic: If hipAngle < 170 AND shoulder is behind hip (x check relative to orientation)
   // Or just check "spineDepth" (z) if robust.
   const spineDepth = midShoulder.z - midHip.z;
-  const extensionDepthThreshold = thresholds.extension_spine_depth ?? 0.08; // Increased from 0.04
+  const extensionDepthThreshold = thresholds.extension_spine_depth ?? 0.05; // Relaxed from 0.08
 
   let phase = "neutral";
   // Require significant backward movement
