@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { StreakDisplay } from "@/components/ui/streak-display";
@@ -20,9 +21,6 @@ import {
   CalendarIcon,
   TimerIcon,
   RepsIcon,
-  LibraryIcon,
-  GoalIcon,
-  GuideIcon,
 } from "@/components/ui/icons";
 import {
   ArrowRight,
@@ -125,9 +123,11 @@ export default function DashboardPage() {
                     <DifficultyStars level={exercise.difficulty} />
                   </div>
 
-                  <Button variant="secondary" size="sm" className="w-full mt-2">
-                    <Play size={14} className="mr-1" />
-                    Start
+                  <Button variant="secondary" size="sm" className="w-full mt-2" asChild>
+                    <Link href={`/workout/${exercise.slug}`}>
+                      <Play size={14} className="mr-1" />
+                      Start
+                    </Link>
                   </Button>
                 </div>
               </Card>
@@ -143,29 +143,32 @@ export default function DashboardPage() {
         </FadeIn>
 
         <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <StaggerItem>
+          <StaggerItem className="h-full">
             <StatsCard
               title="Sessions Completed"
               value="4/7"
               customIcon={<CalendarIcon size="sm" variant="sage" />}
               trend={{ direction: "up", value: "+1 from last week" }}
+              className="h-full"
             />
           </StaggerItem>
-          <StaggerItem>
+          <StaggerItem className="h-full">
             <StatsCard
               title="Total Reps"
               value={120}
               customIcon={<RepsIcon size="sm" variant="sage" />}
               trend={{ direction: "up", value: "+15%" }}
               variant="sage"
+              className="h-full"
             />
           </StaggerItem>
-          <StaggerItem>
+          <StaggerItem className="h-full">
             <StatsCard
               title="Time Exercising"
               value="45 min"
               customIcon={<TimerIcon size="sm" variant="coral" />}
               variant="coral"
+              className="h-full"
             />
           </StaggerItem>
         </StaggerContainer>
@@ -262,92 +265,6 @@ export default function DashboardPage() {
         </section>
       </FadeIn>
 
-      {/* Quick Actions - Better Visual Design */}
-      <section className="space-y-4">
-        <FadeIn>
-          <h2 className="text-lg font-semibold text-foreground">Quick Actions</h2>
-        </FadeIn>
-
-        <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <StaggerItem>
-            <Card
-              className="group p-5 cursor-pointer hover:shadow-md transition-all hover:scale-[1.02] border-sage-200/50 focus:outline-none focus:ring-2 focus:ring-sage-400 focus:ring-offset-2 rounded-3xl"
-              tabIndex={0}
-              role="button"
-              aria-label="Exercise Library - Browse all 52 exercises"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  // Navigate to exercise library
-                }
-              }}
-            >
-              <div className="flex items-center gap-4">
-                <div className="p-2 rounded-xl">
-                  <LibraryIcon size="md" variant="sage" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold">Exercise Library</h3>
-                  <p className="text-sm text-muted-foreground">Browse all 52 exercises</p>
-                </div>
-                <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-foreground group-hover:translate-x-1 transition-all" aria-hidden="true" />
-              </div>
-            </Card>
-          </StaggerItem>
-
-          <StaggerItem>
-            <Card
-              className="group p-5 cursor-pointer hover:shadow-md transition-all hover:scale-[1.02] border-sage-200/50 focus:outline-none focus:ring-2 focus:ring-sage-400 focus:ring-offset-2 rounded-3xl"
-              tabIndex={0}
-              role="button"
-              aria-label="Set Daily Goal - Configure your targets"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  // Navigate to set daily goal
-                }
-              }}
-            >
-              <div className="flex items-center gap-4">
-                <div className="p-2 rounded-xl">
-                  <GoalIcon size="md" variant="coral" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold">Set Daily Goal</h3>
-                  <p className="text-sm text-muted-foreground">Configure your targets</p>
-                </div>
-                <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-foreground group-hover:translate-x-1 transition-all" aria-hidden="true" />
-              </div>
-            </Card>
-          </StaggerItem>
-
-          <StaggerItem>
-            <Card
-              className="group p-5 cursor-pointer hover:shadow-md transition-all hover:scale-[1.02] border-sage-200/50 focus:outline-none focus:ring-2 focus:ring-sage-400 focus:ring-offset-2 rounded-3xl"
-              tabIndex={0}
-              role="button"
-              aria-label="How-To Guides - Learn proper form"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  // Navigate to how-to guides
-                }
-              }}
-            >
-              <div className="flex items-center gap-4">
-                <div className="p-2 rounded-xl">
-                  <GuideIcon size="md" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold">How-To Guides</h3>
-                  <p className="text-sm text-muted-foreground">Learn proper form</p>
-                </div>
-                <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-foreground group-hover:translate-x-1 transition-all" aria-hidden="true" />
-              </div>
-            </Card>
-          </StaggerItem>
-        </StaggerContainer>
-      </section>
     </div>
   );
 }
