@@ -694,7 +694,7 @@ export default function LowerBackAssessmentPage() {
               {isSaving ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
+                  Creating plan...
                 </>
               ) : !isMovementPhase && currentPhase === "interview" ? (
                 "Skip to Movement"
@@ -759,9 +759,14 @@ export default function LowerBackAssessmentPage() {
                     Assessment Complete
                   </h2>
                   {isSaving ? (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Saving your assessment...
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Creating your personalized recovery plan...
+                      </div>
+                      <p className="text-xs text-muted-foreground/70">
+                        This may take up to a minute
+                      </p>
                     </div>
                   ) : saveError ? (
                     <div className="space-y-3">

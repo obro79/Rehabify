@@ -7,11 +7,27 @@
 import { z } from 'zod';
 
 /**
- * Exercise prescription within a week
+ * Raw exercise from Gemini (uses slug, no ID)
+ */
+export const rawPlanExerciseSchema = z.object({
+  exerciseSlug: z.string().min(1),
+  name: z.string().min(1),
+  sets: z.number().int().min(1).max(10),
+  reps: z.number().int().min(1).max(100),
+  holdSeconds: z.number().int().min(0).max(300).optional(),
+  days: z.array(z.number().int().min(0).max(6)).min(1).max(7),
+  order: z.number().int().min(0),
+  notes: z.string().optional(),
+});
+
+export type RawPlanExercise = z.infer<typeof rawPlanExerciseSchema>;
+
+/**
+ * Exercise prescription within a week (after slug-to-ID mapping)
  */
 export const planExerciseSchema = z.object({
   exerciseId: z.string().uuid(),
-  exerciseSlug: z.string().optional(),
+  exerciseSlug: z.string(),
   name: z.string().min(1),
   sets: z.number().int().min(1).max(10),
   reps: z.number().int().min(1).max(100),
@@ -24,7 +40,28 @@ export const planExerciseSchema = z.object({
 export type PlanExercise = z.infer<typeof planExerciseSchema>;
 
 /**
- * Week structure in a plan
+ * Raw week structure from Gemini (uses slugs)
+ */
+export const rawPlanWeekSchema = z.object({
+  weekNumber: z.number().int().min(1).max(12),
+  focus: z.string().min(1).max(200),
+  notes: z.string().min(1).max(500),
+  exercises: z.array(rawPlanExerciseSchema).min(1).max(10),
+});
+
+export type RawPlanWeek = z.infer<typeof rawPlanWeekSchema>;
+
+/**
+ * Raw plan structure from Gemini (12 weeks, uses slugs)
+ */
+export const rawPlanStructureSchema = z.object({
+  weeks: z.array(rawPlanWeekSchema).length(12),
+});
+
+export type RawPlanStructure = z.infer<typeof rawPlanStructureSchema>;
+
+/**
+ * Week structure in a plan (after slug-to-ID mapping)
  */
 export const planWeekSchema = z.object({
   weekNumber: z.number().int().min(1).max(12),
@@ -36,7 +73,7 @@ export const planWeekSchema = z.object({
 export type PlanWeek = z.infer<typeof planWeekSchema>;
 
 /**
- * Full plan structure (12 weeks)
+ * Full plan structure (12 weeks, after slug-to-ID mapping)
  */
 export const planStructureSchema = z.object({
   weeks: z.array(planWeekSchema).length(12),
@@ -56,7 +93,18 @@ export const recommendationSchema = z.object({
 export type Recommendation = z.infer<typeof recommendationSchema>;
 
 /**
- * Complete Gemini API response
+ * Raw Gemini API response (before slug-to-ID mapping)
+ */
+export const rawGeminiPlanResponseSchema = z.object({
+  structure: rawPlanStructureSchema,
+  summary: z.string().min(50).max(2000),
+  recommendations: z.array(recommendationSchema).default([]),
+});
+
+export type RawGeminiPlanResponse = z.infer<typeof rawGeminiPlanResponseSchema>;
+
+/**
+ * Complete Gemini API response (after slug-to-ID mapping)
  */
 export const geminiPlanResponseSchema = z.object({
   structure: planStructureSchema,

@@ -19,8 +19,8 @@ function formatExerciseLibrary(exercises: Exercise[]): string {
         ? `\n  Modifications: ${JSON.stringify(ex.modifications)}`
         : '';
 
-      return `- ${ex.name} (slug: ${ex.slug})
-  ID: ${ex.id}
+      return `- ${ex.name}
+  SLUG: ${ex.slug}
   Category: ${ex.category}
   Body Region: ${ex.bodyRegion}
   Difficulty: ${ex.difficulty}
@@ -131,8 +131,7 @@ OUTPUT FORMAT (JSON only, no markdown):
         "notes": "Patient-facing instructions (e.g., 'Focus on pain-free movement. Stop if pain increases.')",
         "exercises": [
           {
-            "exerciseId": "uuid-from-exercise-library",
-            "exerciseSlug": "optional-slug-for-reference",
+            "exerciseSlug": "the-exact-slug-from-exercise-library",
             "name": "Exercise Name",
             "sets": 2,
             "reps": 8,
@@ -157,7 +156,7 @@ OUTPUT FORMAT (JSON only, no markdown):
 }
 
 CRITICAL CONSTRAINTS:
-- Use ONLY exercise IDs from the provided exercise library
+- Use ONLY exercise slugs from the provided exercise library (the SLUG field, e.g., "cat-camel", "dead-bug")
 - Days array uses 0-6 (0=Sunday, 1=Monday, ..., 6=Saturday)
 - Sets must be 1-10, reps must be 1-100, holdSeconds must be 0-300
 - Each week must have at least 1 exercise, maximum 10 exercises

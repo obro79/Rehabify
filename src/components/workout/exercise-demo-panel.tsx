@@ -5,6 +5,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { getExerciseVideoUrl } from "@/lib/exercises/video-map";
 import type { Exercise } from "@/lib/exercises/types";
 
 interface ExerciseDemoPanelProps {
@@ -14,6 +15,7 @@ interface ExerciseDemoPanelProps {
 
 export function ExerciseDemoPanel({ exercise, className }: ExerciseDemoPanelProps) {
   const [showMore, setShowMore] = React.useState(false);
+  const videoUrl = getExerciseVideoUrl(exercise.slug);
 
   // Show first 3 instructions, rest in expandable
   const primaryInstructions = exercise.instructions.slice(0, 3);
@@ -24,30 +26,41 @@ export function ExerciseDemoPanel({ exercise, className }: ExerciseDemoPanelProp
       {/* Demo Visual */}
       <Card className="flex-shrink-0 overflow-hidden mb-4">
         <div className="aspect-[3/4] bg-gradient-to-br from-sage-100 to-sage-200 flex items-center justify-center relative">
-          {/* Placeholder for exercise GIF/video */}
-          <div className="text-center p-4">
-            <div className="w-20 h-20 mx-auto mb-3 rounded-full bg-sage-300/50 flex items-center justify-center">
-              <svg
-                viewBox="0 0 24 24"
-                className="w-10 h-10 text-sage-600"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              >
-                {/* Simple person icon */}
-                <circle cx="12" cy="5" r="3" />
-                <line x1="12" y1="8" x2="12" y2="16" />
-                <line x1="12" y1="12" x2="8" y2="10" />
-                <line x1="12" y1="12" x2="16" y2="10" />
-                <line x1="12" y1="16" x2="9" y2="21" />
-                <line x1="12" y1="16" x2="15" y2="21" />
-              </svg>
+          {videoUrl ? (
+            /* Video player */
+            <video
+              src={videoUrl}
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            /* Placeholder when no video */
+            <div className="text-center p-4">
+              <div className="w-20 h-20 mx-auto mb-3 rounded-full bg-sage-300/50 flex items-center justify-center">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="w-10 h-10 text-sage-600"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                >
+                  <circle cx="12" cy="5" r="3" />
+                  <line x1="12" y1="8" x2="12" y2="16" />
+                  <line x1="12" y1="12" x2="8" y2="10" />
+                  <line x1="12" y1="12" x2="16" y2="10" />
+                  <line x1="12" y1="16" x2="9" y2="21" />
+                  <line x1="12" y1="16" x2="15" y2="21" />
+                </svg>
+              </div>
+              <p className="text-sm font-medium text-sage-700">{exercise.name}</p>
+              <p className="text-xs text-sage-500 mt-1 capitalize">
+                {exercise.category.replace(/_/g, " ")}
+              </p>
             </div>
-            <p className="text-sm font-medium text-sage-700">{exercise.name}</p>
-            <p className="text-xs text-sage-500 mt-1 capitalize">
-              {exercise.category.replace(/_/g, " ")}
-            </p>
-          </div>
+          )}
 
           {/* Demo badge */}
           <div className="absolute top-3 left-3">
