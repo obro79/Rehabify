@@ -65,12 +65,11 @@ export default function WorkoutSessionPage() {
   const { start: startVapi, stop: stopVapi, isConnected, setMuted, say, injectContext } = useVapi();
   const { connectionState, speakingStatus, transcript: transcriptEntries, isMuted } = useVoiceStore();
 
-  // Wire vision events to voice feedback
+  // Wire vision events to voice feedback (LLM-based)
   useFormEventBridge({
-    say,
     injectContext,
     isConnected,
-    exerciseId: exercise?.id,
+    exerciseName: exercise?.name,
     targetReps,
   });
 
