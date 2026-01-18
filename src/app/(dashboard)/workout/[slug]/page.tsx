@@ -27,6 +27,7 @@ import {
 } from "@/stores/exercise-store-selectors";
 import type { Exercise } from "@/lib/exercises/types";
 import { useVapi } from "@/hooks/use-vapi";
+import { useFormEventBridge } from "@/hooks/use-form-event-bridge";
 import { useVoiceStore } from "@/stores/voice-store";
 
 type SessionState = "active" | "paused" | "complete";
@@ -60,8 +61,17 @@ export default function WorkoutSessionPage() {
   const targetReps = exercise?.default_reps || 10;
 
   // Real Vapi voice integration
-  const { start: startVapi, stop: stopVapi, isConnected, setMuted } = useVapi();
+  const { start: startVapi, stop: stopVapi, isConnected, setMuted, say, injectContext } = useVapi();
   const { connectionState, speakingStatus, transcript: transcriptEntries, isMuted } = useVoiceStore();
+
+  // Wire vision events to voice feedback
+  useFormEventBridge({
+    say,
+    injectContext,
+    isConnected,
+    exerciseId: exercise?.id,
+    targetReps,
+  });
 
   // Map connection state to VoiceIndicator state
   const voiceState = React.useMemo((): VoiceState => {

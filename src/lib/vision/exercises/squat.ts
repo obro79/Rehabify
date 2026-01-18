@@ -140,6 +140,7 @@ export function analyzeSquat(
   // Thresholds with defaults
   const standingAngle = thresholds.standing_angle ?? 20;
   const minDepthAngle = thresholds.min_depth_angle ?? 70;
+  const minRepAngle = thresholds.min_rep_angle ?? 40; // Minimum depth to count as a rep attempt
   const maxTrunkLean = thresholds.max_trunk_lean ?? 30;
   const maxKneeForward = thresholds.max_knee_forward ?? 0.12;
   const maxDescentSpeed = thresholds.max_descent_speed ?? 5.0;
@@ -157,15 +158,22 @@ export function analyzeSquat(
     }
   }
 
-  // Rep counts when coming back to standing from ascending
-  const repIncremented = state.lastPhase === "ascending" && phase === "standing";
+  // Rep counts when coming back to standing from ascending OR descending (shallow rep)
+  // But only if we reached minRepAngle (40°) - otherwise it's just noise
+  const isRepTransition = (state.lastPhase === "ascending" || state.lastPhase === "descending") && phase === "standing";
+  const reachedMinDepth = state.maxThighAngle >= minRepAngle;
+  const repIncremented = isRepTransition && reachedMinDepth;
+  const wasShallowRep = state.lastPhase === "descending" && phase === "standing" && reachedMinDepth;
 
   // Debug logging
   if (state.lastPhase !== phase) {
     console.log(`[SQUAT] ${state.lastPhase} → ${phase} | thigh=${thighAngle.toFixed(0)}° (stand<${standingAngle}, depth≥${minDepthAngle})`);
   }
+  if (isRepTransition && !reachedMinDepth) {
+    console.log(`[SQUAT] ✗ Ignored (max ${state.maxThighAngle.toFixed(0)}° < ${minRepAngle}° min)`);
+  }
   if (repIncremented) {
-    console.log(`[SQUAT] ✓ REP COUNTED`);
+    console.log(`[SQUAT] ✓ REP COUNTED${wasShallowRep ? " (shallow - not deep enough)" : ""}`);
   }
 
   const formScore = baseFormScore(landmarks);
