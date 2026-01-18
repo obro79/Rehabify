@@ -2,23 +2,18 @@
 
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Pause, Play, X, Image as ImageIcon, AlertTriangle, Volume2, Mic, MicOff } from "lucide-react";
+import { Pause, Play, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ProgressRing } from "@/components/ui/progress-ring";
-import { RepCounter } from "@/components/ui/rep-counter";
 import { SessionTimer } from "@/components/ui/session-timer";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-  Collapsible,
-  CollapsibleTrigger,
-  CollapsibleContent,
-} from "@/components/ui/collapsible";
-import { VoiceIndicator } from "@/components/ui/voice-indicator";
 import { cn } from "@/lib/utils";
 import exercisesData from "@/lib/exercises/data.json";
-import { ExerciseCamera } from "@/components/workout";
+import {
+  ExerciseCamera,
+  ExerciseDemoPanel,
+  WorkoutStatsPanel,
+} from "@/components/workout";
 import { useExerciseStore } from "@/stores/exercise-store";
 import {
   selectFormScore,
@@ -50,9 +45,10 @@ export default function WorkoutSessionPage() {
   const [sessionState, setSessionState] = React.useState<SessionState>("active");
   const [isPaused, setIsPaused] = React.useState(false);
   const [showEndDialog, setShowEndDialog] = React.useState(false);
-  const [showGuideImage, setShowGuideImage] = React.useState(false);
   const [startTime] = React.useState(new Date());
-  const [sessionId] = React.useState(() => `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`);
+  const [sessionId] = React.useState(
+    () => `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+  );
 
   const repCount = useExerciseStore(selectRepCount);
   const formScore = useExerciseStore(selectFormScore);
@@ -64,27 +60,37 @@ export default function WorkoutSessionPage() {
   const incrementRep = useExerciseStore((state) => state.incrementRep);
   const targetReps = exercise?.default_reps || 10;
 
-  // Voice coaching phase: explaining -> analyzing -> finished
+  // Voice coaching phase
   const [voicePhase, setVoicePhase] = React.useState<VoicePhase>("explaining");
   const voicePhaseRef = React.useRef<VoicePhase>("explaining");
   voicePhaseRef.current = voicePhase;
 
-  // Handle user confirmation to transition from explaining to analyzing
-  // Using ref to avoid callback reference changing and causing useVapi to reinitialize
   const handleUserReady = React.useCallback(() => {
     if (voicePhaseRef.current === "explaining") {
-      console.log("[WorkoutPage] User confirmed ready, transitioning to analyze phase");
+      console.log("[WorkoutPage] User ready, transitioning to analyze phase");
       setVoicePhase("analyzing");
     }
   }, []);
 
-  // Real Vapi voice integration
-  const { start: startVapi, stop: stopVapi, isConnected, isSpeaking, setMuted, say, injectContext } = useVapi({
+  // Vapi integration
+  const {
+    start: startVapi,
+    stop: stopVapi,
+    isConnected,
+    isSpeaking,
+    setMuted,
+    injectContext,
+  } = useVapi({
     onUserReady: handleUserReady,
   });
-  const { connectionState, speakingStatus, transcript: transcriptEntries, isMuted } = useVoiceStore();
+  const {
+    connectionState,
+    speakingStatus,
+    transcript: transcriptEntries,
+    isMuted,
+  } = useVoiceStore();
 
-  // Wire vision events to voice feedback (LLM-based)
+  // Form event bridge
   useFormEventBridge({
     injectContext,
     isConnected,
@@ -94,30 +100,30 @@ export default function WorkoutSessionPage() {
     targetReps,
   });
 
-  // Map connection state to VoiceIndicator state
+  // Voice state for UI
   const voiceState = React.useMemo((): VoiceState => {
-    if (connectionState === 'connecting') return 'connecting';
-    if (connectionState === 'error') return 'idle';
-    if (connectionState === 'disconnected') return 'idle';
-    if (speakingStatus === 'speaking') return 'speaking';
-    if (speakingStatus === 'thinking') return 'thinking';
-    return 'listening';
+    if (connectionState === "connecting") return "connecting";
+    if (connectionState === "error") return "idle";
+    if (connectionState === "disconnected") return "idle";
+    if (speakingStatus === "speaking") return "speaking";
+    if (speakingStatus === "thinking") return "thinking";
+    return "listening";
   }, [connectionState, speakingStatus]);
 
-  // Get latest transcript
+  // Transcript for display
   const transcript = React.useMemo(() => {
     if (transcriptEntries.length === 0) {
-      return isConnected ? "Listening..." : "Click 'Start Voice Coach' to begin";
+      return isConnected ? "Listening..." : "Start voice coach for guidance";
     }
-    return transcriptEntries.slice(-2).map(t => t.content).join(' ');
+    return transcriptEntries.slice(-2).map((t) => t.content).join(" ");
   }, [transcriptEntries, isConnected]);
 
-  // Pre-compute exercise intro context (ready before Vapi connects)
+  // Exercise intro context
   const exerciseIntroContext = React.useMemo(() => {
     if (!exercise) return null;
     return `[EXERCISE INTRO]
 Exercise: ${exercise.name}
-Target area: ${exercise.target_area || exercise.category.replace(/_/g, ' ')}
+Target area: ${exercise.target_area || exercise.category.replace(/_/g, " ")}
 Key cue: ${exercise.instructions[0]}
 
 Greet the user briefly. Tell them what exercise we're doing and give them ONE key thing to focus on.
@@ -125,56 +131,49 @@ Then ask: "Ready to start?"
 Wait for their confirmation before we begin analyzing their form.`;
   }, [exercise]);
 
-  // Inject pre-computed context when Vapi connects (with delay to ensure connection is ready)
+  // Inject context when connected
   const hasInjectedContext = React.useRef(false);
   React.useEffect(() => {
     if (isConnected && exerciseIntroContext && !hasInjectedContext.current) {
       hasInjectedContext.current = true;
-
-      // Small delay to ensure Vapi connection is fully established
       const timer = setTimeout(() => {
-        console.log('[WorkoutPage] Injecting pre-computed exercise intro context');
+        console.log("[WorkoutPage] Injecting exercise intro context");
         injectContext(exerciseIntroContext);
       }, 500);
-
       return () => clearTimeout(timer);
     }
-
-    // Reset when disconnected
     if (!isConnected) {
       hasInjectedContext.current = false;
       setVoicePhase("explaining");
     }
   }, [isConnected, exerciseIntroContext, injectContext]);
 
-  // Inject analyze context when user confirms ready
+  // Inject analyze context
   React.useEffect(() => {
     if (voicePhase === "analyzing" && isConnected) {
       const context = `[EXERCISE STARTING]
 The user is ready to begin. Say "Great, let's go - I'm watching your form."
 From now on, give brief form corrections when I send you [FORM FEEDBACK NEEDED] messages.
 Keep corrections to 5-15 words max. Focus on what TO do, not what's wrong.`;
-
-      console.log('[WorkoutPage] Transitioning to analyze phase:', context);
+      console.log("[WorkoutPage] Transitioning to analyze phase");
       injectContext(context);
     }
   }, [voicePhase, isConnected, injectContext]);
 
-  // Sync exercise state to API for Vapi webhook access (get_form_status tool)
+  // Sync state for webhook
   React.useEffect(() => {
     if (!exercise || !isConnected) return;
-
     const syncState = async () => {
       try {
-        await fetch('/api/session-state', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        await fetch("/api/session-state", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             sessionId,
             exerciseId: exercise.id,
             exerciseName: exercise.name,
             formScore,
-            activeErrors: activeErrors.map(e => e.type),
+            activeErrors: activeErrors.map((e) => e.type),
             repCount,
             targetReps,
             phase,
@@ -182,46 +181,43 @@ Keep corrections to 5-15 words max. Focus on what TO do, not what's wrong.`;
           }),
         });
       } catch (err) {
-        console.error('[WorkoutPage] Failed to sync session state:', err);
+        console.error("[WorkoutPage] Failed to sync state:", err);
       }
     };
-
-    // Sync immediately and then every 1 second
     syncState();
     const interval = setInterval(syncState, 1000);
     return () => clearInterval(interval);
   }, [exercise, isConnected, sessionId, formScore, activeErrors, repCount, phase, targetReps]);
 
-  // Stop voice when session ends
+  // Stop voice on unmount
   React.useEffect(() => {
     return () => {
-      if (isConnected) {
-        stopVapi();
-      }
+      if (isConnected) stopVapi();
     };
   }, [isConnected, stopVapi]);
 
+  // Set exercise in store
   React.useEffect(() => {
     if (!exercise) return;
     setExercise(exercise);
     return () => resetExercise();
   }, [exercise, resetExercise, setExercise]);
 
+  // Auto-complete when target reps reached
   React.useEffect(() => {
     if (sessionState !== "active") return;
     if (repCount >= targetReps) {
       setSessionState("complete");
-      router.push(`/workout/${slug}/complete`);
+      router.push(`/workout/${slug}/complete?score=${formScore}&reps=${repCount}`);
     }
-  }, [repCount, router, sessionState, slug, targetReps]);
+  }, [repCount, router, sessionState, slug, targetReps, formScore]);
 
+  // Demo mode for non-vision exercises
   React.useEffect(() => {
     if (!exercise || exercise.form_detection_enabled) return;
     if (sessionState !== "active" || isPaused) return;
-
     const phases = exercise.detection_config?.phases;
     let phaseIndex = 0;
-
     const interval = setInterval(() => {
       incrementRep();
       if (phases && phases.length > 0) {
@@ -229,15 +225,8 @@ Keep corrections to 5-15 words max. Focus on what TO do, not what's wrong.`;
         setExercisePhase(phases[phaseIndex]);
       }
     }, 3000);
-
     return () => clearInterval(interval);
-  }, [
-    exercise,
-    incrementRep,
-    isPaused,
-    sessionState,
-    setExercisePhase,
-  ]);
+  }, [exercise, incrementRep, isPaused, sessionState, setExercisePhase]);
 
   if (!exercise) {
     return (
@@ -249,27 +238,17 @@ Keep corrections to 5-15 words max. Focus on what TO do, not what's wrong.`;
     );
   }
 
-  const handlePauseToggle = () => {
-    setIsPaused(!isPaused);
-  };
+  const handlePauseToggle = () => setIsPaused(!isPaused);
+  const handleEndSession = () => setShowEndDialog(true);
+  const handleConfirmEnd = () => router.push(`/workout/${slug}/complete?score=${formScore}&reps=${repCount}`);
 
-  const handleEndSession = () => {
-    setShowEndDialog(true);
-  };
-
-  const handleConfirmEnd = () => {
-    router.push(`/workout/${slug}/complete`);
-  };
-
-  const getFormScoreColor = (score: number): "sage" | "coral" => {
-    return score >= 70 ? "sage" : "coral";
-  };
-
-  const getFormFeedback = (score: number): string => {
-    if (score >= 90) return "Perfect form!";
-    if (score >= 70) return "Great spinal curve!";
-    if (score >= 50) return "Try arching more";
-    return "Pause - let me help";
+  const handleStartVoice = () => {
+    startVapi(undefined, {
+      sessionId,
+      exerciseId: exercise?.id,
+      exerciseName: exercise?.name,
+      targetReps,
+    });
   };
 
   return (
@@ -286,39 +265,22 @@ Keep corrections to 5-15 words max. Focus on what TO do, not what's wrong.`;
             </div>
 
             <div className="flex items-center gap-3">
-              <SessionTimer
-                startTime={startTime}
-                isPaused={isPaused}
-                size="default"
-              />
+              <SessionTimer startTime={startTime} isPaused={isPaused} size="default" />
 
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handlePauseToggle}
-                className="gap-1.5"
-              >
+              <Button variant="ghost" size="sm" onClick={handlePauseToggle} className="gap-1.5">
                 {isPaused ? (
                   <>
-                    <Play className="h-4 w-4" />
-                    Resume
+                    <Play className="h-4 w-4" /> Resume
                   </>
                 ) : (
                   <>
-                    <Pause className="h-4 w-4" />
-                    Pause
+                    <Pause className="h-4 w-4" /> Pause
                   </>
                 )}
               </Button>
 
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleEndSession}
-                className="gap-1.5"
-              >
-                <X className="h-4 w-4" />
-                End Session
+              <Button variant="destructive" size="sm" onClick={handleEndSession} className="gap-1.5">
+                <X className="h-4 w-4" /> End
               </Button>
             </div>
           </div>
@@ -571,10 +533,25 @@ Keep corrections to 5-15 words max. Focus on what TO do, not what's wrong.`;
               )}
             </div>
           </div>
+
+          {/* Right Panel - Stats */}
+          <WorkoutStatsPanel
+            voiceState={voiceState}
+            transcript={transcript}
+            isConnected={isConnected}
+            isMuted={isMuted}
+            onStartVoice={handleStartVoice}
+            onStopVoice={stopVapi}
+            onToggleMute={() => setMuted(!isMuted)}
+            repCount={repCount}
+            targetReps={targetReps}
+            formScore={formScore}
+            phase={phase}
+          />
         </div>
       </main>
 
-      {/* End Session Confirmation Dialog */}
+      {/* End Dialog */}
       <ConfirmDialog
         open={showEndDialog}
         onOpenChange={setShowEndDialog}

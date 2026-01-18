@@ -6,3 +6,5 @@ export { MetricPill } from "./metric-pill";
 export { KineticMetricsBar } from "./kinetic-metrics-bar";
 export { FloatingVoiceCoach } from "./floating-voice-coach";
 export { ImmersivePauseOverlay } from "./pause-overlay";
+export { ExerciseDemoPanel } from "./exercise-demo-panel";
+export { WorkoutStatsPanel } from "./workout-stats-panel";

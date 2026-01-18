@@ -126,11 +126,16 @@ Acknowledge the halfway milestone briefly.`;
         } else if (errors.length > 0) {
           // Form feedback needed - include specific cue suggestions for variety
           const errorCues: Record<string, string[]> = {
+            // Squat cues
             forward_lean: ['chest up', 'tall spine', 'proud chest', 'shoulders back', 'look forward'],
             insufficient_depth: ['sink deeper', 'drop lower', 'hips below knees', 'deeper squat', 'all the way down'],
             knee_forward: ['knees out', 'push knees wide', 'track over toes', 'spread the floor', 'knees follow toes'],
             knee_valgus: ['knees out', 'push knees apart', 'knees over pinky toes', 'spread the floor'],
             heel_rise: ['heels down', 'weight in heels', 'press through heels', 'ground your heels'],
+            // Lunge cues
+            trunk_lean: ['stand tall', 'upright torso', 'chest proud', 'shoulders over hips', 'torso vertical'],
+            depth: ['drop lower', 'thigh parallel', 'sink deeper', '90 degree knees', 'lower hips'],
+            hands_on_legs: ['hands free', 'arms at sides', 'no leaning on legs', 'use your legs'],
           };
 
           // Pick a random cue for the primary error
