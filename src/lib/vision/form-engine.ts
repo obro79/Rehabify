@@ -66,6 +66,22 @@ function angleBetween(a: Landmark, b: Landmark, c: Landmark) {
   return Math.acos(cos) * (180 / Math.PI);
 }
 
+function angleBetween3D(a: Landmark, b: Landmark, c: Landmark) {
+  const abx = a.x - b.x;
+  const aby = a.y - b.y;
+  const abz = a.z - b.z;
+  const cbx = c.x - b.x;
+  const cby = c.y - b.y;
+  const cbz = c.z - b.z;
+  const dot = abx * cbx + aby * cby + abz * cbz;
+  const mag =
+    Math.sqrt(abx * abx + aby * aby + abz * abz) *
+    Math.sqrt(cbx * cbx + cby * cby + cbz * cbz);
+  if (mag === 0) return 0;
+  const cos = clamp(dot / mag, -1, 1);
+  return Math.acos(cos) * (180 / Math.PI);
+}
+
 function averageVisibility(landmarks: Landmark[], indices: number[]) {
   const total = indices.reduce((sum, index) => sum + (landmarks[index]?.visibility ?? 0), 0);
   return total / indices.length;
@@ -83,6 +99,18 @@ function baseFormScore(landmarks: Landmark[]) {
   return clamp(Math.round(visibility * 100), 0, 100);
 }
 
+function scoreFromTargetAngle(angle: number, target: number, tolerance: number) {
+  if (tolerance <= 0) return 0;
+  const delta = Math.abs(angle - target);
+  const ratio = clamp(1 - delta / tolerance, 0, 1);
+  return Math.round(ratio * 100);
+}
+
+function scoreFromKneeAngle(angle: number, minAngle: number) {
+  if (minAngle <= 0) return 0;
+  const ratio = clamp(angle / minAngle, 0, 1);
+  return Math.round(ratio * 100);
+}
 function analyzeCatCamel(
   landmarks: Landmark[],
   thresholds: Record<string, number>,
@@ -188,6 +216,201 @@ function analyzeCobra(
       severity: "info",
       timestamp: Date.now(),
       bodyPart: "elbows",
+    });
+  }
+
+  return {
+    phase,
+    formScore,
+    errors,
+    isCorrect: errors.length === 0,
+    repIncremented,
+    confidence: averageVisibility(landmarks, [
+      LANDMARKS.leftShoulder,
+      LANDMARKS.rightShoulder,
+      LANDMARKS.leftHip,
+      LANDMARKS.rightHip,
+    ]),
+  };
+}
+
+function analyzeStandingLumbarFlexion(
+  landmarks: Landmark[],
+  thresholds: Record<string, number>,
+  state: EngineState
+): FormEngineResult {
+  const leftShoulder = landmarks[LANDMARKS.leftShoulder];
+  const rightShoulder = landmarks[LANDMARKS.rightShoulder];
+  const leftHip = landmarks[LANDMARKS.leftHip];
+  const rightHip = landmarks[LANDMARKS.rightHip];
+  const leftKnee = landmarks[LANDMARKS.leftKnee];
+  const rightKnee = landmarks[LANDMARKS.rightKnee];
+  const leftAnkle = landmarks[LANDMARKS.leftAnkle];
+  const rightAnkle = landmarks[LANDMARKS.rightAnkle];
+
+  const midShoulder = midpoint(leftShoulder, rightShoulder);
+  const midHip = midpoint(leftHip, rightHip);
+  const midKnee = midpoint(leftKnee, rightKnee);
+  const midAnkle = midpoint(leftAnkle, rightAnkle);
+
+  const hipAngle = angleBetween3D(midShoulder, midHip, midAnkle);
+  const kneeAngle = angleBetween3D(midHip, midKnee, midAnkle);
+  const spineDepth = midShoulder.z - midHip.z;
+
+  const flexionPhaseAngle = thresholds.flexion_phase_angle ?? 150;
+  const flexionTargetAngle = thresholds.flexion_target_angle ?? 120;
+  const flexionTolerance = thresholds.flexion_angle_tolerance ?? 25;
+  const neutralAngle = thresholds.neutral_angle ?? 165;
+  const kneeAngleMin = thresholds.knee_angle_min ?? 150;
+  const flexionDepthThreshold = thresholds.flexion_spine_depth ?? -0.05;
+
+  let phase = "neutral";
+  if (hipAngle <= flexionPhaseAngle || spineDepth <= flexionDepthThreshold) phase = "flexion";
+  if (state.lastPhase === "flexion" && hipAngle >= neutralAngle) phase = "return";
+
+  const repIncremented = state.lastPhase === "flexion" && phase === "return";
+
+  const hipScore = scoreFromTargetAngle(hipAngle, flexionTargetAngle, flexionTolerance);
+  const kneeScore = scoreFromKneeAngle(kneeAngle, kneeAngleMin);
+  const formScore = Math.round(hipScore * 0.7 + kneeScore * 0.3);
+  const errors: FormError[] = [];
+
+  if (kneeAngle < kneeAngleMin) {
+    errors.push({
+      type: "knee_bend",
+      message: "Keep a soft bend in the knees without squatting",
+      severity: "warning",
+      timestamp: Date.now(),
+      bodyPart: "knees",
+    });
+  }
+
+  return {
+    phase,
+    formScore,
+    errors,
+    isCorrect: errors.length === 0,
+    repIncremented,
+    confidence: averageVisibility(landmarks, [
+      LANDMARKS.leftShoulder,
+      LANDMARKS.rightShoulder,
+      LANDMARKS.leftHip,
+      LANDMARKS.rightHip,
+    ]),
+  };
+}
+
+function analyzeStandingLumbarExtension(
+  landmarks: Landmark[],
+  thresholds: Record<string, number>,
+  state: EngineState
+): FormEngineResult {
+  const leftShoulder = landmarks[LANDMARKS.leftShoulder];
+  const rightShoulder = landmarks[LANDMARKS.rightShoulder];
+  const leftHip = landmarks[LANDMARKS.leftHip];
+  const rightHip = landmarks[LANDMARKS.rightHip];
+  const leftKnee = landmarks[LANDMARKS.leftKnee];
+  const rightKnee = landmarks[LANDMARKS.rightKnee];
+  const leftAnkle = landmarks[LANDMARKS.leftAnkle];
+  const rightAnkle = landmarks[LANDMARKS.rightAnkle];
+
+  const midShoulder = midpoint(leftShoulder, rightShoulder);
+  const midHip = midpoint(leftHip, rightHip);
+  const midKnee = midpoint(leftKnee, rightKnee);
+  const midAnkle = midpoint(leftAnkle, rightAnkle);
+
+  const hipAngle = angleBetween3D(midShoulder, midHip, midAnkle);
+  const kneeAngle = angleBetween3D(midHip, midKnee, midAnkle);
+  const spineDepth = midShoulder.z - midHip.z;
+
+  const extensionDepthThreshold = thresholds.extension_spine_depth ?? 0.04;
+  const extensionTargetAngle = thresholds.extension_target_angle ?? 175;
+  const extensionTolerance = thresholds.extension_angle_tolerance ?? 10;
+  const neutralAngle = thresholds.neutral_angle ?? 165;
+  const kneeAngleMin = thresholds.knee_angle_min ?? 150;
+
+  let phase = "neutral";
+  if (spineDepth >= extensionDepthThreshold) phase = "extension";
+  if (state.lastPhase === "extension" && hipAngle <= neutralAngle) phase = "return";
+
+  const repIncremented = state.lastPhase === "extension" && phase === "return";
+
+  const hipScore = scoreFromTargetAngle(hipAngle, extensionTargetAngle, extensionTolerance);
+  const kneeScore = scoreFromKneeAngle(kneeAngle, kneeAngleMin);
+  const formScore = Math.round(hipScore * 0.7 + kneeScore * 0.3);
+  const errors: FormError[] = [];
+
+  if (kneeAngle < kneeAngleMin) {
+    errors.push({
+      type: "knee_bend",
+      message: "Keep knees softly straight as you extend",
+      severity: "warning",
+      timestamp: Date.now(),
+      bodyPart: "knees",
+    });
+  }
+
+  return {
+    phase,
+    formScore,
+    errors,
+    isCorrect: errors.length === 0,
+    repIncremented,
+    confidence: averageVisibility(landmarks, [
+      LANDMARKS.leftShoulder,
+      LANDMARKS.rightShoulder,
+      LANDMARKS.leftHip,
+      LANDMARKS.rightHip,
+    ]),
+  };
+}
+
+function analyzeStandingLumbarSideBend(
+  landmarks: Landmark[],
+  thresholds: Record<string, number>,
+  state: EngineState
+): FormEngineResult {
+  const leftShoulder = landmarks[LANDMARKS.leftShoulder];
+  const rightShoulder = landmarks[LANDMARKS.rightShoulder];
+  const leftHip = landmarks[LANDMARKS.leftHip];
+  const rightHip = landmarks[LANDMARKS.rightHip];
+  const leftKnee = landmarks[LANDMARKS.leftKnee];
+  const rightKnee = landmarks[LANDMARKS.rightKnee];
+  const leftAnkle = landmarks[LANDMARKS.leftAnkle];
+  const rightAnkle = landmarks[LANDMARKS.rightAnkle];
+
+  const midShoulder = midpoint(leftShoulder, rightShoulder);
+  const midHip = midpoint(leftHip, rightHip);
+  const midKnee = midpoint(leftKnee, rightKnee);
+  const midAnkle = midpoint(leftAnkle, rightAnkle);
+
+  const lateralAngle = angleBetween(midShoulder, midHip, midAnkle);
+  const kneeAngle = angleBetween3D(midHip, midKnee, midAnkle);
+
+  const bendPhaseAngle = thresholds.side_bend_phase_angle ?? 165;
+  const bendTargetAngle = thresholds.side_bend_target_angle ?? 150;
+  const bendTolerance = thresholds.side_bend_angle_tolerance ?? 20;
+  const neutralAngle = thresholds.neutral_angle ?? 175;
+  const kneeAngleMin = thresholds.knee_angle_min ?? 150;
+
+  let phase = "neutral";
+  if (lateralAngle <= bendPhaseAngle) phase = "side_bend";
+  if (state.lastPhase === "side_bend" && lateralAngle >= neutralAngle) phase = "return";
+
+  const repIncremented = state.lastPhase === "side_bend" && phase === "return";
+
+  const bendScore = scoreFromTargetAngle(lateralAngle, bendTargetAngle, bendTolerance);
+  const kneeScore = scoreFromKneeAngle(kneeAngle, kneeAngleMin);
+  const formScore = Math.round(bendScore * 0.7 + kneeScore * 0.3);
+  const errors: FormError[] = [];
+
+  if (kneeAngle < kneeAngleMin) {
+    errors.push({
+      type: "knee_bend",
+      message: "Keep knees softly straight during the bend",
+      severity: "warning",
+      timestamp: Date.now(),
+      bodyPart: "knees",
     });
   }
 
@@ -390,6 +613,15 @@ export function createFormEngine(exercise: Exercise) {
       case "dead-bug":
         result = analyzeDeadBug(landmarks, thresholds, state);
         break;
+      case "standing-lumbar-flexion":
+        result = analyzeStandingLumbarFlexion(landmarks, thresholds, state);
+        break;
+      case "standing-lumbar-extension":
+        result = analyzeStandingLumbarExtension(landmarks, thresholds, state);
+        break;
+      case "standing-lumbar-side-bending":
+        result = analyzeStandingLumbarSideBend(landmarks, thresholds, state);
+        break;
       case "romanian-deadlift":
         result = analyzeRDL(landmarks, thresholds, state);
         break;
@@ -404,6 +636,15 @@ export function createFormEngine(exercise: Exercise) {
                 break;
             case "dead-bug":
                 result = analyzeDeadBug(landmarks, thresholds, state);
+                break;
+            case "standing-lumbar-flexion":
+                result = analyzeStandingLumbarFlexion(landmarks, thresholds, state);
+                break;
+            case "standing-lumbar-extension":
+                result = analyzeStandingLumbarExtension(landmarks, thresholds, state);
+                break;
+            case "standing-lumbar-side-bending":
+                result = analyzeStandingLumbarSideBend(landmarks, thresholds, state);
                 break;
             case "romanian-deadlift":
                 result = analyzeRDL(landmarks, thresholds, state);
