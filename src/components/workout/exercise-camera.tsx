@@ -11,11 +11,16 @@ import { createLandmarkFilter, filterLandmarks, type LandmarkFilterState } from 
 import { getCameraFeedback, type CameraFeedback } from "@/lib/vision/camera-feedback";
 import { useExerciseStore } from "@/stores/exercise-store";
 
-// Side-view skeleton: only torso and legs, no arms
+// Skeleton: both left and right sides
 const POSE_CONNECTIONS: Array<[number, number]> = [
+  // Left side
   [11, 23],  // left shoulder to left hip (torso)
   [23, 25],  // left hip to left knee (thigh)
   [25, 27],  // left knee to left ankle (shin)
+  // Right side
+  [12, 24],  // right shoulder to right hip (torso)
+  [24, 26],  // right hip to right knee (thigh)
+  [26, 28],  // right knee to right ankle (shin)
 ];
 
 interface ExerciseCameraProps {
@@ -46,11 +51,20 @@ export function ExerciseCamera({
   const [feedback, setFeedback] = React.useState<CameraFeedback>(null);
   const [formFeedback, setFormFeedback] = React.useState<CameraFeedback>(null);
   const [debugValues, setDebugValues] = React.useState<{
-    kneeAngle: number;
-    trunkLean: number;
-    kneeForward: number;
-    descentSpeed: number;
-    minDepth: number;
+    // Squat fields
+    kneeAngle?: number;
+    trunkLean?: number;
+    kneeForward?: number;
+    descentSpeed?: number;
+    minDepth?: number;
+
+    // Lumbar extension fields
+    hipAngle?: number;
+    spineDepth?: number;
+    depthChange?: number;
+    baseline?: number;
+    baselineSamples?: number;
+
     phase: string;
     queuedErrors: string[];
   } | null>(null);
@@ -258,15 +272,33 @@ export function ExerciseCamera({
         className="absolute inset-0 h-full w-full scale-x-[-1]"
       />
 
-      {/* Debug Overlay for tuning thresholds */}
-      {debugValues && (
-        <div className="absolute top-24 left-2 bg-black/95 text-green-400 p-4 rounded-xl font-mono z-30 space-y-1 min-w-[180px]">
-          <div className="text-xl font-bold">thigh: {debugValues.kneeAngle.toFixed(0)}°</div>
-          <div className="text-xl font-bold">lean: {debugValues.trunkLean.toFixed(0)}°</div>
-          <div className="text-xl font-bold">fwd: {debugValues.kneeForward.toFixed(2)}</div>
-          <div className="text-xl font-bold">spd: {debugValues.descentSpeed.toFixed(2)}</div>
-          <div className="text-cyan-400 font-bold">max: {debugValues.minDepth.toFixed(0)}°</div>
-          <div className="text-yellow-400 font-bold text-2xl mt-2 uppercase">{debugValues.phase}</div>
+      {/* Debug Overlay for tuning thresholds - DISABLED */}
+      {/* {debugValues && (
+        <div className="absolute top-24 left-2 bg-black/95 text-green-400 p-4 rounded-xl font-mono z-30 space-y-1 min-w-[200px]">
+          <div className="text-yellow-400 font-bold text-2xl mb-2 uppercase">{debugValues.phase}</div>
+
+          {debugValues.trunkLean !== undefined && (
+            <>
+              <div className="text-xl font-bold">thigh: {debugValues.kneeAngle?.toFixed(0) ?? 'N/A'}°</div>
+              <div className="text-xl font-bold">lean: {debugValues.trunkLean.toFixed(0)}°</div>
+              <div className="text-xl font-bold">fwd: {debugValues.kneeForward?.toFixed(2) ?? 'N/A'}</div>
+              <div className="text-xl font-bold">spd: {debugValues.descentSpeed?.toFixed(2) ?? 'N/A'}</div>
+              <div className="text-cyan-400 font-bold">max: {debugValues.minDepth?.toFixed(0) ?? 'N/A'}°</div>
+            </>
+          )}
+
+          {debugValues.hipAngle !== undefined && (
+            <>
+              <div className="text-xl font-bold">hip: {debugValues.hipAngle.toFixed(0)}°</div>
+              <div className="text-xl font-bold">knee: {debugValues.kneeAngle?.toFixed(0) ?? 'N/A'}°</div>
+              <div className="text-xl font-bold">depth: {debugValues.spineDepth?.toFixed(3) ?? 'N/A'}</div>
+              <div className={`text-xl font-bold ${(debugValues.depthChange ?? 0) <= -0.15 ? 'text-cyan-400' : ''}`}>
+                Δ: {debugValues.depthChange?.toFixed(3) ?? 'N/A'}
+              </div>
+              <div className="text-sm">base: {debugValues.baseline?.toFixed(3) ?? 'N/A'} ({debugValues.baselineSamples ?? 0})</div>
+            </>
+          )}
+
           {debugValues.queuedErrors.length > 0 && (
             <div className="mt-2 pt-2 border-t border-orange-500/50">
               <div className="text-orange-400 text-sm font-bold mb-1">QUEUED:</div>
@@ -276,7 +308,7 @@ export function ExerciseCamera({
             </div>
           )}
         </div>
-      )}
+      )} */}
 
       {/* Feedback Overlay (Camera Positioning or Exercise Form) */}
       {activeFeedback && status === "ready" && (
@@ -346,9 +378,9 @@ function drawSkeleton(canvas: HTMLCanvasElement, landmarks: Landmark[]) {
     ctx.stroke();
   });
 
-  // Side-view landmarks only: shoulder, hip, knee, ankle (left side)
-  const sideViewLandmarks = [11, 23, 25, 27];  // left shoulder, hip, knee, ankle
-  sideViewLandmarks.forEach((index) => {
+  // Landmarks for both sides: shoulder, hip, knee, ankle
+  const landmarksToShow = [11, 23, 25, 27, 12, 24, 26, 28];  // left and right sides
+  landmarksToShow.forEach((index) => {
     const landmark = landmarks[index];
     if (!landmark) return;
     ctx.beginPath();

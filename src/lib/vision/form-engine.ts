@@ -12,11 +12,21 @@ interface FormEngineResult {
   repIncremented: boolean;
   confidence: number;
   debug?: {
-    kneeAngle: number;
-    trunkLean: number;
-    kneeForward: number;
-    descentSpeed: number;
-    minDepth: number;
+    // Squat fields
+    kneeAngle?: number;
+    trunkLean?: number;
+    kneeForward?: number;
+    descentSpeed?: number;
+    minDepth?: number;
+
+    // Lumbar extension fields
+    hipAngle?: number;
+    spineDepth?: number;
+    depthChange?: number;
+    baseline?: number;
+    baselineSamples?: number;
+    phase?: string;
+
     queuedErrors: string[];
   };
 }
@@ -27,6 +37,8 @@ interface EngineState {
   lastExtendedSide: "left" | "right" | null;
   // Exercise-specific states
   squatState: SquatState;
+  // Baseline tracking for lumbar extension
+  baselineSpineDepth: number[];
 }
 
 const LANDMARKS = {
@@ -312,7 +324,7 @@ export function analyzeStandingLumbarFlexion(
   const hipAngle = angleBetween3D(midShoulder, midHip, midKnee);
   const kneeAngle = angleBetween3D(midHip, midKnee, midAnkle);
 
-  const flexionPhaseAngle = 145; // Relaxed threshold (was 135)
+  const flexionPhaseAngle = 90; // Require deeper bend for flexion
   const neutralAngle = 160; // Relaxed return threshold
   const kneeAngleMin = 120; // Allow moderate knee bend - only warn for significant bend
 
@@ -424,26 +436,40 @@ function analyzeStandingLumbarExtension(
   // Simple heuristic: If hipAngle < 170 AND shoulder is behind hip (x check relative to orientation)
   // Or just check "spineDepth" (z) if robust.
   const spineDepth = midShoulder.z - midHip.z;
-  const extensionDepthThreshold = thresholds.extension_spine_depth ?? 0.05; // Relaxed from 0.08
+  const absSpineDepth = Math.abs(spineDepth);
 
-  let phase = "neutral";
-  // Require significant backward movement
-  if (spineDepth >= extensionDepthThreshold) phase = "extension";
-  if (state.lastPhase === "extension" && spineDepth < extensionDepthThreshold / 2) phase = "return";
-
-  const repIncremented = state.lastPhase === "extension" && phase === "return";
-
-  if (state.lastPhase !== phase) {
-    console.log(`[LUMBAR_EXT] ${state.lastPhase} → ${phase} | spineDepth=${spineDepth.toFixed(3)} (threshold=${extensionDepthThreshold})`);
+  // Build baseline over first 60 frames (2 seconds at 30fps)
+  if (state.baselineSpineDepth.length < 60) {
+    state.baselineSpineDepth.push(absSpineDepth);
   }
 
-  if (repIncremented) {
-    console.log(`[LUMBAR_EXT] ✓ REP COUNTED`);
+  // Calculate baseline average
+  const baseline = state.baselineSpineDepth.length > 0
+    ? state.baselineSpineDepth.reduce((sum, val) => sum + val, 0) / state.baselineSpineDepth.length
+    : absSpineDepth;
+
+  // Detect extension as a DECREASE in spine depth from baseline
+  // When extending backward, the spine straightens and depth decreases
+  const depthChange = absSpineDepth - baseline;
+  const extensionThreshold = -0.05; // Depth must decrease by 0.15 from baseline
+  const returnThreshold = -0.02; // Return when depth is within 0.05 of baseline
+
+  let phase = "neutral";
+  // Extension = depth DECREASES from baseline (spine straightens)
+  if (depthChange <= extensionThreshold) {
+    phase = "extension";
+  }
+
+  // Count rep when returning from extension to neutral
+  const repIncremented = state.lastPhase === "extension" && phase === "neutral";
+
+  if (state.lastPhase !== phase) {
+    console.log(`[LUMBAR_EXT] 🔄 PHASE CHANGE: ${state.lastPhase} → ${phase}`);
   }
 
   const formScore = baseFormScore(landmarks);
 
-  if (kneeAngle < 160) {
+  if (kneeAngle < 135) {
     errors.push({
       type: "knee_bend",
       message: "Keep knees straight",
@@ -451,6 +477,14 @@ function analyzeStandingLumbarExtension(
       timestamp: Date.now(),
       bodyPart: "knees",
     });
+  }
+
+  if (repIncremented && errors.length > 0) {
+    console.log(`[LUMBAR_EXT] 🚫 REP BLOCKED - Errors:`, errors.map(e => e.type));
+  }
+
+  if (repIncremented && errors.length === 0) {
+    console.log(`[LUMBAR_EXT] ✅ REP COUNTED`);
   }
 
   return {
@@ -466,6 +500,16 @@ function analyzeStandingLumbarExtension(
       LANDMARKS.leftHip,
       LANDMARKS.rightHip,
     ]),
+    debug: {
+      hipAngle,
+      kneeAngle,
+      spineDepth: absSpineDepth,
+      depthChange,
+      baseline,
+      baselineSamples: state.baselineSpineDepth.length,
+      phase,
+      queuedErrors: errors.map(e => e.type),
+    }
   };
 }
 
@@ -648,7 +692,7 @@ function analyzeRDL(
   let feedback = "";
 
   // Feedback Logic
-  if (kneeAngle < 140) {
+  if (kneeAngle < 115) {
     errors.push({
       type: "knee_bend",
       message: "Too much knee bend - hinge at hips",
@@ -741,6 +785,7 @@ export function createFormEngine(exercise: Exercise) {
     lastRepPhase: "",
     lastExtendedSide: null,
     squatState: createSquatState(),
+    baselineSpineDepth: [],
   };
 
   return (landmarks: Landmark[]): FormEngineResult => {

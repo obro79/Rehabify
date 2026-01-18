@@ -98,6 +98,18 @@ export default function AssessmentPage() {
         score: averageScore,
       },
     ]);
+  }, [
+    assessmentResults,
+    currentExercise,
+    formScore,
+    repCount,
+    scoreSamples,
+    sessionState,
+  ]);
+
+  React.useEffect(() => {
+    if (!currentExercise || sessionState !== "active") return;
+    if (!assessmentResults.some((result) => result.slug === currentExercise.slug)) return;
 
     const timer = setTimeout(() => {
       if (currentIndex < exercises.length - 1) {
@@ -115,10 +127,7 @@ export default function AssessmentPage() {
     currentExercise,
     currentIndex,
     exercises.length,
-    formScore,
-    repCount,
     resetExercise,
-    scoreSamples,
     sessionState,
   ]);
 
