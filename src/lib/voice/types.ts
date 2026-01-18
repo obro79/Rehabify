@@ -36,6 +36,7 @@ export type FormErrorType =
   | 'knee_forward'
   | 'forward_lean'
   | 'insufficient_depth'
+  | 'hands_on_legs'
   | 'unknown';
 
 /**
@@ -153,6 +154,7 @@ export const FORM_ERROR_CORRECTIONS: Record<FormErrorType, string> = {
   knee_forward: 'Sit back more, keep knees over ankles',
   forward_lean: 'Keep your chest up',
   insufficient_depth: 'Try to get a bit lower if comfortable',
+  hands_on_legs: 'Keep your hands off your legs for balance',
   unknown: 'Adjust your form slightly',
 };
 
@@ -176,5 +178,6 @@ export const ERROR_PRIORITY: Record<FormErrorType, EventPriority> = {
   knee_forward: EventPriority.MEDIUM,
   forward_lean: EventPriority.HIGH, // Safety concern - spine position
   insufficient_depth: EventPriority.LOW,
+  hands_on_legs: EventPriority.MEDIUM,
   unknown: EventPriority.LOW,
 };
