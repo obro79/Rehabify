@@ -7,24 +7,15 @@ import type { Landmark } from "@/types/vision";
 import { cn } from "@/lib/utils";
 import { getPoseLandmarker } from "@/lib/vision/pose-landmarker";
 import { createFormEngine } from "@/lib/vision/form-engine";
+import { createLandmarkFilter, filterLandmarks, type LandmarkFilterState } from "@/lib/vision/landmark-filter";
 import { getCameraFeedback, type CameraFeedback } from "@/lib/vision/camera-feedback";
 import { useExerciseStore } from "@/stores/exercise-store";
 
+// Side-view skeleton: only torso and legs, no arms
 const POSE_CONNECTIONS: Array<[number, number]> = [
-  [11, 12],
-  [11, 13],
-  [13, 15],
-  [12, 14],
-  [14, 16],
-  [11, 23],
-  [12, 24],
-  [23, 24],
-  [23, 25],
-  [24, 26],
-  [25, 27],
-  [26, 28],
-  [27, 31],
-  [28, 32],
+  [11, 23],  // left shoulder to left hip (torso)
+  [23, 25],  // left hip to left knee (thigh)
+  [25, 27],  // left knee to left ankle (shin)
 ];
 
 interface ExerciseCameraProps {
@@ -50,9 +41,19 @@ export function ExerciseCamera({
   const lastFeedbackRef = React.useRef(0);
   const lastTimestampRef = React.useRef(0);
   const engineRef = React.useRef<ReturnType<typeof createFormEngine> | null>(null);
+  const filterRef = React.useRef<LandmarkFilterState | null>(null);
   const [status, setStatus] = React.useState<CameraStatus>("loading");
   const [feedback, setFeedback] = React.useState<CameraFeedback>(null);
   const [formFeedback, setFormFeedback] = React.useState<CameraFeedback>(null);
+  const [debugValues, setDebugValues] = React.useState<{
+    kneeAngle: number;
+    trunkLean: number;
+    kneeForward: number;
+    descentSpeed: number;
+    minDepth: number;
+    phase: string;
+    queuedErrors: string[];
+  } | null>(null);
 
   const setPhase = useExerciseStore((state) => state.setPhase);
   const setFormScore = useExerciseStore((state) => state.setFormScore);
@@ -64,6 +65,9 @@ export function ExerciseCamera({
 
   React.useEffect(() => {
     engineRef.current = createFormEngine(exercise);
+    if (!filterRef.current) {
+      filterRef.current = createLandmarkFilter();
+    }
   }, [exercise]);
 
   React.useEffect(() => {
@@ -133,8 +137,13 @@ export function ExerciseCamera({
           animationRef.current = requestAnimationFrame(processFrame);
           return;
         }
-        const landmarks = result.landmarks?.[0] as Landmark[] | undefined;
-        
+        const rawLandmarks = result.landmarks?.[0] as Landmark[] | undefined;
+
+        // Apply OneEuroFilter for smooth landmarks
+        const landmarks = rawLandmarks && filterRef.current
+          ? filterLandmarks(filterRef.current, rawLandmarks)
+          : rawLandmarks;
+
         if (landmarks && canvasRef.current) {
           drawSkeleton(canvasRef.current, landmarks);
         }
@@ -158,14 +167,20 @@ export function ExerciseCamera({
           if (engine) {
             const analysis = engine(landmarks);
 
-            // Update form feedback
-            if (now - lastEmitRef.current > 150) {
+            // Rep counting must happen immediately (not throttled)
+            // because repIncremented is only true for one frame
+            if (analysis.repIncremented) {
+              incrementRep();
+            }
+
+            // Update form feedback (throttled to 500ms for readability)
+            if (now - lastEmitRef.current > 500) {
               lastEmitRef.current = now;
-              
+
               if (analysis.feedback) {
-                setFormFeedback({ 
-                  message: analysis.feedback, 
-                  type: analysis.feedback.includes("Excellent") || analysis.feedback.includes("Good") ? "success" : "info" 
+                setFormFeedback({
+                  message: analysis.feedback,
+                  type: analysis.feedback.includes("Excellent") || analysis.feedback.includes("Good") ? "success" : "info"
                 });
               } else {
                 setFormFeedback(null);
@@ -176,10 +191,15 @@ export function ExerciseCamera({
               setConfidence(analysis.confidence);
               clearAllErrors();
               analysis.errors.forEach((error) => addError(error));
-              if (analysis.repIncremented) {
-                incrementRep();
-              }
               updateLastFrame();
+
+              // Update debug values if available
+              if (analysis.debug) {
+                setDebugValues({
+                  ...analysis.debug,
+                  phase: analysis.phase,
+                });
+              }
             }
           }
         }
@@ -230,19 +250,39 @@ export function ExerciseCamera({
         ref={canvasRef}
         className="absolute inset-0 h-full w-full scale-x-[-1]"
       />
-      
+
+      {/* Debug Overlay for tuning thresholds */}
+      {debugValues && (
+        <div className="absolute top-24 left-2 bg-black/95 text-green-400 p-4 rounded-xl font-mono z-30 space-y-1 min-w-[180px]">
+          <div className="text-xl font-bold">thigh: {debugValues.kneeAngle.toFixed(0)}°</div>
+          <div className="text-xl font-bold">lean: {debugValues.trunkLean.toFixed(0)}°</div>
+          <div className="text-xl font-bold">fwd: {debugValues.kneeForward.toFixed(2)}</div>
+          <div className="text-xl font-bold">spd: {debugValues.descentSpeed.toFixed(2)}</div>
+          <div className="text-cyan-400 font-bold">max: {debugValues.minDepth.toFixed(0)}°</div>
+          <div className="text-yellow-400 font-bold text-2xl mt-2 uppercase">{debugValues.phase}</div>
+          {debugValues.queuedErrors.length > 0 && (
+            <div className="mt-2 pt-2 border-t border-orange-500/50">
+              <div className="text-orange-400 text-sm font-bold mb-1">QUEUED:</div>
+              {debugValues.queuedErrors.map((err, i) => (
+                <div key={i} className="text-orange-500 text-sm font-bold">{err}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Feedback Overlay (Camera Positioning or Exercise Form) */}
       {activeFeedback && status === "ready" && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
           <div className={cn(
-            "px-4 py-2 rounded-full backdrop-blur-md flex items-center gap-2 shadow-lg transition-all duration-300",
-            activeFeedback.type === "warning" ? "bg-amber-500/80 text-white" : 
-            activeFeedback.type === "success" ? "bg-emerald-500/80 text-white" :
-            "bg-blue-500/80 text-white"
+            "px-6 py-4 rounded-2xl backdrop-blur-md flex items-center gap-3 shadow-xl transition-all duration-300",
+            activeFeedback.type === "warning" ? "bg-amber-500/90 text-white" :
+            activeFeedback.type === "success" ? "bg-emerald-500/90 text-white" :
+            "bg-blue-500/90 text-white"
           )}>
-            {activeFeedback.type === "warning" && <AlertTriangle className="w-4 h-4" />}
-            {activeFeedback.type !== "warning" && <Info className="w-4 h-4" />}
-            <span className="text-sm font-medium">{activeFeedback.message}</span>
+            {activeFeedback.type === "warning" && <AlertTriangle className="w-8 h-8" />}
+            {activeFeedback.type !== "warning" && <Info className="w-8 h-8" />}
+            <span className="text-xl font-bold">{activeFeedback.message}</span>
           </div>
         </div>
       )}
@@ -299,9 +339,13 @@ function drawSkeleton(canvas: HTMLCanvasElement, landmarks: Landmark[]) {
     ctx.stroke();
   });
 
-  landmarks.forEach((landmark) => {
+  // Side-view landmarks only: shoulder, hip, knee, ankle (left side)
+  const sideViewLandmarks = [11, 23, 25, 27];  // left shoulder, hip, knee, ankle
+  sideViewLandmarks.forEach((index) => {
+    const landmark = landmarks[index];
+    if (!landmark) return;
     ctx.beginPath();
-    ctx.arc(landmark.x * canvas.width, landmark.y * canvas.height, 3, 0, Math.PI * 2);
+    ctx.arc(landmark.x * canvas.width, landmark.y * canvas.height, 5, 0, Math.PI * 2);
     ctx.fill();
   });
 }
