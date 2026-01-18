@@ -37,7 +37,7 @@ const navItems: NavItem[] = [
   },
   {
     label: "Profile",
-    href: "/profile",
+    href: "/patient-profile",
     icon: <User className="h-6 w-6" />,
   },
 ];
