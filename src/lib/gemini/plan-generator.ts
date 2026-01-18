@@ -4,59 +4,135 @@
  * Main logic for generating rehabilitation plans using Gemini AI.
  */
 
-import { eq, inArray } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { db, assessments, exercises, plans } from '@/db';
 import { APIError, ErrorCode } from '@/lib/api/errors';
 import { generateContent, parseGeminiJson } from './client';
 import { buildPlanGenerationPrompt } from './prompts';
 import {
-  geminiPlanResponseSchema,
+  rawGeminiPlanResponseSchema,
+  type RawGeminiPlanResponse,
   type GeminiPlanResponse,
   type GeneratePlanRequest,
 } from './types';
+import type { Exercise } from '@/db/schema';
 
 /**
- * Validate that all exercise IDs in the plan exist in the database
+ * Build a slug-to-ID map from the exercise library
  */
-async function validateExerciseIds(
-  exerciseIds: string[]
-): Promise<void> {
-  const uniqueIds = [...new Set(exerciseIds)];
-
-  if (uniqueIds.length === 0) {
-    return;
+function buildSlugToIdMap(exerciseLibrary: Exercise[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const ex of exerciseLibrary) {
+    map.set(ex.slug, ex.id);
   }
-
-  // Fetch all exercise IDs in one query
-  const foundExercises = await db
-    .select({ id: exercises.id })
-    .from(exercises)
-    .where(inArray(exercises.id, uniqueIds));
-
-  const foundIds = new Set(foundExercises.map((e) => e.id));
-
-  // Check for missing IDs
-  const missingIds = uniqueIds.filter((id) => !foundIds.has(id));
-
-  if (missingIds.length > 0) {
-    throw new APIError(
-      ErrorCode.VALIDATION_ERROR,
-      `Invalid exercise IDs: ${missingIds.join(', ')}`
-    );
-  }
+  return map;
 }
 
 /**
- * Extract all exercise IDs from a plan structure
+ * Try to find a matching slug using fuzzy matching
+ * Returns the best match or null if no good match found
  */
-function extractExerciseIds(response: GeminiPlanResponse): string[] {
-  const ids: string[] = [];
-  for (const week of response.structure.weeks) {
-    for (const exercise of week.exercises) {
-      ids.push(exercise.exerciseId);
+function findClosestSlug(
+  inputSlug: string,
+  validSlugs: string[]
+): string | null {
+  // Exact match
+  if (validSlugs.includes(inputSlug)) {
+    return inputSlug;
+  }
+
+  // Try removing common prefixes/suffixes
+  const variations = [
+    inputSlug,
+    inputSlug.replace('kneeling-', ''),
+    inputSlug.replace('standing-', ''),
+    inputSlug.replace('seated-', ''),
+    inputSlug.replace('supine-', ''),
+    inputSlug.replace('prone-', ''),
+    inputSlug.replace('-stretch', ''),
+    inputSlug.replace('-exercise', ''),
+  ];
+
+  for (const variant of variations) {
+    if (validSlugs.includes(variant)) {
+      return variant;
     }
   }
-  return ids;
+
+  // Try finding a slug that contains most of the input words
+  const inputWords = inputSlug.split('-');
+  let bestMatch: string | null = null;
+  let bestScore = 0;
+
+  for (const slug of validSlugs) {
+    const slugWords = slug.split('-');
+    let score = 0;
+    for (const word of inputWords) {
+      if (slugWords.includes(word)) {
+        score++;
+      }
+    }
+    // Require at least 2 matching words or 50% match
+    if (score > bestScore && (score >= 2 || score / inputWords.length >= 0.5)) {
+      bestScore = score;
+      bestMatch = slug;
+    }
+  }
+
+  return bestMatch;
+}
+
+/**
+ * Map exercise slugs to IDs and validate all slugs exist
+ */
+function mapSlugsToIds(
+  rawResponse: RawGeminiPlanResponse,
+  slugToIdMap: Map<string, string>
+): GeminiPlanResponse {
+  const missingSlugs: string[] = [];
+  const validSlugs = Array.from(slugToIdMap.keys());
+
+  const mappedWeeks = rawResponse.structure.weeks.map((week) => ({
+    ...week,
+    exercises: week.exercises.map((ex) => {
+      // Try exact match first
+      let exerciseId = slugToIdMap.get(ex.exerciseSlug);
+      let finalSlug = ex.exerciseSlug;
+
+      // If no exact match, try fuzzy matching
+      if (!exerciseId) {
+        const closestSlug = findClosestSlug(ex.exerciseSlug, validSlugs);
+        if (closestSlug) {
+          exerciseId = slugToIdMap.get(closestSlug);
+          finalSlug = closestSlug;
+        }
+      }
+
+      if (!exerciseId) {
+        missingSlugs.push(ex.exerciseSlug);
+        return { ...ex, exerciseId: '' }; // Placeholder, will throw below
+      }
+
+      return {
+        ...ex,
+        exerciseSlug: finalSlug,
+        exerciseId,
+      };
+    }),
+  }));
+
+  if (missingSlugs.length > 0) {
+    throw new APIError(
+      ErrorCode.VALIDATION_ERROR,
+      `Invalid exercise slugs: ${[...new Set(missingSlugs)].join(', ')}`
+    );
+  }
+
+  return {
+    structure: { weeks: mappedWeeks },
+    summary: rawResponse.summary,
+    recommendations: rawResponse.recommendations,
+  };
 }
 
 /**
@@ -173,10 +249,10 @@ export async function generatePlan(
     );
   }
 
-  // 5. Parse and validate JSON response
-  let parsedResponse: GeminiPlanResponse;
+  // 5. Parse JSON response
+  let parsedRawResponse: RawGeminiPlanResponse;
   try {
-    parsedResponse = parseGeminiJson<GeminiPlanResponse>(rawResponse);
+    parsedRawResponse = parseGeminiJson<RawGeminiPlanResponse>(rawResponse);
   } catch (error) {
     if (error instanceof APIError) {
       throw error;
@@ -187,9 +263,9 @@ export async function generatePlan(
     );
   }
 
-  // 6. Validate response structure
+  // 6. Validate raw response structure
   try {
-    geminiPlanResponseSchema.parse(parsedResponse);
+    rawGeminiPlanResponseSchema.parse(parsedRawResponse);
   } catch (error) {
     throw new APIError(
       ErrorCode.VALIDATION_ERROR,
@@ -199,13 +275,13 @@ export async function generatePlan(
     );
   }
 
-  // 7. Validate all exercise IDs exist
-  const exerciseIds = extractExerciseIds(parsedResponse);
-  await validateExerciseIds(exerciseIds);
+  // 7. Map exercise slugs to IDs (also validates slugs exist)
+  const slugToIdMap = buildSlugToIdMap(exerciseLibrary);
+  const mappedResponse = mapSlugsToIds(parsedRawResponse, slugToIdMap);
 
   // 8. Validate progression
-  validateProgression(parsedResponse);
+  validateProgression(mappedResponse);
 
-  return parsedResponse;
+  return mappedResponse;
 }
 

@@ -9,11 +9,15 @@
 
 import { NextRequest } from "next/server";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/api/auth";
 import { success, error } from "@/lib/api/response";
 import { ErrorCode, handleAPIError } from "@/lib/api/errors";
 import { validateBody } from "@/lib/api/validation";
-import { db, assessments } from "@/db";
+import { db, assessments, plans } from "@/db";
+import { generatePlan } from "@/lib/gemini/plan-generator";
+import { generateFallbackPlan } from "@/lib/gemini/fallback-plan";
+import type { GeminiPlanResponse } from "@/lib/gemini/types";
 
 // Validation schema for assessment data
 const chiefComplaintSchema = z.object({
@@ -134,9 +138,77 @@ export async function POST(request: NextRequest) {
       })
       .returning();
 
+    // If assessment is complete, generate the rehabilitation plan
+    let planId: string | null = null;
+
+    if (newAssessment.completed) {
+      let planResponse: GeminiPlanResponse | null = null;
+      let usedFallback = false;
+
+      // Try to generate plan with Gemini (with 1 retry)
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          planResponse = await generatePlan({
+            assessmentId: newAssessment.id,
+            patientId: user.id,
+          });
+          break; // Success, exit retry loop
+        } catch (err) {
+          console.error(
+            `Plan generation attempt ${attempt} failed:`,
+            err instanceof Error ? err.message : err
+          );
+          if (attempt === 2) {
+            // Both attempts failed, use fallback
+            console.log("Using fallback plan");
+          }
+        }
+      }
+
+      // If Gemini failed, use fallback plan
+      if (!planResponse) {
+        try {
+          planResponse = await generateFallbackPlan({
+            directionalPreference: directionalPreference as
+              | "flexion"
+              | "extension"
+              | "neutral",
+          });
+          usedFallback = true;
+        } catch (fallbackErr) {
+          console.error("Fallback plan generation failed:", fallbackErr);
+          // Continue without a plan - user can still see assessment
+        }
+      }
+
+      // Save the plan if we have one
+      if (planResponse) {
+        const [newPlan] = await db
+          .insert(plans)
+          .values({
+            patientId: user.id,
+            name: "Your Recovery Plan",
+            status: "approved", // Auto-approve for patient self-service
+            structure: planResponse.structure,
+            ptSummary: planResponse.summary,
+            recommendations: planResponse.recommendations,
+          })
+          .returning();
+
+        planId = newPlan.id;
+
+        // Link assessment to plan
+        await db
+          .update(assessments)
+          .set({ planId: newPlan.id })
+          .where(eq(assessments.id, newAssessment.id));
+      }
+    }
+
     return success(
       {
         id: newAssessment.id,
+        planId,
         directionalPreference,
         hasRedFlags,
         completed: newAssessment.completed,
