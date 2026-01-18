@@ -19,6 +19,8 @@ export interface UseVapiOptions {
   onConnectionChange?: (connected: boolean) => void;
   /** Called when an error occurs */
   onError?: (error: Error) => void;
+  /** Called when user confirms they are ready (says "ready", "yes", etc.) */
+  onUserReady?: () => void;
 }
 
 export interface UseVapiReturn {
@@ -59,7 +61,10 @@ export interface UseVapiReturn {
  * ```
  */
 export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
-  const { assistantId, onConnectionChange, onError } = options;
+  const { assistantId, onConnectionChange, onError, onUserReady } = options;
+
+  // Phrases that indicate user is ready to start
+  const READY_PHRASES = ['ready', 'yes', "let's go", 'start', 'begin', 'ok', 'okay', 'yep', 'sure', 'go ahead'];
 
   // Store actions and state
   const {
@@ -79,6 +84,14 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
   // Vapi instance ref (persists across renders)
   const vapiRef = useRef<Vapi | null>(null);
   const isInitializedRef = useRef(false);
+
+  // Store callbacks in refs to prevent useEffect reinitializing when they change
+  const onConnectionChangeRef = useRef(onConnectionChange);
+  const onErrorRef = useRef(onError);
+  const onUserReadyRef = useRef(onUserReady);
+  onConnectionChangeRef.current = onConnectionChange;
+  onErrorRef.current = onError;
+  onUserReadyRef.current = onUserReady;
 
   // Check if voice is enabled
   const isVoiceEnabled = clientEnv.NEXT_PUBLIC_ENABLE_VOICE ?? true;
@@ -109,22 +122,24 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
         console.log('[useVapi] Call started');
         setConnectionState('connected');
         setSpeakingStatus('listening');
-        onConnectionChange?.(true);
+        onConnectionChangeRef.current?.(true);
       });
 
       vapi.on('call-end', () => {
         console.log('[useVapi] Call ended');
         setConnectionState('disconnected');
         setSpeakingStatus('idle');
-        onConnectionChange?.(false);
+        onConnectionChangeRef.current?.(false);
       });
 
       // Speech events
       vapi.on('speech-start', () => {
+        console.log('[useVapi] 🎤 Assistant started speaking');
         setSpeakingStatus('speaking');
       });
 
       vapi.on('speech-end', () => {
+        console.log('[useVapi] 🎤 Assistant stopped speaking');
         setSpeakingStatus('listening');
       });
 
@@ -135,27 +150,50 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
 
       // Message/transcript events
       vapi.on('message', (message: VapiMessage) => {
+        console.log('[useVapi] 📨 Message received:', message.type, message);
+
         if (message.type === 'transcript') {
           const role = message.role === 'assistant' ? 'assistant' : 'user';
+          console.log(`[useVapi] 💬 Transcript (${role}):`, message.transcript);
           addTranscript({
             role,
             content: message.transcript || '',
             timestamp: Date.now(),
           });
+
+          // Detect user confirmation ("ready", "yes", etc.)
+          if (role === 'user' && message.transcript) {
+            const text = message.transcript.toLowerCase();
+            const isReady = READY_PHRASES.some(phrase => text.includes(phrase));
+            if (isReady) {
+              console.log('[useVapi] ✅ User confirmed ready:', message.transcript);
+              onUserReadyRef.current?.();
+            }
+          }
         }
 
         // Handle function calls if needed
         if (message.type === 'function-call') {
-          console.log('[useVapi] Function call:', message);
+          console.log('[useVapi] 🔧 Function call:', message);
         }
       });
 
       // Error handling
-      vapi.on('error', (error: Error) => {
-        console.error('[useVapi] Error:', error);
+      vapi.on('error', (error: Error | unknown) => {
+        // Log full error details for debugging
+        console.error('[useVapi] Error:', JSON.stringify(error, null, 2));
+        console.error('[useVapi] Error type:', typeof error);
+        if (error && typeof error === 'object') {
+          console.error('[useVapi] Error keys:', Object.keys(error));
+        }
+        const errorMessage = error instanceof Error
+          ? error.message
+          : typeof error === 'object' && error !== null
+            ? JSON.stringify(error)
+            : 'Unknown Vapi error';
         setConnectionState('error');
-        setError(error.message || 'Unknown Vapi error');
-        onError?.(error);
+        setError(errorMessage);
+        onErrorRef.current?.(error instanceof Error ? error : new Error(errorMessage));
       });
 
       console.log('[useVapi] Initialized successfully');
@@ -164,14 +202,28 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
       setError(err instanceof Error ? err.message : 'Failed to initialize Vapi');
     }
 
-    // Cleanup on unmount
-    return () => {
+    // Cleanup function - ensures call is always disconnected
+    const cleanup = () => {
       if (vapiRef.current) {
+        console.log('[useVapi] Cleanup: stopping call');
         vapiRef.current.stop();
         vapiRef.current = null;
         isInitializedRef.current = false;
         reset();
       }
+    };
+
+    // Handle browser/tab close
+    const handleBeforeUnload = () => {
+      cleanup();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // Cleanup on unmount
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      cleanup();
     };
   }, [
     isVoiceEnabled,
@@ -181,8 +233,6 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
     addTranscript,
     setError,
     reset,
-    onConnectionChange,
-    onError,
   ]);
 
   // Start a call
@@ -250,21 +300,23 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
   // Inject context message for LLM
   const injectContext = useCallback((context: string) => {
     if (!vapiRef.current) {
-      console.warn('[useVapi] Cannot inject context - not connected');
+      console.warn('[useVapi] ⚠️ Cannot inject context - not connected');
       return;
     }
 
     try {
+      console.log('[useVapi] 📤 Sending context to LLM (triggerResponseEnabled=true)...');
       vapiRef.current.send({
         type: 'add-message',
         message: {
-          role: 'system',
+          role: 'user',
           content: context,
         },
+        triggerResponseEnabled: true,
       });
-      console.log('[useVapi] Context injected:', context.substring(0, 50) + '...');
+      console.log('[useVapi] ✅ Context sent:', context.substring(0, 80) + '...');
     } catch (err) {
-      console.error('[useVapi] Failed to inject context:', err);
+      console.error('[useVapi] ❌ Failed to inject context:', err);
     }
   }, []);
 

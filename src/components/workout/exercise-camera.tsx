@@ -187,9 +187,12 @@ export function ExerciseCamera({
           if (engine) {
             const analysis = engine(landmarks);
 
-            // Rep counting must happen immediately (not throttled)
+            // Rep counting and rep errors must happen immediately (not throttled)
             // because repIncremented is only true for one frame
             if (analysis.repIncremented) {
+              // Add errors BEFORE incrementing rep so form event bridge sees them
+              clearAllErrors();
+              analysis.errors.forEach((error) => addError(error));
               incrementRep();
             }
 
