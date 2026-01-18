@@ -10,7 +10,7 @@ const Table = React.forwardRef<
   <div
     className={cn(
       "w-full overflow-auto rounded-2xl",
-      "bg-white border border-sage-200/60",
+      "bg-white",
       "shadow-[0_2px_8px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]"
     )}
   >
@@ -29,7 +29,7 @@ const TableHeader = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <thead
     ref={ref}
-    className={cn("bg-sage-50/50 [&_tr]:border-b", className)}
+    className={cn("bg-sage-50/50", className)}
     {...props}
   />
 ));

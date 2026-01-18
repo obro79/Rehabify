@@ -56,7 +56,6 @@ export function FloatingDock({
       className={cn(
         "fixed bottom-6 left-1/2 -translate-x-1/2 z-40",
         "bg-white/70 backdrop-blur-xl",
-        "border border-sage-200/50",
         "rounded-3xl",
         "px-4 py-2",
         "shadow-lg shadow-sage-900/10",

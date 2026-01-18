@@ -16,7 +16,7 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
           "rounded-3xl bg-white",
           variant === "default" && "surface-card",
           variant === "elevated" && "surface-elevated",
-          variant === "outlined" && "border border-sage-200 shadow-sm",
+          variant === "outlined" && "shadow-sm",
           variant === "organic" && "surface-organic",
           className
         )}

@@ -275,7 +275,7 @@ Keep corrections to 5-15 words max. Focus on what TO do, not what's wrong.`;
   return (
     <div className="sanctuary-paused min-h-screen bg-gradient-to-b from-sand-100 to-background">
       {/* Minimal Session Header */}
-      <header className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-b border-sage-200/60 shadow-sm">
+      <header className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex-1">
@@ -331,7 +331,7 @@ Keep corrections to 5-15 words max. Focus on what TO do, not what's wrong.`;
           {/* Left Column: Coach, Metrics & Info */}
           <div className="space-y-6">
             {/* Voice Coach Card */}
-            <Card className="p-6 flex flex-col bg-white/50 backdrop-blur-sm border-sage-200">
+            <Card className="p-6 flex flex-col bg-white/50 backdrop-blur-sm">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-bold text-foreground">Voice Coach</h2>
                 <div className="flex items-center gap-2">
@@ -360,7 +360,7 @@ Keep corrections to 5-15 words max. Focus on what TO do, not what's wrong.`;
               <div className="space-y-3 mt-4">
                 <div className="relative">
                   <div className="absolute -top-2 left-6 w-4 h-4 bg-white border-t border-l border-sage-200 transform rotate-45 z-10"></div>
-                  <div className="bg-white rounded-2xl p-4 border border-sage-200 shadow-sm relative z-0">
+                  <div className="bg-white rounded-2xl p-4 shadow-sm relative z-0">
                     <p className="text-sm text-sage-800 font-medium leading-relaxed">
                       "{transcript}"
                     </p>
@@ -492,7 +492,7 @@ Keep corrections to 5-15 words max. Focus on what TO do, not what's wrong.`;
           {/* Right Column: Vertical Camera */}
           <div className="space-y-4">
             <div className="relative">
-              <Card className="overflow-hidden shadow-lg border-sage-200">
+              <Card className="overflow-hidden shadow-lg">
                 <ExerciseCamera
                   exercise={exercise}
                   isPaused={isPaused}
