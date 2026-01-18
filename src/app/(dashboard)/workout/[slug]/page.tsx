@@ -18,10 +18,7 @@ import {
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import exercisesData from "@/lib/exercises/data.json";
-import {
-  ExerciseCamera,
-  WorkoutStatsPanel,
-} from "@/components/workout";
+import { ExerciseCamera } from "@/components/workout";
 import { getExerciseVideoUrl } from "@/lib/exercises/video-map";
 import { useExerciseStore } from "@/stores/exercise-store";
 import {
@@ -267,15 +264,6 @@ Keep corrections to 5-15 words max. Focus on what TO do, not what's wrong.`;
   const handlePauseToggle = () => setIsPaused(!isPaused);
   const handleEndSession = () => setShowEndDialog(true);
   const handleConfirmEnd = () => router.push(`/workout/${slug}/complete?score=${formScore}&reps=${repCount}`);
-
-  const handleStartVoice = () => {
-    startVapi(undefined, {
-      sessionId,
-      exerciseId: exercise?.id,
-      exerciseName: exercise?.name,
-      targetReps,
-    });
-  };
 
   return (
     <div className="sanctuary-paused min-h-screen bg-gradient-to-b from-sand-100 to-background">
@@ -602,21 +590,6 @@ Keep corrections to 5-15 words max. Focus on what TO do, not what's wrong.`;
               )}
             </div>
           </div>
-
-          {/* Right Panel - Stats */}
-          <WorkoutStatsPanel
-            voiceState={voiceState}
-            transcript={transcript}
-            isConnected={isConnected}
-            isMuted={isMuted}
-            onStartVoice={handleStartVoice}
-            onStopVoice={stopVapi}
-            onToggleMute={() => setMuted(!isMuted)}
-            repCount={repCount}
-            targetReps={targetReps}
-            formScore={formScore}
-            phase={phase}
-          />
         </div>
       </main>
 
