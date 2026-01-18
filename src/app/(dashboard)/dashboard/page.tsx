@@ -13,7 +13,6 @@ import { StatsCard } from "@/components/ui/stats-card";
 import { Card } from "@/components/ui/card";
 import { ProgressRing } from "@/components/ui/progress-ring";
 import { WeeklyCalendar } from "@/components/ui/weekly-calendar";
-import { DifficultyStars } from "@/components/ui/difficulty-stars";
 import {
   Table,
   TableHeader,
@@ -29,7 +28,6 @@ import {
 } from "@/components/ui/icons";
 import {
   ArrowRight,
-  Play,
 } from "lucide-react";
 import {
   mockExercises,
@@ -51,6 +49,19 @@ function getTimeOfDayGreeting() {
   if (hour < 12) return "Good morning";
   if (hour < 17) return "Good afternoon";
   return "Good evening";
+}
+
+function getDifficultyBadgeVariant(difficulty: string): "easy" | "medium" | "hard" {
+  switch (difficulty) {
+    case "beginner":
+      return "easy";
+    case "intermediate":
+      return "medium";
+    case "advanced":
+      return "hard";
+    default:
+      return "medium";
+  }
 }
 
 export default function DashboardPage() {
@@ -267,12 +278,19 @@ export default function DashboardPage() {
 
                   <div className="flex items-center justify-between text-sm text-muted-foreground">
                     <span>{exercise.duration} • {exercise.reps} reps</span>
-                    <DifficultyStars level={exercise.difficulty} />
+                    {(() => {
+                      const fullExercise = getExerciseById(exercise.id);
+                      const difficulty = fullExercise?.difficulty || "intermediate";
+                      return (
+                        <Badge variant={getDifficultyBadgeVariant(difficulty)} size="sm">
+                          {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+                        </Badge>
+                      );
+                    })()}
                   </div>
 
-                  <Button variant="secondary" size="sm" className="w-full mt-2" asChild>
+                  <Button variant="ghost" size="sm" className="w-full mt-2 h-8 px-2 text-xs font-normal text-muted-foreground hover:text-foreground" asChild>
                     <Link href={`/workout/${exercise.slug}`}>
-                      <Play size={14} className="mr-1" />
                       Start
                     </Link>
                   </Button>
