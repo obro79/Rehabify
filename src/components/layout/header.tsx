@@ -22,20 +22,13 @@ export function Header({ showCTA = true, className }: HeaderProps) {
   const [open, setOpen] = React.useState(false);
   const isDemoMode = clientEnv.NEXT_PUBLIC_DEMO_MODE;
 
-  const navLinks = [
-    { label: "About", href: "/about" },
-    { label: "Exercises", href: "/exercises" },
-    { label: "How It Works", href: "#how-it-works" },
-  ];
-
   // In demo mode, link directly to dashboard
-  const loginHref = isDemoMode ? "/dashboard" : "/login";
   const signupHref = isDemoMode ? "/dashboard" : "/signup";
 
   return (
     <header
       className={cn(
-        "sticky top-0 z-50 w-full border-b border-sage-200/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
+        "sticky top-0 z-50 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
         className
       )}
     >
@@ -45,24 +38,8 @@ export function Header({ showCTA = true, className }: HeaderProps) {
           <Logo size="sm" showText />
         </Link>
 
-        {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-6">
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
-
         {/* Desktop CTA Buttons */}
         <div className="hidden md:flex items-center gap-3">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={loginHref}>{isDemoMode ? "Dashboard" : "Login"}</Link>
-          </Button>
           {showCTA && (
             <Button variant="secondary" size="sm" asChild>
               <Link href={signupHref}>Get Started</Link>
@@ -84,27 +61,8 @@ export function Header({ showCTA = true, className }: HeaderProps) {
           </SheetTrigger>
           <SheetContent side="right">
             <div className="flex flex-col gap-6 mt-6">
-              {/* Mobile Nav Links */}
-              <nav className="flex flex-col gap-4">
-                {navLinks.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    onClick={() => setOpen(false)}
-                    className="text-base font-medium text-foreground hover:text-sage-600 transition-colors"
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-              </nav>
-
               {/* Mobile CTA Buttons */}
-              <div className="flex flex-col gap-3 pt-4 border-t border-sage-200">
-                <Button variant="ghost" asChild>
-                  <Link href={loginHref} onClick={() => setOpen(false)}>
-                    {isDemoMode ? "Dashboard" : "Login"}
-                  </Link>
-                </Button>
+              <div className="flex flex-col gap-3">
                 {showCTA && (
                   <Button variant="secondary" asChild>
                     <Link href={signupHref} onClick={() => setOpen(false)}>

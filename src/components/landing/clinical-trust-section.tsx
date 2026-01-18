@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Card } from "@/components/ui/card";
 import { ScrollReveal } from "@/components/motion";
+import { Tooltip } from "@/components/ui/tooltip-card";
 import {
   NASMIcon,
   CESIcon,
@@ -17,6 +17,20 @@ const credentials = [
     title: "NASM Protocol",
     description:
       "Exercises sourced from National Academy of Sports Medicine corrective exercise protocols",
+    detailedInfo: (
+      <div>
+        <p className="text-lg font-bold text-sage-900 mb-2">NASM Protocol</p>
+        <p className="text-sm text-sage-600 mb-3">
+          Our exercise library is built on the National Academy of Sports Medicine's
+          Corrective Exercise Continuum (CEx), a systematic approach to addressing
+          movement compensations and muscle imbalances.
+        </p>
+        <p className="text-xs text-sage-500">
+          All exercises follow NASM's evidence-based protocols for injury prevention
+          and rehabilitation, ensuring safe and effective movement patterns.
+        </p>
+      </div>
+    ),
     variant: "sage" as const,
   },
   {
@@ -25,6 +39,20 @@ const credentials = [
     title: "CES Methodology",
     description:
       "Movement assessments based on Corrective Exercise Specialist program standards",
+    detailedInfo: (
+      <div>
+        <p className="text-lg font-bold text-sage-900 mb-2">CES Methodology</p>
+        <p className="text-sm text-sage-600 mb-3">
+          Our movement assessments are designed using Corrective Exercise Specialist
+          (CES) principles, focusing on identifying and addressing muscle imbalances,
+          movement dysfunctions, and postural deviations.
+        </p>
+        <p className="text-xs text-sage-500">
+          This systematic approach helps create personalized exercise programs that
+          address root causes rather than just symptoms.
+        </p>
+      </div>
+    ),
     variant: "coral" as const,
   },
   {
@@ -33,6 +61,20 @@ const credentials = [
     title: "PIPEDA Compliant",
     description:
       "Your health data protected under Canadian federal privacy law standards",
+    detailedInfo: (
+      <div>
+        <p className="text-lg font-bold text-sage-900 mb-2">PIPEDA Compliant</p>
+        <p className="text-sm text-sage-600 mb-3">
+          We comply with the Personal Information Protection and Electronic Documents
+          Act (PIPEDA), Canada's federal privacy law. Your health data is processed
+          locally in your browser and never leaves your device without your explicit consent.
+        </p>
+        <p className="text-xs text-sage-500">
+          All data transmission is encrypted, and we follow strict data minimization
+          principles - we only collect what's necessary for your rehabilitation journey.
+        </p>
+      </div>
+    ),
     variant: "sage" as const,
   },
   {
@@ -41,6 +83,20 @@ const credentials = [
     title: "PT Reviewed",
     description:
       "Every AI-generated plan reviewed by a licensed physical therapist before you see it",
+    detailedInfo: (
+      <div>
+        <p className="text-lg font-bold text-sage-900 mb-2">PT Reviewed</p>
+        <p className="text-sm text-sage-600 mb-3">
+          Every AI-generated rehabilitation plan undergoes review by our Clinical Advisory
+          Board of licensed physical therapists. This human-in-the-loop (HITL) approach
+          ensures clinical accuracy and safety.
+        </p>
+        <p className="text-xs text-sage-500">
+          Our PTs verify exercise selection, progression, and form cues before any plan
+          reaches you, combining AI efficiency with clinical expertise.
+        </p>
+      </div>
+    ),
     variant: "coral" as const,
   },
 ];
@@ -90,42 +146,21 @@ export function ClinicalTrustSection() {
           </div>
         </ScrollReveal>
 
-        {/* Asymmetric 2x2 grid with staggered positioning */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 max-w-4xl mx-auto">
-          {credentials.map((cred, index) => (
+        {/* Shield icons with tooltips */}
+        <div className="flex items-center justify-center gap-6 md:gap-8 lg:gap-10 max-w-6xl mx-auto">
+          {credentials.map((cred) => (
             <ScrollReveal key={cred.id}>
-              <div
-                className={`
-                  ${index === 1 ? "md:mt-12" : ""}
-                  ${index === 2 ? "md:-mt-6" : ""}
-                  ${index === 3 ? "md:mt-6" : ""}
-                `}
+              <Tooltip
+                content={cred.detailedInfo}
+                containerClassName="cursor-pointer"
+                side="top"
               >
-                <Card
-                  variant="organic"
-                  className={`
-                    group p-8 hover-lift h-full transition-all duration-300
-                    ${cred.variant === "coral" ? "bg-gradient-to-br from-white to-terracotta-50/40" : ""}
-                  `}
-                >
-                  <div className="flex items-start gap-6">
-                    {/* Shield badge */}
-                    <div className="flex-shrink-0 transform group-hover:scale-105 transition-transform duration-300">
-                      <cred.Icon size="xl" variant={cred.variant} />
-                    </div>
-
-                    {/* Content */}
-                    <div className="space-y-2 pt-1">
-                      <h3 className="text-lg font-display font-semibold text-sage-900">
-                        {cred.title}
-                      </h3>
-                      <p className="text-sage-600 leading-relaxed">
-                        {cred.description}
-                      </p>
-                    </div>
+                <div className="transform hover:scale-110 transition-transform duration-300">
+                  <div className="w-28 h-28 md:w-36 md:h-36 lg:w-44 lg:h-44">
+                    <cred.Icon size="xl" variant={cred.variant} className="w-full h-full" />
                   </div>
-                </Card>
-              </div>
+                </div>
+              </Tooltip>
             </ScrollReveal>
           ))}
         </div>
