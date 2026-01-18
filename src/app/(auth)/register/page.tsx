@@ -77,6 +77,7 @@ export default function RegisterPage(): React.JSX.Element {
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [isPT, setIsPT] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -133,8 +134,14 @@ export default function RegisterPage(): React.JSX.Element {
         return;
       }
 
-      await createProfile();
-      router.push('/dashboard');
+      // Create profile in database
+      await createProfile(isPT ? 'pt' : 'patient');
+      
+      if (isPT) {
+        router.push('/pt/dashboard');
+      } else {
+        router.push('/dashboard');
+      }
     } catch {
       setErrors({ form: 'An unexpected error occurred' });
     } finally {
@@ -238,6 +245,17 @@ export default function RegisterPage(): React.JSX.Element {
                   {errors.confirmPassword}
                 </p>
               )}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="isPT"
+                  checked={isPT}
+                  onCheckedChange={(checked) => setIsPT(checked as boolean)}
+                />
+                <Label htmlFor="isPT" className="cursor-pointer">I am a Physical Therapist</Label>
+              </div>
             </div>
 
             <div className="space-y-2">

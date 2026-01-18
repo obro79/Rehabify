@@ -32,6 +32,7 @@ export const profiles = pgTable(
       onDelete: 'set null',
     }),
     ptNotes: text('pt_notes'),
+    joinCode: text('join_code'),
 
     // Timestamps
     createdAt: timestamp('created_at', { withTimezone: true })
