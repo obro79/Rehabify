@@ -373,7 +373,7 @@ export default function WorkoutSessionPage() {
                     >
                       <X className="h-4 w-4" />
                     </Button>
-                    
+
                     <div className="space-y-3 pt-2">
                       <h3 className="font-bold text-base">Reference Guide</h3>
                       <div className="aspect-[3/4] bg-gradient-to-br from-sage-100 to-sage-200 rounded-lg flex items-center justify-center">
