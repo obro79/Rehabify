@@ -189,6 +189,252 @@
       }
     },
     {
+      "id": "bodyweight-squat",
+      "name": "Bodyweight Squat",
+      "slug": "bodyweight-squat",
+      "tier": 1,
+      "body_region": "lower_body",
+      "category": "strengthening",
+      "target_area": "quadriceps",
+      "difficulty": "beginner",
+      "description": "A fundamental lower body exercise that strengthens the quadriceps, glutes, and core while improving mobility. Performed with bodyweight only, focusing on proper form and depth.",
+      "instructions": [
+        "Stand with feet shoulder-width apart, toes slightly turned out",
+        "Keep your chest up and core engaged",
+        "Initiate the movement by pushing your hips back",
+        "Bend your knees and lower your body as if sitting into a chair",
+        "Keep your knees tracking over your toes",
+        "Lower until thighs are parallel to the floor or as low as comfortable",
+        "Press through your heels to return to standing",
+        "Maintain a neutral spine throughout the movement"
+      ],
+      "common_mistakes": [
+        "Not reaching parallel depth",
+        "Knees caving inward",
+        "Excessive forward lean of the torso",
+        "Knees drifting too far past toes",
+        "Dropping too quickly without control",
+        "Rising onto toes instead of pressing through heels"
+      ],
+      "modifications": {
+        "easier": "Use a chair for support, reduce depth",
+        "harder": "Add pause at bottom, slow tempo, single leg progression"
+      },
+      "contraindications": [
+        "Acute knee injury",
+        "Severe hip arthritis",
+        "Balance issues (use support)"
+      ],
+      "default_reps": 10,
+      "default_sets": 3,
+      "default_hold_seconds": 0,
+      "rep_type": "standard",
+      "equipment": "none",
+      "video_url": null,
+      "thumbnail_url": null,
+      "form_detection_enabled": true,
+      "detection_config": {
+        "phases": [
+          "standing",
+          "descending",
+          "bottom",
+          "ascending"
+        ],
+        "key_landmarks": [
+          "knee_angle",
+          "trunk_lean",
+          "knee_position"
+        ],
+        "thresholds": {
+          "min_depth_angle": 70,
+          "max_trunk_lean": 30,
+          "max_knee_forward": 0.12,
+          "max_descent_speed": 5.0,
+          "standing_angle": 20
+        }
+      }
+    },
+    {
+      "id": "standing-lumbar-flexion",
+      "name": "Standing Lumbar Flexion",
+      "slug": "standing-lumbar-flexion",
+      "tier": 1,
+      "body_region": "lower_back",
+      "category": "mobility",
+      "target_area": "lumbar_spine",
+      "difficulty": "beginner",
+      "description": "A standing forward bend to assess lumbar flexion range of motion in a controlled, pain-free manner.",
+      "instructions": [
+        "Stand tall with feet hip-width apart",
+        "Keep knees softly straight and arms relaxed",
+        "Slowly hinge forward, sliding hands toward your shins",
+        "Stop when you feel a gentle stretch",
+        "Return to standing with control"
+      ],
+      "common_mistakes": [
+        "Bending the knees into a squat",
+        "Rounding the shoulders excessively",
+        "Forcing the stretch into pain",
+        "Holding your breath"
+      ],
+      "modifications": {
+        "easier": "Limit range to mid-shin or rest hands on thighs",
+        "harder": "Hold the end position for 3-5 seconds"
+      },
+      "contraindications": [
+        "Acute disc herniation",
+        "Severe flexion intolerance",
+        "Dizziness with forward bending"
+      ],
+      "default_reps": 1,
+      "default_sets": 1,
+      "default_hold_seconds": 3,
+      "rep_type": "hold",
+      "equipment": "none",
+      "video_url": null,
+      "thumbnail_url": null,
+      "form_detection_enabled": true,
+      "detection_config": {
+        "phases": [
+          "neutral",
+          "flexion",
+          "return"
+        ],
+        "key_landmarks": [
+          "hip_angle",
+          "knee_angle",
+          "ankle_alignment"
+        ],
+        "thresholds": {
+          "flexion_phase_angle": 150,
+          "flexion_target_angle": 120,
+          "flexion_angle_tolerance": 25,
+          "flexion_spine_depth": -0.05,
+          "neutral_angle": 165,
+          "knee_angle_min": 150
+        }
+      }
+    },
+    {
+      "id": "standing-lumbar-extension",
+      "name": "Standing Lumbar Extension",
+      "slug": "standing-lumbar-extension",
+      "tier": 1,
+      "body_region": "lower_back",
+      "category": "extension",
+      "target_area": "lumbar_spine",
+      "difficulty": "beginner",
+      "description": "A gentle standing back bend used to assess lumbar extension and tolerance.",
+      "instructions": [
+        "Stand tall with feet hip-width apart",
+        "Place hands on hips or lower back for support",
+        "Gently lean back, lifting the chest",
+        "Keep knees softly straight and avoid locking",
+        "Return to neutral standing position"
+      ],
+      "common_mistakes": [
+        "Locking the knees",
+        "Throwing the head back",
+        "Leaning too far too fast",
+        "Holding breath"
+      ],
+      "modifications": {
+        "easier": "Reduce range of motion and keep gaze forward",
+        "harder": "Hold the end position for 3-5 seconds"
+      },
+      "contraindications": [
+        "Facet joint irritation",
+        "Spondylolisthesis",
+        "Acute back pain with extension"
+      ],
+      "default_reps": 1,
+      "default_sets": 1,
+      "default_hold_seconds": 3,
+      "rep_type": "hold",
+      "equipment": "none",
+      "video_url": null,
+      "thumbnail_url": null,
+      "form_detection_enabled": true,
+      "detection_config": {
+        "phases": [
+          "neutral",
+          "extension",
+          "return"
+        ],
+        "key_landmarks": [
+          "hip_angle",
+          "knee_angle",
+          "spine_extension"
+        ],
+        "thresholds": {
+          "extension_spine_depth": 0.04,
+          "extension_target_angle": 175,
+          "extension_angle_tolerance": 10,
+          "neutral_angle": 165,
+          "knee_angle_min": 150
+        }
+      }
+    },
+    {
+      "id": "standing-lumbar-side-bending",
+      "name": "Standing Lumbar Side Bending",
+      "slug": "standing-lumbar-side-bending",
+      "tier": 1,
+      "body_region": "lower_back",
+      "category": "mobility",
+      "target_area": "lumbar_spine",
+      "difficulty": "beginner",
+      "description": "A standing side bend to assess lateral lumbar range of motion.",
+      "instructions": [
+        "Stand tall with feet hip-width apart",
+        "Keep shoulders relaxed and arms at your sides",
+        "Slide one hand down the outside of your thigh",
+        "Keep hips stacked and avoid twisting",
+        "Return to standing with control"
+      ],
+      "common_mistakes": [
+        "Twisting the torso instead of bending sideways",
+        "Bending the knees excessively",
+        "Leaning forward during the bend",
+        "Forcing the stretch"
+      ],
+      "modifications": {
+        "easier": "Reduce range of motion and keep both arms relaxed",
+        "harder": "Hold the end position for 3-5 seconds"
+      },
+      "contraindications": [
+        "Acute lateral disc pain",
+        "Severe scoliosis pain flare",
+        "Balance issues without support"
+      ],
+      "default_reps": 1,
+      "default_sets": 1,
+      "default_hold_seconds": 3,
+      "rep_type": "hold",
+      "equipment": "none",
+      "video_url": null,
+      "thumbnail_url": null,
+      "form_detection_enabled": true,
+      "detection_config": {
+        "phases": [
+          "neutral",
+          "side_bend",
+          "return"
+        ],
+        "key_landmarks": [
+          "lateral_angle",
+          "knee_angle"
+        ],
+        "thresholds": {
+          "side_bend_phase_angle": 165,
+          "side_bend_target_angle": 150,
+          "side_bend_angle_tolerance": 20,
+          "neutral_angle": 175,
+          "knee_angle_min": 150
+        }
+      }
+    },
+    {
       "id": "bird-dog",
       "name": "Bird Dog",
       "slug": "bird-dog",

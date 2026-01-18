@@ -1,6 +1,7 @@
 import type { FormError } from "@/types";
 import type { Exercise } from "@/lib/exercises/types";
 import type { Landmark } from "@/types/vision";
+import { analyzeSquat, createSquatState, type SquatState } from "./exercises/squat";
 
 interface FormEngineResult {
   phase: string;
@@ -10,12 +11,45 @@ interface FormEngineResult {
   isCorrect: boolean;
   repIncremented: boolean;
   confidence: number;
+  debug?: {
+    // Squat fields
+    kneeAngle?: number;
+    trunkLean?: number;
+    kneeForward?: number;
+    descentSpeed?: number;
+    minDepth?: number;
+
+    // Lumbar extension fields
+    hipAngle?: number;
+    spineDepth?: number;
+    depthChange?: number;
+    baseline?: number;
+    baselineSamples?: number;
+
+    // Side bend fields
+    shoulderTilt?: number;
+    shoulderTiltAngle?: number;
+    hipTilt?: number;
+    bendingSide?: string;
+
+    phase?: string;
+    queuedErrors: string[];
+  };
 }
 
 interface EngineState {
   lastPhase: string;
   lastRepPhase: string;
   lastExtendedSide: "left" | "right" | null;
+  // Exercise-specific states
+  squatState: SquatState;
+  // Baseline tracking for lumbar extension
+  baselineSpineDepth: number[];
+  // Side bend tracking
+  sideBendState: {
+    leftDone: boolean;
+    rightDone: boolean;
+  };
 }
 
 const LANDMARKS = {
@@ -33,6 +67,10 @@ const LANDMARKS = {
   rightKnee: 26,
   leftAnkle: 27,
   rightAnkle: 28,
+  leftHeel: 29,
+  rightHeel: 30,
+  leftFootIndex: 31,
+  rightFootIndex: 32,
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -66,6 +104,22 @@ function angleBetween(a: Landmark, b: Landmark, c: Landmark) {
   return Math.acos(cos) * (180 / Math.PI);
 }
 
+function angleBetween3D(a: Landmark, b: Landmark, c: Landmark) {
+  const abx = a.x - b.x;
+  const aby = a.y - b.y;
+  const abz = a.z - b.z;
+  const cbx = c.x - b.x;
+  const cby = c.y - b.y;
+  const cbz = c.z - b.z;
+  const dot = abx * cbx + aby * cby + abz * cbz;
+  const mag =
+    Math.sqrt(abx * abx + aby * aby + abz * abz) *
+    Math.sqrt(cbx * cbx + cby * cby + cbz * cbz);
+  if (mag === 0) return 0;
+  const cos = clamp(dot / mag, -1, 1);
+  return Math.acos(cos) * (180 / Math.PI);
+}
+
 function averageVisibility(landmarks: Landmark[], indices: number[]) {
   const total = indices.reduce((sum, index) => sum + (landmarks[index]?.visibility ?? 0), 0);
   return total / indices.length;
@@ -81,6 +135,45 @@ function baseFormScore(landmarks: Landmark[]) {
     LANDMARKS.rightKnee,
   ]);
   return clamp(Math.round(visibility * 100), 0, 100);
+}
+
+function scoreFromTargetAngle(angle: number, target: number, tolerance: number) {
+  if (tolerance <= 0) return 0;
+  const delta = Math.abs(angle - target);
+  const ratio = clamp(1 - delta / tolerance, 0, 1);
+  return Math.round(ratio * 100);
+}
+
+function scoreFromKneeAngle(angle: number, minAngle: number) {
+  if (minAngle <= 0) return 0;
+  const ratio = clamp(angle / minAngle, 0, 1);
+  return Math.round(ratio * 100);
+}
+
+function checkOrientation(landmarks: Landmark[], desired: "front" | "side"): { isCorrect: boolean; feedback?: string } {
+  const leftShoulder = landmarks[LANDMARKS.leftShoulder];
+  const rightShoulder = landmarks[LANDMARKS.rightShoulder];
+  const leftHip = landmarks[LANDMARKS.leftHip];
+  const rightHip = landmarks[LANDMARKS.rightHip];
+  
+  const shoulderWidth = distance2D(leftShoulder, rightShoulder);
+  const midShoulder = midpoint(leftShoulder, rightShoulder);
+  const midHip = midpoint(leftHip, rightHip);
+  const torsoHeight = distance2D(midShoulder, midHip) || 1; // Prevent div by zero
+  
+  // Ratio of shoulder width to torso height
+  // Front view: Shoulders are wide (~0.8 - 1.2 ratio typically)
+  // Side view: Shoulders are narrow (< 0.5 ratio)
+  const ratio = shoulderWidth / torsoHeight;
+  
+  if (desired === "side") {
+    // Expect narrow shoulders
+    if (ratio > 0.6) return { isCorrect: false, feedback: "Turn to face the side" };
+  } else {
+    // Expect wide shoulders
+    if (ratio < 0.5) return { isCorrect: false, feedback: "Turn to face forward" };
+  }
+  return { isCorrect: true };
 }
 
 function analyzeCatCamel(
@@ -206,6 +299,358 @@ function analyzeCobra(
   };
 }
 
+export function analyzeStandingLumbarFlexion(
+  landmarks: Landmark[],
+  thresholds: Record<string, number>,
+  state: EngineState
+): FormEngineResult {
+  const errors: FormError[] = [];
+  
+  // Check Orientation first
+  const orientation = checkOrientation(landmarks, "side");
+  if (!orientation.isCorrect && orientation.feedback) {
+    errors.push({
+      type: "orientation",
+      message: orientation.feedback,
+      severity: "warning",
+      timestamp: Date.now(),
+      bodyPart: "body",
+    });
+  }
+
+  const leftShoulder = landmarks[LANDMARKS.leftShoulder];
+  const rightShoulder = landmarks[LANDMARKS.rightShoulder];
+  const leftHip = landmarks[LANDMARKS.leftHip];
+  const rightHip = landmarks[LANDMARKS.rightHip];
+  const leftKnee = landmarks[LANDMARKS.leftKnee];
+  const rightKnee = landmarks[LANDMARKS.rightKnee];
+  const leftAnkle = landmarks[LANDMARKS.leftAnkle];
+  const rightAnkle = landmarks[LANDMARKS.rightAnkle];
+
+  const midShoulder = midpoint(leftShoulder, rightShoulder);
+  const midHip = midpoint(leftHip, rightHip);
+  const midKnee = midpoint(leftKnee, rightKnee);
+  const midAnkle = midpoint(leftAnkle, rightAnkle);
+
+  const hipAngle = angleBetween3D(midShoulder, midHip, midKnee);
+  const kneeAngle = angleBetween3D(midHip, midKnee, midAnkle);
+
+  const flexionPhaseAngle = 90; // Require deeper bend for flexion
+  const neutralAngle = 160; // Relaxed return threshold
+  const kneeAngleMin = 120; // Allow moderate knee bend - only warn for significant bend
+
+  // Simple phase detection: neutral → flexion → neutral
+  let phase = "neutral";
+
+  if (hipAngle <= flexionPhaseAngle) {
+    phase = "flexion";
+  } else if (hipAngle < neutralAngle && state.lastPhase === "flexion") {
+    // Stay in flexion until we cross back to neutral threshold
+    phase = "flexion";
+  }
+  // else: hipAngle >= neutralAngle → phase = "neutral"
+
+  // Rep counts when going from flexion back to neutral
+  const repIncremented = state.lastPhase === "flexion" && phase === "neutral";
+
+  if (state.lastPhase !== phase) {
+    console.log(`[LUMBAR_FLEX] ${state.lastPhase} → ${phase} | hipAngle=${hipAngle.toFixed(0)}° kneeAngle=${kneeAngle.toFixed(0)}°`);
+  }
+
+  if (repIncremented) {
+    console.log(`[LUMBAR_FLEX] ✓ REP COUNTED`);
+  }
+
+  const formScore = baseFormScore(landmarks);
+
+  if (kneeAngle < kneeAngleMin) {
+    errors.push({
+      type: "knee_bend",
+      message: "Keep legs straight",
+      severity: "warning",
+      timestamp: Date.now(),
+      bodyPart: "knees",
+    });
+  }
+
+  return {
+    phase,
+    formScore,
+    errors,
+    feedback: errors.length === 0 && phase === "flexion" ? "Good stretch" : undefined,
+    isCorrect: errors.length === 0,
+    repIncremented,
+    confidence: averageVisibility(landmarks, [
+      LANDMARKS.leftShoulder,
+      LANDMARKS.rightShoulder,
+      LANDMARKS.leftHip,
+      LANDMARKS.rightHip,
+    ]),
+  };
+}
+
+function analyzeStandingLumbarExtension(
+  landmarks: Landmark[],
+  thresholds: Record<string, number>,
+  state: EngineState
+): FormEngineResult {
+  const errors: FormError[] = [];
+  
+  // Check Orientation
+  const orientation = checkOrientation(landmarks, "side");
+  if (!orientation.isCorrect && orientation.feedback) {
+    errors.push({
+      type: "orientation",
+      message: orientation.feedback,
+      severity: "warning",
+      timestamp: Date.now(),
+      bodyPart: "body",
+    });
+  }
+
+  const leftShoulder = landmarks[LANDMARKS.leftShoulder];
+  const rightShoulder = landmarks[LANDMARKS.rightShoulder];
+  const leftHip = landmarks[LANDMARKS.leftHip];
+  const rightHip = landmarks[LANDMARKS.rightHip];
+  const leftKnee = landmarks[LANDMARKS.leftKnee];
+  const rightKnee = landmarks[LANDMARKS.rightKnee];
+  const leftAnkle = landmarks[LANDMARKS.leftAnkle];
+  const rightAnkle = landmarks[LANDMARKS.rightAnkle];
+
+  const midShoulder = midpoint(leftShoulder, rightShoulder);
+  const midHip = midpoint(leftHip, rightHip);
+  const midKnee = midpoint(leftKnee, rightKnee);
+  const midAnkle = midpoint(leftAnkle, rightAnkle);
+
+  const hipAngle = angleBetween3D(midShoulder, midHip, midAnkle);
+  const kneeAngle = angleBetween3D(midHip, midKnee, midAnkle);
+  
+  // Extension check: Shoulder should be behind Hip
+  // In side view (assume moving right?), x coords change.
+  // Using angle: hipAngle > 180? No, angleBetween is usually 0-180.
+  // Use Trunk Lean.
+  const dy = midHip.y - midShoulder.y;
+  const dx = midHip.x - midShoulder.x;
+  const trunkAngle = Math.atan2(dx, dy) * (180 / Math.PI); 
+  // Upright = 0. Leaning back depends on orientation.
+  // Absolute lean > 10 degrees BACK?
+  // We can't know "back" easily without tracking sequence or checking heel-toe.
+  // Assume extension means hipAngle < 180 but "open" front?
+  // Actually angleBetween3D(shoulder, hip, ankle) will decrease if extending (hyperextending).
+  // Standard standing is ~170-180.
+  // Extension: < 170? No, that's flexion too?
+  // Angle logic:
+  // Flexion: Shoulder moves forward -> Angle < 180.
+  // Extension: Shoulder moves backward -> Angle < 180 (on other side).
+  // Need Signed Angle or check Z/X relative positions.
+  
+  // Simple heuristic: If hipAngle < 170 AND shoulder is behind hip (x check relative to orientation)
+  // Or just check "spineDepth" (z) if robust.
+  const spineDepth = midShoulder.z - midHip.z;
+  const absSpineDepth = Math.abs(spineDepth);
+
+  // Build baseline over first 60 frames (2 seconds at 30fps)
+  const isCalibrating = state.baselineSpineDepth.length < 60;
+  if (isCalibrating) {
+    state.baselineSpineDepth.push(absSpineDepth);
+  }
+
+  // Calculate baseline average
+  const baseline = state.baselineSpineDepth.length > 0
+    ? state.baselineSpineDepth.reduce((sum, val) => sum + val, 0) / state.baselineSpineDepth.length
+    : absSpineDepth;
+
+  // Detect extension as a DECREASE in spine depth from baseline
+  // When extending backward, the spine straightens and depth decreases
+  const depthChange = absSpineDepth - baseline;
+  const extensionThreshold = -0.05; // Depth must decrease by 0.15 from baseline
+  const returnThreshold = -0.02; // Return when depth is within 0.05 of baseline
+
+  let phase = "neutral";
+  // Extension = depth DECREASES from baseline (spine straightens)
+  if (depthChange <= extensionThreshold) {
+    phase = "extension";
+  }
+
+  // Count rep when returning from extension to neutral
+  const repIncremented = state.lastPhase === "extension" && phase === "neutral";
+
+  if (state.lastPhase !== phase) {
+    console.log(`[LUMBAR_EXT] 🔄 PHASE CHANGE: ${state.lastPhase} → ${phase}`);
+  }
+
+  const formScore = baseFormScore(landmarks);
+
+  if (kneeAngle < 135) {
+    errors.push({
+      type: "knee_bend",
+      message: "Keep knees straight",
+      severity: "warning",
+      timestamp: Date.now(),
+      bodyPart: "knees",
+    });
+  }
+
+  if (repIncremented && errors.length > 0) {
+    console.log(`[LUMBAR_EXT] 🚫 REP BLOCKED - Errors:`, errors.map(e => e.type));
+  }
+
+  if (repIncremented && errors.length === 0) {
+    console.log(`[LUMBAR_EXT] ✅ REP COUNTED`);
+  }
+
+  // Determine feedback message
+  let feedback: string | undefined;
+  if (isCalibrating) {
+    feedback = "Wait for a second, calibrating to your normal stance";
+  } else if (phase === "extension") {
+    feedback = "Hold extension";
+  }
+
+  return {
+    phase,
+    formScore,
+    errors,
+    feedback,
+    isCorrect: errors.length === 0,
+    repIncremented,
+    confidence: averageVisibility(landmarks, [
+      LANDMARKS.leftShoulder,
+      LANDMARKS.rightShoulder,
+      LANDMARKS.leftHip,
+      LANDMARKS.rightHip,
+    ]),
+    // debug: {
+    //   hipAngle,
+    //   kneeAngle,
+    //   spineDepth: absSpineDepth,
+    //   depthChange,
+    //   baseline,
+    //   baselineSamples: state.baselineSpineDepth.length,
+    //   phase,
+    //   queuedErrors: errors.map(e => e.type),
+    // }
+  };
+}
+
+function analyzeStandingLumbarSideBend(
+  landmarks: Landmark[],
+  thresholds: Record<string, number>,
+  state: EngineState
+): FormEngineResult {
+  const errors: FormError[] = [];
+  
+  // Check Orientation
+  const orientation = checkOrientation(landmarks, "front");
+  if (!orientation.isCorrect && orientation.feedback) {
+    errors.push({
+      type: "orientation",
+      message: orientation.feedback,
+      severity: "warning",
+      timestamp: Date.now(),
+      bodyPart: "body",
+    });
+  }
+
+  const leftShoulder = landmarks[LANDMARKS.leftShoulder];
+  const rightShoulder = landmarks[LANDMARKS.rightShoulder];
+  const leftHip = landmarks[LANDMARKS.leftHip];
+  const rightHip = landmarks[LANDMARKS.rightHip];
+  const leftKnee = landmarks[LANDMARKS.leftKnee];
+  const rightKnee = landmarks[LANDMARKS.rightKnee];
+  const midShoulder = midpoint(leftShoulder, rightShoulder);
+  const midHip = midpoint(leftHip, rightHip);
+  const midKnee = midpoint(leftKnee, rightKnee);
+
+  // Calculate angle of shoulder line relative to horizontal
+  // 0 = horizontal.
+  const dy = rightShoulder.y - leftShoulder.y;
+  const dx = rightShoulder.x - leftShoulder.x;
+  const shoulderTiltAngle = Math.atan2(dy, dx) * (180 / Math.PI);
+  const shoulderTilt = Math.abs(shoulderTiltAngle);
+
+  // Determine which side is bending (positive dy = right shoulder lower = bending right)
+  // We use a small threshold (0.02) to avoid noise when near neutral
+  const bendingSide = dy > 0.02 ? "right" : dy < -0.02 ? "left" : "neutral";
+
+  // Calculate hip tilt to ensure bending is happening from the torso
+  const hipDy = rightHip.y - leftHip.y;
+  const hipDx = rightHip.x - leftHip.x;
+  const hipTilt = Math.abs(Math.atan2(hipDy, hipDx) * (180 / Math.PI));
+
+  // Threshold: shoulder angle around 165 degrees indicates good stretch
+  // (measured from horizontal, ~15 degree tilt)
+  const bendThreshold = 168;
+  const returnThreshold = 172; // Closer to neutral (180 degrees = horizontal)
+
+  let phase = "neutral";
+
+  // Check if shoulder tilt is close to 165 degrees (good stretch position)
+  if (shoulderTilt <= bendThreshold && bendingSide !== "neutral") {
+    phase = bendingSide === "left" ? "bend_left" : "bend_right";
+  } else if (state.lastPhase.startsWith("bend_") && shoulderTilt >= returnThreshold) {
+    phase = "neutral";
+  } else if (state.lastPhase.startsWith("bend_")) {
+    // Hold the bend
+    phase = state.lastPhase;
+  }
+
+  // Count rep when returning to neutral from a bend
+  let repIncremented = false;
+  let feedback = phase.startsWith("bend_") ? "Good stretch" : undefined;
+
+  if (state.lastPhase.startsWith("bend_") && phase === "neutral") {
+    if (state.lastPhase === "bend_left") {
+      state.sideBendState.leftDone = true;
+    } else if (state.lastPhase === "bend_right") {
+      state.sideBendState.rightDone = true;
+    }
+
+    if (state.sideBendState.leftDone && state.sideBendState.rightDone) {
+      repIncremented = true;
+      state.sideBendState.leftDone = false;
+      state.sideBendState.rightDone = false;
+      feedback = "Good job! Both sides done";
+    } else {
+      if (state.sideBendState.leftDone) feedback = "Great, now repeat for the right side";
+      if (state.sideBendState.rightDone) feedback = "Great, now repeat for the left side";
+    }
+  }
+
+  if (state.lastPhase !== phase) {
+    console.log(`[SIDE_BEND] 🔄 PHASE CHANGE: ${state.lastPhase} → ${phase} | tilt=${shoulderTilt.toFixed(1)}°`);
+  }
+
+  if (repIncremented) {
+    console.log(`[SIDE_BEND] ✅ REP COUNTED (${state.lastPhase} → ${phase})`);
+  }
+
+  const formScore = baseFormScore(landmarks);
+
+  return {
+    phase,
+    formScore,
+    errors,
+    feedback,
+    isCorrect: errors.length === 0,
+    repIncremented,
+    confidence: averageVisibility(landmarks, [
+      LANDMARKS.leftShoulder,
+      LANDMARKS.rightShoulder,
+      LANDMARKS.leftHip,
+      LANDMARKS.rightHip,
+    ]),
+    // debug: {
+    //   shoulderTilt,
+    //   shoulderTiltAngle,
+    //   hipTilt,
+    //   bendingSide,
+    //   phase,
+    //   queuedErrors: errors.map(e => e.type),
+    // }
+  };
+}
+
 function analyzeDeadBug(
   landmarks: Landmark[],
   thresholds: Record<string, number>,
@@ -278,6 +723,8 @@ function analyzeRDL(
   const rightKnee = landmarks[LANDMARKS.rightKnee];
   const leftAnkle = landmarks[LANDMARKS.leftAnkle];
   const rightAnkle = landmarks[LANDMARKS.rightAnkle];
+  const leftWrist = landmarks[LANDMARKS.leftWrist];
+  const rightWrist = landmarks[LANDMARKS.rightWrist];
 
   // Midpoints for analysis
   const midEar = midpoint(leftEar, rightEar);
@@ -285,6 +732,7 @@ function analyzeRDL(
   const midHip = midpoint(leftHip, rightHip);
   const midKnee = midpoint(leftKnee, rightKnee);
   const midAnkle = midpoint(leftAnkle, rightAnkle);
+  const midWrist = midpoint(leftWrist, rightWrist);
 
   // 1. Knee Angle (Hip-Knee-Ankle)
   // We want a "soft bend" (approx 150-170 degrees), not locked (180) and not squatting (<140)
@@ -302,12 +750,23 @@ function analyzeRDL(
   // Angle in degrees from vertical (0 = upright, 90 = horizontal)
   const trunkLean = Math.abs(Math.atan2(dx, dy) * (180 / Math.PI));
 
+  // 4. Hip Shift (Horizontal distance between Hip and Ankle)
+  // Essential for RDL: Hips must move BACK as torso moves DOWN.
+  const legLength = distance2D(midHip, midAnkle) || 1;
+  const hipShift = Math.abs(midHip.x - midAnkle.x);
+  const normalizedShift = hipShift / legLength;
+
+  // 5. Bar Path (Horizontal distance between Wrist and Knee/Shin)
+  // Weights should stay close to legs.
+  const barDist = Math.abs(midWrist.x - midKnee.x);
+  const normalizedBarDist = barDist / legLength;
+
   const formScore = baseFormScore(landmarks);
   const errors: FormError[] = [];
   let feedback = "";
 
   // Feedback Logic
-  if (kneeAngle < 140) {
+  if (kneeAngle < 115) {
     errors.push({
       type: "knee_bend",
       message: "Too much knee bend - hinge at hips",
@@ -332,6 +791,30 @@ function analyzeRDL(
       severity: "warning",
       timestamp: Date.now(),
       bodyPart: "head",
+    });
+  }
+
+  // Detect Rounding / Poor Hinge
+  // If leaning forward but hips haven't shifted back, user is likely rounding the spine.
+  if (trunkLean > 30 && normalizedShift < 0.15) {
+    errors.push({
+      type: "poor_hinge",
+      message: "Push hips back to flatten spine",
+      severity: "warning",
+      timestamp: Date.now(),
+      bodyPart: "hips",
+    });
+  }
+
+  // Detect Bar Drift
+  // If leaning and bar is far from legs, it increases spinal load/rounding risk.
+  if (trunkLean > 30 && normalizedBarDist > 0.2) {
+    errors.push({
+      type: "bar_drift",
+      message: "Keep weights close to legs",
+      severity: "warning",
+      timestamp: Date.now(),
+      bodyPart: "arms",
     });
   }
 
@@ -364,15 +847,23 @@ function analyzeRDL(
       LANDMARKS.leftShoulder,
       LANDMARKS.rightShoulder,
       LANDMARKS.leftHip,
+      LANDMARKS.rightHip,
     ]),
   };
 }
+
 
 export function createFormEngine(exercise: Exercise) {
   const state: EngineState = {
     lastPhase: "neutral",
     lastRepPhase: "",
     lastExtendedSide: null,
+    squatState: createSquatState(),
+    baselineSpineDepth: [],
+    sideBendState: {
+      leftDone: false,
+      rightDone: false,
+    },
   };
 
   return (landmarks: Landmark[]): FormEngineResult => {
@@ -390,8 +881,21 @@ export function createFormEngine(exercise: Exercise) {
       case "dead-bug":
         result = analyzeDeadBug(landmarks, thresholds, state);
         break;
+      case "standing-lumbar-flexion":
+        result = analyzeStandingLumbarFlexion(landmarks, thresholds, state);
+        break;
+      case "standing-lumbar-extension":
+        result = analyzeStandingLumbarExtension(landmarks, thresholds, state);
+        break;
+      case "standing-lumbar-side-bending":
+        result = analyzeStandingLumbarSideBend(landmarks, thresholds, state);
+        break;
       case "romanian-deadlift":
         result = analyzeRDL(landmarks, thresholds, state);
+        break;
+      case "bodyweight-squat":
+      case "squat":
+        result = analyzeSquat(landmarks, thresholds, state.squatState);
         break;
       default:
         // Use ID as fallback if slug doesn't match
@@ -405,8 +909,21 @@ export function createFormEngine(exercise: Exercise) {
             case "dead-bug":
                 result = analyzeDeadBug(landmarks, thresholds, state);
                 break;
+            case "standing-lumbar-flexion":
+                result = analyzeStandingLumbarFlexion(landmarks, thresholds, state);
+                break;
+            case "standing-lumbar-extension":
+                result = analyzeStandingLumbarExtension(landmarks, thresholds, state);
+                break;
+            case "standing-lumbar-side-bending":
+                result = analyzeStandingLumbarSideBend(landmarks, thresholds, state);
+                break;
             case "romanian-deadlift":
                 result = analyzeRDL(landmarks, thresholds, state);
+                break;
+            case "bodyweight-squat":
+            case "squat":
+                result = analyzeSquat(landmarks, thresholds, state.squatState);
                 break;
             default:
                 result = {
@@ -427,6 +944,14 @@ export function createFormEngine(exercise: Exercise) {
     }
 
     state.lastPhase = result.phase;
+
+    // Block rep counting if there are any warning-severity errors
+    const hasWarning = result.errors.some(e => e.severity === "warning");
+    if (hasWarning && result.repIncremented) {
+      console.log(`[FORM_ENGINE] ⚠ REP BLOCKED due to warnings:`, result.errors.filter(e => e.severity === "warning").map(e => e.message));
+      result.repIncremented = false;
+    }
+
     if (result.repIncremented) {
       state.lastRepPhase = result.phase;
     }
