@@ -25,7 +25,6 @@ const VIDEO_MAPPINGS: Record<string, string[]> = {
     'cobra-stretch',
     'prone-press-up',
     'sphinx-pose',
-    'standing-back-extension',
     'standing-lumbar-extension',
     'prone-extension-shoulder',
     'superman',

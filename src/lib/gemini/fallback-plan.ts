@@ -14,7 +14,7 @@ const EXTENSION_EXERCISES = [
   'cobra-stretch',
   'prone-press-up',
   'sphinx-pose',
-  'standing-back-extension',
+  'standing-lumbar-extension',
   'bird-dog',
   'dead-bug',
   'glute-bridge',

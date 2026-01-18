@@ -59,7 +59,7 @@ export function LandingClient() {
   const [currentTestimonial, setCurrentTestimonial] = React.useState(0);
   const [currentCarouselIndex, setCurrentCarouselIndex] = React.useState(0);
   const [isTransitioning, setIsTransitioning] = React.useState(false);
-  const ctaHref = "/assessment";
+  const ctaHref = "/assessment/lower-back";
 
   // Auto-rotate testimonials
   React.useEffect(() => {

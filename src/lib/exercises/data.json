@@ -1621,9 +1621,9 @@
       "form_detection_enabled": false
     },
     {
-      "id": "standing-back-extension",
-      "name": "Standing Back Extension",
-      "slug": "standing-back-extension",
+      "id": "standing-lumbar-extension",
+      "name": "Standing Lumbar Extension",
+      "slug": "standing-lumbar-extension",
       "tier": 2,
       "body_region": "lower_back",
       "category": "extension",
