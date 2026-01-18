@@ -99,13 +99,17 @@ export default function AssessmentPage() {
       },
     ]);
 
-    if (currentIndex < exercises.length - 1) {
-      resetExercise();
-      setCurrentIndex((prev) => prev + 1);
-    } else {
-      setSessionState("complete");
-      resetExercise();
-    }
+    const timer = setTimeout(() => {
+      if (currentIndex < exercises.length - 1) {
+        resetExercise();
+        setCurrentIndex((prev) => prev + 1);
+      } else {
+        setSessionState("complete");
+        resetExercise();
+      }
+    }, 1500); // 1.5s delay to show "Complete!"
+
+    return () => clearTimeout(timer);
   }, [
     assessmentResults,
     currentExercise,

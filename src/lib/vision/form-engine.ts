@@ -265,7 +265,7 @@ function analyzeCobra(
   };
 }
 
-function analyzeStandingLumbarFlexion(
+export function analyzeStandingLumbarFlexion(
   landmarks: Landmark[],
   thresholds: Record<string, number>,
   state: EngineState
