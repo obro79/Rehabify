@@ -1,6 +1,7 @@
 import type { FormError } from "@/types";
 import type { Exercise } from "@/lib/exercises/types";
 import type { Landmark } from "@/types/vision";
+import { analyzeSquat, createSquatState, type SquatState } from "./exercises/squat";
 
 interface FormEngineResult {
   phase: string;
@@ -10,12 +11,22 @@ interface FormEngineResult {
   isCorrect: boolean;
   repIncremented: boolean;
   confidence: number;
+  debug?: {
+    kneeAngle: number;
+    trunkLean: number;
+    kneeForward: number;
+    descentSpeed: number;
+    minDepth: number;
+    queuedErrors: string[];
+  };
 }
 
 interface EngineState {
   lastPhase: string;
   lastRepPhase: string;
   lastExtendedSide: "left" | "right" | null;
+  // Exercise-specific states
+  squatState: SquatState;
 }
 
 const LANDMARKS = {
@@ -705,126 +716,13 @@ function analyzeRDL(
   };
 }
 
-function analyzeSquat(
-  landmarks: Landmark[],
-  thresholds: Record<string, number>,
-  state: EngineState
-): FormEngineResult {
-  const leftEar = landmarks[LANDMARKS.leftEar];
-  const rightEar = landmarks[LANDMARKS.rightEar];
-  const leftShoulder = landmarks[LANDMARKS.leftShoulder];
-  const rightShoulder = landmarks[LANDMARKS.rightShoulder];
-  const leftHip = landmarks[LANDMARKS.leftHip];
-  const rightHip = landmarks[LANDMARKS.rightHip];
-  const leftKnee = landmarks[LANDMARKS.leftKnee];
-  const rightKnee = landmarks[LANDMARKS.rightKnee];
-  const leftAnkle = landmarks[LANDMARKS.leftAnkle];
-  const rightAnkle = landmarks[LANDMARKS.rightAnkle];
-
-  // Midpoints
-  const midEar = midpoint(leftEar, rightEar);
-  const midShoulder = midpoint(leftShoulder, rightShoulder);
-  const midHip = midpoint(leftHip, rightHip);
-  const midKnee = midpoint(leftKnee, rightKnee);
-  const midAnkle = midpoint(leftAnkle, rightAnkle);
-
-  // 1. Depth (Hip Y vs Knee Y)
-  // Higher value = lower position (screen coords)
-  const depth = midHip.y - midKnee.y; // Positive if hip below knee (good depth)
-  const isParallel = depth > -0.05; // Slightly above or at parallel
-  const isBelowParallel = depth > 0.05;
-
-  // 2. Trunk Lean (Chest Up)
-  const dy = midHip.y - midShoulder.y;
-  const dx = midHip.x - midShoulder.x;
-  const trunkLean = Math.abs(Math.atan2(dx, dy) * (180 / Math.PI));
-
-  // 3. Valgus (Knees caving in - Frontal view heuristic)
-  // Check horizontal distance between knees vs ankles
-  const kneeDist = Math.abs(leftKnee.x - rightKnee.x);
-  const ankleDist = Math.abs(leftAnkle.x - rightAnkle.x);
-  // If knees significantly closer than ankles (and ankles are not touching)
-  const isValgus = ankleDist > 0.1 && kneeDist < ankleDist * 0.75;
-
-  // 4. Neck/Head Alignment
-  const neckAngle = angleBetween(midEar, midShoulder, midHip);
-
-  const formScore = baseFormScore(landmarks);
-  const errors: FormError[] = [];
-  let feedback = "";
-
-  // Feedback Logic
-  if (trunkLean > 45) {
-    errors.push({
-      type: "chest_drop",
-      message: "Keep chest up",
-      severity: "warning",
-      timestamp: Date.now(),
-      bodyPart: "chest",
-    });
-  }
-
-  if (isValgus) {
-    errors.push({
-      type: "knee_valgus",
-      message: "Push knees out",
-      severity: "warning",
-      timestamp: Date.now(),
-      bodyPart: "knees",
-    });
-  }
-
-  if (neckAngle < 150 || neckAngle > 210) {
-    errors.push({
-      type: "neck_alignment",
-      message: "Look forward, keep head neutral",
-      severity: "info",
-      timestamp: Date.now(),
-      bodyPart: "head",
-    });
-  }
-
-  // Depth Feedback (Positive)
-  if (errors.length === 0) {
-    if (isBelowParallel) {
-      feedback = "Perfect depth! Drive up.";
-    } else if (isParallel) {
-      feedback = "Good depth.";
-    } else {
-      feedback = "Go lower if you can.";
-    }
-  }
-
-  // Phase detection
-  // Use knee angle for phase? 180 = standing, < 90 = bottom
-  const kneeFlexion = angleBetween(midHip, midKnee, midAnkle);
-  let phase = "standing";
-  if (kneeFlexion < 160) phase = "descending";
-  if (kneeFlexion < 100) phase = "bottom";
-  if (state.lastPhase === "bottom" && kneeFlexion > 100) phase = "ascending";
-
-  const repIncremented = state.lastPhase === "descending" && phase === "standing"; // Simplified, usually needs bottom->ascending->standing
-
-  return {
-    phase,
-    formScore,
-    errors,
-    feedback,
-    isCorrect: errors.length === 0,
-    repIncremented: state.lastPhase === "bottom" && kneeFlexion > 150, // Trigger rep on full extension
-    confidence: averageVisibility(landmarks, [
-      LANDMARKS.leftHip,
-      LANDMARKS.leftKnee,
-      LANDMARKS.leftAnkle,
-    ]),
-  };
-}
 
 export function createFormEngine(exercise: Exercise) {
   const state: EngineState = {
     lastPhase: "neutral",
     lastRepPhase: "",
     lastExtendedSide: null,
+    squatState: createSquatState(),
   };
 
   return (landmarks: Landmark[]): FormEngineResult => {
@@ -854,9 +752,9 @@ export function createFormEngine(exercise: Exercise) {
       case "romanian-deadlift":
         result = analyzeRDL(landmarks, thresholds, state);
         break;
-      case "goblet-squat":
-      case "squat": // Fallback if added
-        result = analyzeSquat(landmarks, thresholds, state);
+      case "bodyweight-squat":
+      case "squat":
+        result = analyzeSquat(landmarks, thresholds, state.squatState);
         break;
       default:
         // Use ID as fallback if slug doesn't match
@@ -882,8 +780,9 @@ export function createFormEngine(exercise: Exercise) {
             case "romanian-deadlift":
                 result = analyzeRDL(landmarks, thresholds, state);
                 break;
-            case "goblet-squat":
-                result = analyzeSquat(landmarks, thresholds, state);
+            case "bodyweight-squat":
+            case "squat":
+                result = analyzeSquat(landmarks, thresholds, state.squatState);
                 break;
             default:
                 result = {

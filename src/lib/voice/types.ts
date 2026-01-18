@@ -33,6 +33,9 @@ export type FormErrorType =
   | 'speed_too_slow'
   | 'range_of_motion'
   | 'position_drift'
+  | 'knee_forward'
+  | 'forward_lean'
+  | 'insufficient_depth'
   | 'unknown';
 
 /**
@@ -147,6 +150,9 @@ export const FORM_ERROR_CORRECTIONS: Record<FormErrorType, string> = {
   speed_too_slow: 'You can move a little faster',
   range_of_motion: 'Try to increase your range slightly',
   position_drift: 'Come back to center',
+  knee_forward: 'Sit back more, keep knees over ankles',
+  forward_lean: 'Keep your chest up',
+  insufficient_depth: 'Try to get a bit lower if comfortable',
   unknown: 'Adjust your form slightly',
 };
 
@@ -167,5 +173,8 @@ export const ERROR_PRIORITY: Record<FormErrorType, EventPriority> = {
   speed_too_slow: EventPriority.LOW,
   range_of_motion: EventPriority.LOW,
   position_drift: EventPriority.MEDIUM,
+  knee_forward: EventPriority.MEDIUM,
+  forward_lean: EventPriority.HIGH, // Safety concern - spine position
+  insufficient_depth: EventPriority.LOW,
   unknown: EventPriority.LOW,
 };
