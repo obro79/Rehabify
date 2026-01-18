@@ -67,6 +67,7 @@ export function getExercisesByTier(tier: ExerciseTier): Exercise[] {
 export function toCardData(exercise: Exercise): ExerciseCardData {
   return {
     id: exercise.id,
+    slug: exercise.slug,
     name: exercise.name,
     category: mapToDisplayCategory(exercise.category),
     duration: formatDuration(exercise),

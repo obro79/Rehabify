@@ -13,7 +13,6 @@ export function Footer({ className }: FooterProps) {
   const currentYear = new Date().getFullYear();
 
   const footerLinks = [
-    { label: "About", href: "/about" },
     { label: "Privacy", href: "/privacy" },
     { label: "Terms", href: "/terms" },
     { label: "Contact", href: "/contact" },

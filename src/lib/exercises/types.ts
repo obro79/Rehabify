@@ -100,6 +100,7 @@ export interface Exercise {
 // Simplified exercise for display in cards/lists
 export interface ExerciseCardData {
   id: string;
+  slug: string;
   name: string;
   category: DisplayCategory;
   duration: string;

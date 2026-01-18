@@ -24,6 +24,7 @@ import {
   selectFormScore,
   selectPhase,
   selectRepCount,
+  selectActiveErrors,
 } from "@/stores/exercise-store-selectors";
 import type { Exercise } from "@/lib/exercises/types";
 import { useVapi } from "@/hooks/use-vapi";
@@ -32,6 +33,7 @@ import { useVoiceStore } from "@/stores/voice-store";
 
 type SessionState = "active" | "paused" | "complete";
 type VoiceState = "idle" | "connecting" | "listening" | "thinking" | "speaking";
+type VoicePhase = "explaining" | "analyzing" | "finished";
 
 export default function WorkoutSessionPage() {
   const params = useParams();
@@ -55,20 +57,39 @@ export default function WorkoutSessionPage() {
   const repCount = useExerciseStore(selectRepCount);
   const formScore = useExerciseStore(selectFormScore);
   const phase = useExerciseStore(selectPhase);
+  const activeErrors = useExerciseStore(selectActiveErrors);
   const setExercise = useExerciseStore((state) => state.setExercise);
   const resetExercise = useExerciseStore((state) => state.reset);
   const setExercisePhase = useExerciseStore((state) => state.setPhase);
   const incrementRep = useExerciseStore((state) => state.incrementRep);
   const targetReps = exercise?.default_reps || 10;
 
+  // Voice coaching phase: explaining -> analyzing -> finished
+  const [voicePhase, setVoicePhase] = React.useState<VoicePhase>("explaining");
+  const voicePhaseRef = React.useRef<VoicePhase>("explaining");
+  voicePhaseRef.current = voicePhase;
+
+  // Handle user confirmation to transition from explaining to analyzing
+  // Using ref to avoid callback reference changing and causing useVapi to reinitialize
+  const handleUserReady = React.useCallback(() => {
+    if (voicePhaseRef.current === "explaining") {
+      console.log("[WorkoutPage] User confirmed ready, transitioning to analyze phase");
+      setVoicePhase("analyzing");
+    }
+  }, []);
+
   // Real Vapi voice integration
-  const { start: startVapi, stop: stopVapi, isConnected, setMuted, say, injectContext } = useVapi();
+  const { start: startVapi, stop: stopVapi, isConnected, isSpeaking, setMuted, say, injectContext } = useVapi({
+    onUserReady: handleUserReady,
+  });
   const { connectionState, speakingStatus, transcript: transcriptEntries, isMuted } = useVoiceStore();
 
   // Wire vision events to voice feedback (LLM-based)
   useFormEventBridge({
     injectContext,
     isConnected,
+    isSpeaking,
+    isAnalyzing: voicePhase === "analyzing",
     exerciseName: exercise?.name,
     targetReps,
   });
@@ -91,33 +112,85 @@ export default function WorkoutSessionPage() {
     return transcriptEntries.slice(-2).map(t => t.content).join(' ');
   }, [transcriptEntries, isConnected]);
 
-  // Inject exercise context when Vapi connects
+  // Pre-compute exercise intro context (ready before Vapi connects)
+  const exerciseIntroContext = React.useMemo(() => {
+    if (!exercise) return null;
+    return `[EXERCISE INTRO]
+Exercise: ${exercise.name}
+Target area: ${exercise.target_area || exercise.category.replace(/_/g, ' ')}
+Key cue: ${exercise.instructions[0]}
+
+Greet the user briefly. Tell them what exercise we're doing and give them ONE key thing to focus on.
+Then ask: "Ready to start?"
+Wait for their confirmation before we begin analyzing their form.`;
+  }, [exercise]);
+
+  // Inject pre-computed context when Vapi connects (with delay to ensure connection is ready)
   const hasInjectedContext = React.useRef(false);
   React.useEffect(() => {
-    if (isConnected && exercise && !hasInjectedContext.current) {
+    if (isConnected && exerciseIntroContext && !hasInjectedContext.current) {
       hasInjectedContext.current = true;
 
-      // Inject context for LLM
-      const context = `CURRENT EXERCISE: ${exercise.name}
-The user is currently doing ${exercise.name} (${exercise.category.replace(/_/g, ' ')}).
-Target: ${targetReps} reps.
-Instructions: ${exercise.instructions.slice(0, 3).join(' ')}
-Common mistakes to watch for: ${exercise.common_mistakes.slice(0, 2).join(', ')}`;
+      // Small delay to ensure Vapi connection is fully established
+      const timer = setTimeout(() => {
+        console.log('[WorkoutPage] Injecting pre-computed exercise intro context');
+        injectContext(exerciseIntroContext);
+      }, 500);
 
-      console.log('[WorkoutPage] Injecting exercise context:', context);
-      injectContext(context);
-
-      // Also say it directly so assistant definitely knows
-      setTimeout(() => {
-        say(`We're doing ${exercise.name} today. ${targetReps} reps. Let me know when you're ready.`);
-      }, 1500); // Wait for assistant's first message
+      return () => clearTimeout(timer);
     }
 
     // Reset when disconnected
     if (!isConnected) {
       hasInjectedContext.current = false;
+      setVoicePhase("explaining");
     }
-  }, [isConnected, exercise, targetReps, injectContext, say]);
+  }, [isConnected, exerciseIntroContext, injectContext]);
+
+  // Inject analyze context when user confirms ready
+  React.useEffect(() => {
+    if (voicePhase === "analyzing" && isConnected) {
+      const context = `[EXERCISE STARTING]
+The user is ready to begin. Say "Great, let's go - I'm watching your form."
+From now on, give brief form corrections when I send you [FORM FEEDBACK NEEDED] messages.
+Keep corrections to 5-15 words max. Focus on what TO do, not what's wrong.`;
+
+      console.log('[WorkoutPage] Transitioning to analyze phase:', context);
+      injectContext(context);
+    }
+  }, [voicePhase, isConnected, injectContext]);
+
+  // Sync exercise state to API for Vapi webhook access (get_form_status tool)
+  React.useEffect(() => {
+    if (!exercise || !isConnected) return;
+
+    const syncState = async () => {
+      try {
+        await fetch('/api/session-state', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId,
+            exerciseId: exercise.id,
+            exerciseName: exercise.name,
+            formScore,
+            activeErrors: activeErrors.map(e => e.type),
+            repCount,
+            targetReps,
+            phase,
+            isTracking: true,
+          }),
+        });
+      } catch (err) {
+        console.error('[WorkoutPage] Failed to sync session state:', err);
+      }
+    };
+
+    // Sync immediately and then every 1 second
+    syncState();
+    const interval = setInterval(syncState, 1000);
+    return () => clearInterval(interval);
+  }, [exercise, isConnected, sessionId, formScore, activeErrors, repCount, phase, targetReps]);
 
   // Stop voice when session ends
   React.useEffect(() => {
