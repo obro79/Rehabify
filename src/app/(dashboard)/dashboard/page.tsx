@@ -1,6 +1,10 @@
 "use client";
 
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { getExerciseById } from "@/lib/exercises";
+import type { PlanStructure } from "@/lib/gemini/types";
 import { Badge } from "@/components/ui/badge";
 import { StreakDisplay } from "@/components/ui/streak-display";
 import { StatsCard } from "@/components/ui/stats-card";
@@ -50,9 +54,140 @@ function getTimeOfDayGreeting() {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const userName = "Sarah";
   const quote = motivationalQuotes[0];
   const greeting = getTimeOfDayGreeting();
+  const [firstExerciseSlug, setFirstExerciseSlug] = useState<string | null>(null);
+
+  // Fetch user's plan and get first exercise, create default if none exists
+  useEffect(() => {
+    async function fetchFirstExercise() {
+      try {
+        const response = await fetch("/api/patient-records");
+        if (!response.ok) {
+          // Try to create a default plan
+          await createDefaultPlan();
+          return;
+        }
+
+        const result = await response.json();
+
+        // API returns { data: { plans: [...], assessments: [...], sessions: [...] } }
+        const data = result.data || result;
+
+        if (!data) {
+          await createDefaultPlan();
+          return;
+        }
+
+        const plans = data.plans || [];
+
+        if (plans.length === 0) {
+          // No plans exist, create a default one
+          await createDefaultPlan();
+          return;
+        }
+
+        // Get the most recent approved plan, or first plan if none approved
+        const activePlan = plans.find(
+          (plan: { status: string }) => plan.status === "approved"
+        ) || plans[0];
+
+        if (!activePlan?.structure) {
+          await createDefaultPlan();
+          return;
+        }
+
+        // Parse structure if it's a string (JSONB from database might be stringified)
+        let structure: PlanStructure;
+        if (typeof activePlan.structure === 'string') {
+          try {
+            structure = JSON.parse(activePlan.structure);
+          } catch (e) {
+            console.error("[Dashboard] Failed to parse plan structure:", e);
+            await createDefaultPlan();
+            return;
+          }
+        } else {
+          structure = activePlan.structure as PlanStructure;
+        }
+
+        // Validate structure has weeks
+        if (!structure?.weeks || !Array.isArray(structure.weeks) || structure.weeks.length === 0) {
+          await createDefaultPlan();
+          return;
+        }
+
+        // Get first week
+        const firstWeek = structure.weeks[0];
+
+        if (!firstWeek?.exercises || !Array.isArray(firstWeek.exercises) || firstWeek.exercises.length === 0) {
+          await createDefaultPlan();
+          return;
+        }
+
+        // Get first exercise (sorted by order)
+        const sortedExercises = [...firstWeek.exercises].sort(
+          (a, b) => (a.order || 0) - (b.order || 0)
+        );
+        const firstExercise = sortedExercises[0];
+
+        if (!firstExercise) {
+          await createDefaultPlan();
+          return;
+        }
+
+        // Use exerciseSlug if available, otherwise look up by exerciseId
+        let slug = firstExercise.exerciseSlug;
+        if (!slug && firstExercise.exerciseId) {
+          const exercise = getExerciseById(firstExercise.exerciseId);
+          if (exercise?.slug) {
+            slug = exercise.slug;
+          }
+        }
+
+        if (slug) {
+          setFirstExerciseSlug(slug);
+        } else {
+          // Fallback to cat-camel if slug not found
+          setFirstExerciseSlug('cat-camel');
+        }
+      } catch (error) {
+        console.error("[Dashboard] Failed to fetch plan:", error);
+        // Try to create default plan as fallback
+        await createDefaultPlan();
+      }
+    }
+
+    async function createDefaultPlan() {
+      try {
+        const response = await fetch("/api/plans/create-default", {
+          method: "POST",
+        });
+
+        if (response.ok) {
+          // Default plan created, set slug to cat-camel
+          setFirstExerciseSlug('cat-camel');
+        } else {
+          // If creation fails, still set to cat-camel as fallback
+          setFirstExerciseSlug('cat-camel');
+        }
+      } catch (error) {
+        console.error("[Dashboard] Failed to create default plan:", error);
+        // Still set to cat-camel as fallback
+        setFirstExerciseSlug('cat-camel');
+      }
+    }
+
+    fetchFirstExercise();
+  }, []);
+
+  const handleStartRoutine = () => {
+    // Use first exercise slug if available, otherwise default to cat-camel
+    const slug = firstExerciseSlug || 'cat-camel';
+    router.push(`/workout/${slug}`);
+  };
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 relative">
@@ -92,7 +227,7 @@ export default function DashboardPage() {
                 Based on your progress and recovery goals
               </p>
             </div>
-            <Button variant="primary">
+            <Button variant="primary" onClick={handleStartRoutine}>
               Start Full Routine
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
