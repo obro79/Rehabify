@@ -79,3 +79,5 @@ pnpm-lock*.yaml
 
 # Local test scripts
 test-*.sh
+
+.cursor

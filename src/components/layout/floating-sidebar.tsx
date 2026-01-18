@@ -42,7 +42,7 @@ const navItems: NavItem[] = [
   },
   {
     label: "Profile",
-    href: "/profile",
+    href: "/patient-profile",
     icon: <ProfileIcon size="md" variant="sage" />,
   },
 ];

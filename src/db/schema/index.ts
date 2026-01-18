@@ -14,6 +14,7 @@ export { messages, cannedResponses } from './messages';
 export { notifications } from './notifications';
 export { ptAlerts, ptRecommendations } from './alerts';
 export { achievements, userAchievements } from './achievements';
+export { patientMedicalInfo } from './patient-medical-info';
 
 // Types
 export type { Profile, NewProfile } from './profiles';
@@ -35,3 +36,7 @@ export type {
   UserAchievement,
   NewUserAchievement,
 } from './achievements';
+export type {
+  PatientMedicalInfo,
+  NewPatientMedicalInfo,
+} from './patient-medical-info';

@@ -8,11 +8,13 @@ import { ArrowLeft, Plus, X, Save, Search, Sparkles, Loader2 } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { NumberInput } from "@/components/ui/number-input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePTStore } from "@/stores/pt-store";
 import type { PlanExercise } from "@/lib/mock-data/pt-data";
+import type { PlanWeek } from "@/lib/gemini/types";
 
 import exerciseData from "@/lib/exercises/data.json";
 
@@ -58,12 +60,19 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
   const {
     getPatientById,
     draftPlan,
+    draftPlanStructure,
     loadDraftPlan,
     addExerciseToPlan,
     removeExerciseFromPlan,
     updateExerciseConfig,
     savePlan,
     clearDraftPlan,
+    setPlanStructure,
+    addExerciseToWeek,
+    removeExerciseFromWeek,
+    updateWeekExercise,
+    updateWeekFocus,
+    updateWeekNotes,
   } = usePTStore();
 
   const patient = getPatientById(clientId);
@@ -73,7 +82,10 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [planName, setPlanName] = useState("");
   const [selectedDay, setSelectedDay] = useState<number>(1); // Default to Monday
+  const [selectedWeek, setSelectedWeek] = useState<number>(1); // Default to Week 1
   const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [availableAssessment, setAvailableAssessment] = useState<{ id: string; completed: boolean } | null>(null);
 
   // Load existing plan on mount
   useEffect(() => {
@@ -85,6 +97,29 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
       setPlanName("New Treatment Plan");
     }
   }, [clientId, patient, loadDraftPlan, clearDraftPlan]);
+
+  // Fetch available assessments for this patient
+  useEffect(() => {
+    async function fetchAssessments() {
+      try {
+        const response = await fetch(`/api/assessments/${clientId}`);
+        if (!response.ok) {
+          // If 404 or other error, just continue without assessment
+          return;
+        }
+        const { data } = await response.json();
+        // Find the most recent completed assessment
+        const completed = data?.find((a: { completed: boolean }) => a.completed);
+        if (completed) {
+          setAvailableAssessment({ id: completed.id, completed: true });
+        }
+      } catch (err) {
+        // Silently fail - assessment is optional
+        console.error('Failed to fetch assessments:', err);
+      }
+    }
+    fetchAssessments();
+  }, [clientId]);
 
   // Filter exercises based on search and category
   const filteredExercises = useMemo(() => {
@@ -98,21 +133,39 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
     });
   }, [searchQuery, selectedCategory]);
 
-  // Filter draft plan exercises by selected day
-  const exercisesForSelectedDay = useMemo(() => {
-    return draftPlan.filter((ex) => ex.dayOfWeek === selectedDay);
-  }, [draftPlan, selectedDay]);
+  // Get current week data
+  const currentWeek = useMemo(() => {
+    if (draftPlanStructure) {
+      return draftPlanStructure.weeks.find(w => w.weekNumber === selectedWeek);
+    }
+    return null;
+  }, [draftPlanStructure, selectedWeek]);
 
-  // Get exercise count per day
+  // Filter exercises for selected week and day
+  const exercisesForSelectedDay = useMemo(() => {
+    if (currentWeek) {
+      return currentWeek.exercises.filter((ex) => ex.days.includes(selectedDay));
+    }
+    // Fallback to legacy draftPlan structure
+    return draftPlan.filter((ex) => ex.dayOfWeek === selectedDay);
+  }, [currentWeek, selectedDay, draftPlan]) as Array<PlanExercise | { exerciseId: string; name: string; sets: number; reps: number; holdSeconds?: number; days: number[]; order: number; exerciseSlug?: string; notes?: string }>;
+
+  // Get exercise count per day for current week
   const getExerciseCountForDay = useCallback(
     (day: number) => {
+      if (currentWeek) {
+        return currentWeek.exercises.filter((ex) => ex.days.includes(day)).length;
+      }
       return draftPlan.filter((ex) => ex.dayOfWeek === day).length;
     },
-    [draftPlan]
+    [currentWeek, draftPlan]
   );
 
-  // Check if exercise is already in plan
+  // Check if exercise is already in current week
   const isInPlan = (exerciseId: string) => {
+    if (currentWeek) {
+      return currentWeek.exercises.some((ex) => ex.exerciseId === exerciseId);
+    }
     return draftPlan.some((ex) => ex.exerciseId === exerciseId);
   };
 
@@ -120,25 +173,102 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
   const handleAddExercise = (exercise: Exercise) => {
     if (isInPlan(exercise.id)) return;
 
-    const planExercise: PlanExercise = {
-      id: `pe-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      exerciseId: exercise.id,
-      name: exercise.name,
-      category: exercise.category,
-      sets: exercise.default_sets,
-      reps: exercise.default_reps,
-      holdSeconds: exercise.default_hold_seconds,
-      order: draftPlan.length,
-      dayOfWeek: selectedDay,
-    };
+    if (draftPlanStructure && currentWeek) {
+      // Add to 12-week structure
+      const planExercise: PlanExercise = {
+        id: `pe-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        exerciseId: exercise.id,
+        name: exercise.name,
+        category: exercise.category,
+        sets: exercise.default_sets,
+        reps: exercise.default_reps,
+        holdSeconds: exercise.default_hold_seconds,
+        order: currentWeek.exercises.length,
+        dayOfWeek: selectedDay,
+      };
 
-    addExerciseToPlan(planExercise);
+      // Check if exercise already exists in this week (by exerciseId)
+      const existsInWeek = currentWeek.exercises.some(ex => ex.exerciseId === exercise.id);
+      if (!existsInWeek) {
+        addExerciseToWeek(selectedWeek, planExercise, [selectedDay]);
+      }
+    } else {
+      // Fallback to legacy structure
+      const planExercise: PlanExercise = {
+        id: `pe-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        exerciseId: exercise.id,
+        name: exercise.name,
+        category: exercise.category,
+        sets: exercise.default_sets,
+        reps: exercise.default_reps,
+        holdSeconds: exercise.default_hold_seconds,
+        order: draftPlan.length,
+        dayOfWeek: selectedDay,
+      };
+
+      addExerciseToPlan(planExercise);
+    }
   };
 
-  // AI Generate Plan - populates with sample exercises
+  // AI Generate Plan from Assessment
   const handleGeneratePlan = async () => {
     setIsGenerating(true);
+    setError(null);
 
+    try {
+      // Check if we have an assessment
+      if (!availableAssessment || !availableAssessment.completed) {
+        // Fallback to mock generation if no assessment
+        await handleMockGeneratePlan();
+        return;
+      }
+
+      // Call the real API
+      const response = await fetch('/api/plans/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          assessmentId: availableAssessment.id,
+          patientId: clientId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Failed to generate plan');
+      }
+
+      const { data } = await response.json();
+
+      // Clear existing draft
+      clearDraftPlan();
+
+      // Store the full 12-week plan structure
+      if (data.structure?.weeks && data.structure.weeks.length === 12) {
+        setPlanStructure(data.structure);
+        setPlanName(data.summary ? `AI Plan: ${data.summary.substring(0, 50)}...` : "AI-Generated Recovery Plan");
+      } else {
+        throw new Error('Invalid plan structure: expected 12 weeks');
+      }
+
+      // Show success message
+      if (data.recommendations && data.recommendations.length > 0) {
+        console.log('Plan recommendations:', data.recommendations);
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to generate plan';
+      setError(errorMessage);
+      console.error('Plan generation error:', err);
+
+      // Fallback to mock generation on error
+      await handleMockGeneratePlan();
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Fallback mock generation (original logic)
+  const handleMockGeneratePlan = async () => {
     // Simulate AI generation delay
     await new Promise((resolve) => setTimeout(resolve, 1200));
 
@@ -176,33 +306,75 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
       }
     }
 
-    // Distribute exercises across weekdays (Mon-Fri)
-    const weekdays = [1, 2, 3, 4, 5]; // Mon-Fri
-    selectedExercises.forEach((exercise, index) => {
-      const dayOfWeek = weekdays[index % weekdays.length];
-      const planExercise: PlanExercise = {
-        id: `pe-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${index}`,
-        exerciseId: exercise.id,
-        name: exercise.name,
-        category: exercise.category,
-        sets: exercise.default_sets,
-        reps: exercise.default_reps,
-        holdSeconds: exercise.default_hold_seconds,
-        order: index,
-        dayOfWeek,
+    // Create a simple 12-week structure for mock generation
+    const mockWeeks: PlanWeek[] = Array.from({ length: 12 }, (_, i) => {
+      const weekNum = i + 1;
+      // Only populate first week with exercises for demo
+      const exercises = weekNum === 1 ? selectedExercises.slice(0, 3).map((ex, idx) => ({
+        exerciseId: ex.id,
+        exerciseSlug: ex.slug,
+        name: ex.name,
+        sets: ex.default_sets,
+        reps: ex.default_reps,
+        holdSeconds: ex.default_hold_seconds,
+        days: [1, 3, 5], // Mon, Wed, Fri
+        order: idx,
+      })) : [];
+
+      return {
+        weekNumber: weekNum,
+        focus: weekNum <= 2 ? 'Pain relief and gentle mobility' :
+               weekNum <= 4 ? 'Core activation and stability basics' :
+               weekNum <= 6 ? 'Progressive strengthening' :
+               weekNum <= 8 ? 'Functional movement patterns' :
+               weekNum <= 10 ? 'Advanced stability and endurance' :
+               'Maintenance and independence',
+        notes: weekNum <= 2 ? 'Focus on pain-free movement. Stop if pain increases.' :
+               weekNum <= 4 ? 'Begin engaging core muscles. Maintain neutral spine.' :
+               weekNum <= 6 ? 'Increase difficulty gradually. Monitor fatigue.' :
+               weekNum <= 8 ? 'Apply exercises to daily movements.' :
+               weekNum <= 10 ? 'Build endurance. Longer holds, more reps.' :
+               "You're ready for independent maintenance!",
+        exercises,
       };
-      addExerciseToPlan(planExercise);
     });
 
+    setPlanStructure({ weeks: mockWeeks });
     setPlanName("AI-Generated Recovery Plan");
-    setIsGenerating(false);
   };
 
   // Handle save plan
-  const handleSavePlan = () => {
-    if (draftPlan.length === 0) return;
-    savePlan(clientId, planName);
-    router.push(`/pt/clients/${clientId}`);
+  const handleSavePlan = async () => {
+    if (!draftPlanStructure && draftPlan.length === 0) return;
+
+    // If we have a 12-week structure, save it to the database
+    if (draftPlanStructure) {
+      try {
+        const response = await fetch('/api/plans', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patientId: clientId,
+            name: planName || 'Rehabilitation Plan',
+            structure: draftPlanStructure,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error?.message || 'Failed to save plan');
+        }
+
+        router.push(`/pt/clients/${clientId}`);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to save plan');
+        console.error('Save plan error:', err);
+      }
+    } else {
+      // Fallback to legacy save
+      savePlan(clientId, planName);
+      router.push(`/pt/clients/${clientId}`);
+    }
   };
 
   // Handle cancel
@@ -274,13 +446,14 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
               onClick={handleGeneratePlan}
               disabled={isGenerating}
               className="text-sage-600 hover:text-sage-800"
+              title={availableAssessment ? "Generate plan from assessment" : "Generate sample plan (no assessment found)"}
             >
               {isGenerating ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
                 <Sparkles className="w-4 h-4 mr-2" />
               )}
-              {isGenerating ? "Generating..." : "AI Generate"}
+              {isGenerating ? "Generating..." : availableAssessment ? "AI Generate from Assessment" : "AI Generate (Sample)"}
             </Button>
             <Button variant="ghost" size="sm" onClick={handleCancel}>
               Cancel
@@ -289,7 +462,7 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
               variant="secondary"
               size="sm"
               onClick={handleSavePlan}
-              disabled={draftPlan.length === 0}
+              disabled={!draftPlanStructure && draftPlan.length === 0}
             >
               <Save className="w-4 h-4 mr-2" />
               Save Plan
@@ -300,6 +473,20 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-6">
+        {/* Error Message */}
+        {error && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-sm text-red-800">
+              <strong>Error:</strong> {error}
+            </p>
+            {availableAssessment && (
+              <p className="text-xs text-red-600 mt-1">
+                Falling back to sample plan generation.
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Plan Name Input */}
         <div className="mb-6">
           <label htmlFor="plan-name" className="block text-sm font-medium text-sage-700 mb-2">
@@ -419,12 +606,78 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
                 <div>
                   <CardTitle className="text-lg">Current Plan</CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {draftPlan.length} exercise{draftPlan.length !== 1 ? "s" : ""} total
+                    {draftPlanStructure
+                      ? `12-week plan${currentWeek ? ` - Week ${selectedWeek}` : ''}`
+                      : `${draftPlan.length} exercise${draftPlan.length !== 1 ? "s" : ""} total`
+                    }
                   </p>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="p-4">
+              {/* Week Tabs (if 12-week structure exists) */}
+              {draftPlanStructure && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-sage-700 mb-2">
+                    Week Selection
+                  </label>
+                  <Tabs
+                    value={String(selectedWeek)}
+                    onValueChange={(val) => setSelectedWeek(Number(val))}
+                    className="mb-4"
+                  >
+                    <TabsList className="grid grid-cols-6 gap-1 w-full">
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((weekNum) => {
+                        const week = draftPlanStructure.weeks.find(w => w.weekNumber === weekNum);
+                        const exerciseCount = week?.exercises.length || 0;
+                        return (
+                          <TabsTrigger
+                            key={weekNum}
+                            value={String(weekNum)}
+                            className="flex flex-col items-center gap-0.5 py-2"
+                          >
+                            <span className="text-xs font-medium">W{weekNum}</span>
+                            {exerciseCount > 0 && (
+                              <span className="text-[10px] text-sage-600 bg-sage-100 rounded-full px-1.5 min-w-[18px]">
+                                {exerciseCount}
+                              </span>
+                            )}
+                          </TabsTrigger>
+                        );
+                      })}
+                    </TabsList>
+                  </Tabs>
+
+                  {/* Week Focus and Notes */}
+                  {currentWeek && (
+                    <div className="mb-4 p-3 bg-sage-50 rounded-lg">
+                      <div className="mb-2">
+                        <label className="block text-xs font-medium text-sage-700 mb-1">
+                          Week Focus
+                        </label>
+                        <Input
+                          value={currentWeek.focus}
+                          onChange={(e) => updateWeekFocus(selectedWeek, e.target.value)}
+                          className="text-sm"
+                          placeholder="e.g., Pain relief and gentle mobility"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-sage-700 mb-1">
+                          Patient Notes
+                        </label>
+                        <Textarea
+                          value={currentWeek.notes}
+                          onChange={(e) => updateWeekNotes(selectedWeek, e.target.value)}
+                          className="min-h-[60px] text-sm"
+                          placeholder="Instructions for this week..."
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Weekly Day Tabs */}
               <Tabs
                 value={String(selectedDay)}
@@ -456,6 +709,11 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
               <div className="mb-3">
                 <h3 className="text-sm font-medium text-sage-700">
                   {DAYS_OF_WEEK.find((d) => d.value === selectedDay)?.fullLabel} - {exercisesForSelectedDay.length} exercise{exercisesForSelectedDay.length !== 1 ? "s" : ""}
+                  {draftPlanStructure && currentWeek && (
+                    <span className="text-xs text-muted-foreground ml-2">
+                      (Week {selectedWeek})
+                    </span>
+                  )}
                 </h3>
               </div>
 
@@ -466,6 +724,7 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
                   </div>
                   <p className="text-muted-foreground">
                     No exercises for {DAYS_OF_WEEK.find((d) => d.value === selectedDay)?.fullLabel}
+                    {draftPlanStructure && ` (Week ${selectedWeek})`}
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
                     Click exercises from the library to add them
@@ -473,76 +732,109 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
                 </div>
               ) : (
                 <div className="space-y-3 max-h-[400px] overflow-y-auto">
-                  {exercisesForSelectedDay.map((exercise, index) => (
-                    <div
-                      key={exercise.id}
-                      className="relative p-4 rounded-xl surface-pillowy hover:shadow-pillowy-lg hover:scale-[1.02] transition-all duration-200"
-                    >
-                      {/* Remove Button */}
-                      <button
-                        onClick={() => removeExerciseFromPlan(exercise.id)}
-                        className="absolute top-3 right-3 w-7 h-7 rounded-full bg-sage-100 hover:bg-red-100 flex items-center justify-center transition-colors group"
-                        aria-label={`Remove ${exercise.name} from plan`}
+                  {exercisesForSelectedDay.map((exercise, index) => {
+                    // Handle both structure types (PlanExercise from mock-data vs PlanExercise from gemini types)
+                    const exerciseId = 'exerciseId' in exercise ? exercise.exerciseId : (exercise as PlanExercise).id;
+                    const exerciseName = exercise.name;
+                    const exerciseSets = exercise.sets;
+                    const exerciseReps = exercise.reps;
+                    const exerciseHoldSeconds = exercise.holdSeconds;
+                    const exerciseCategory = 'category' in exercise ? exercise.category : 'mobility';
+                    const exerciseDays = 'days' in exercise ? exercise.days : [(exercise as PlanExercise).dayOfWeek || selectedDay];
+
+                    return (
+                      <div
+                        key={exerciseId + '-' + index}
+                        className="relative p-4 rounded-xl surface-pillowy hover:shadow-pillowy-lg hover:scale-[1.02] transition-all duration-200"
                       >
-                        <X className="w-4 h-4 text-sage-500 group-hover:text-red-500" />
-                      </button>
-
-                      {/* Exercise Info */}
-                      <div className="pr-10 mb-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-muted-foreground font-medium">
-                            #{index + 1}
-                          </span>
-                          <h4 className="font-medium text-foreground">
-                            {exercise.name}
-                          </h4>
-                        </div>
-                        <Badge
-                          size="sm"
-                          variant={getCategoryBadgeVariant(exercise.category)}
-                          className="mt-1"
-                        >
-                          {formatCategory(exercise.category)}
-                        </Badge>
-                      </div>
-
-                      {/* Configuration Inputs */}
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        <NumberInput
-                          label="Sets"
-                          value={exercise.sets}
-                          onChange={(value) =>
-                            updateExerciseConfig(exercise.id, { sets: value })
-                          }
-                          min={1}
-                          max={10}
-                        />
-                        <NumberInput
-                          label="Reps"
-                          value={exercise.reps}
-                          onChange={(value) =>
-                            updateExerciseConfig(exercise.id, { reps: value })
-                          }
-                          min={1}
-                          max={50}
-                        />
-                        {exercise.holdSeconds !== undefined && (
-                          <NumberInput
-                            label="Hold"
-                            value={exercise.holdSeconds}
-                            onChange={(value) =>
-                              updateExerciseConfig(exercise.id, {
-                                holdSeconds: value,
-                              })
+                        {/* Remove Button */}
+                        <button
+                          onClick={() => {
+                            if (draftPlanStructure && currentWeek) {
+                              removeExerciseFromWeek(selectedWeek, exerciseId);
+                            } else {
+                              removeExerciseFromPlan(exerciseId);
                             }
+                          }}
+                          className="absolute top-3 right-3 w-7 h-7 rounded-full bg-sage-100 hover:bg-red-100 flex items-center justify-center transition-colors group"
+                          aria-label={`Remove ${exerciseName} from plan`}
+                        >
+                          <X className="w-4 h-4 text-sage-500 group-hover:text-red-500" />
+                        </button>
+
+                        {/* Exercise Info */}
+                        <div className="pr-10 mb-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-muted-foreground font-medium">
+                              #{index + 1}
+                            </span>
+                            <h4 className="font-medium text-foreground">
+                              {exerciseName}
+                            </h4>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge
+                              size="sm"
+                              variant={getCategoryBadgeVariant(exerciseCategory)}
+                            >
+                              {formatCategory(exerciseCategory)}
+                            </Badge>
+                            {exerciseDays.length > 1 && (
+                              <span className="text-xs text-muted-foreground">
+                                Days: {exerciseDays.map(d => DAYS_OF_WEEK.find(day => day.value === d)?.label).join(', ')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Configuration Inputs */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          <NumberInput
+                            label="Sets"
+                            value={exerciseSets}
+                            onChange={(value) => {
+                              if (draftPlanStructure && currentWeek) {
+                                updateWeekExercise(selectedWeek, exerciseId, { sets: value });
+                              } else {
+                                updateExerciseConfig(exerciseId, { sets: value });
+                              }
+                            }}
                             min={1}
-                            max={120}
-                            suffix="s"
+                            max={10}
                           />
-                        )}
+                          <NumberInput
+                            label="Reps"
+                            value={exerciseReps}
+                            onChange={(value) => {
+                              if (draftPlanStructure && currentWeek) {
+                                updateWeekExercise(selectedWeek, exerciseId, { reps: value });
+                              } else {
+                                updateExerciseConfig(exerciseId, { reps: value });
+                              }
+                            }}
+                            min={1}
+                            max={50}
+                          />
+                          {(exerciseHoldSeconds !== undefined && exerciseHoldSeconds > 0) && (
+                            <NumberInput
+                              label="Hold"
+                              value={exerciseHoldSeconds}
+                              onChange={(value) => {
+                                if (draftPlanStructure && currentWeek) {
+                                  updateWeekExercise(selectedWeek, exerciseId, { holdSeconds: value });
+                                } else {
+                                  updateExerciseConfig(exerciseId, { holdSeconds: value });
+                                }
+                              }}
+                              min={1}
+                              max={120}
+                              suffix="s"
+                            />
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
