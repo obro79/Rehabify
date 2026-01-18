@@ -63,10 +63,24 @@ export function useFormEventBridge(options: UseFormEventBridgeOptions): void {
 
   // Subscribe to store changes - collect errors and send context on rep completion
   useEffect(() => {
+    if (debug) {
+      console.log(`[useFormEventBridge] 🔄 Hook active | isConnected: ${isConnected} | isAnalyzing: ${isAnalyzing} | exercise: ${exerciseName}`);
+    }
+
     let prevErrors: string[] = [];
     let prevRepCount = prevRepCountRef.current;
 
     const unsubscribe = useExerciseStore.subscribe((state) => {
+      // Only process form feedback when in analyzing phase
+      if (!isAnalyzing) {
+        // Still track rep count changes to stay in sync
+        if (state.repCount !== prevRepCount) {
+          prevRepCount = state.repCount;
+          prevRepCountRef.current = state.repCount;
+        }
+        return;
+      }
+
       // Collect new errors
       const currentErrorTypes = state.activeErrors.map((e) => e.type);
       const newErrors = currentErrorTypes.filter((e) => !prevErrors.includes(e));
@@ -76,7 +90,7 @@ export function useFormEventBridge(options: UseFormEventBridgeOptions): void {
       });
 
       if (debug && newErrors.length > 0) {
-        console.log(`[useFormEventBridge] Errors queued: ${Array.from(repErrorsRef.current).join(', ')}`);
+        console.log(`[useFormEventBridge] 📋 Errors queued: ${Array.from(repErrorsRef.current).join(', ')}`);
       }
 
       prevErrors = currentErrorTypes;
@@ -189,7 +203,7 @@ Form was good. Brief encouragement (3-5 words max). Examples: "Nice!", "Good rep
     });
 
     return unsubscribe;
-  }, [isConnected, isSpeaking, targetReps, exerciseName, injectContext, debug]);
+  }, [isConnected, isSpeaking, isAnalyzing, targetReps, exerciseName, injectContext, debug]);
 
   // Reset when exercise changes
   useEffect(() => {
