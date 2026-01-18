@@ -795,10 +795,10 @@ INSERT INTO exercises (
   '{}'::JSONB
 ),
 
--- Standing Back Extension
+-- Standing Lumbar Extension
 (
-  'Standing Back Extension',
-  'standing-back-extension',
+  'Standing Lumbar Extension',
+  'standing-lumbar-extension',
   'extension',
   'lower_back',
   'lumbar_spine',
