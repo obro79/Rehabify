@@ -19,6 +19,7 @@ import { CelebrationAnimation } from "@/components/ui/celebration-animation";
 import { SanctuaryBackground } from "@/components/ui/sanctuary-background";
 import { getExerciseBySlug } from "@/lib/exercises";
 
+
 // Mock data - in production this would come from session state/API
 const MOCK_SESSION_DATA = {
   userName: "Sarah",
