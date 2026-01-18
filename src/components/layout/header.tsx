@@ -22,6 +22,11 @@ export function Header({ showCTA = true, className }: HeaderProps) {
   const [open, setOpen] = React.useState(false);
   const isDemoMode = clientEnv.NEXT_PUBLIC_DEMO_MODE;
 
+  const navLinks = [
+    { label: "Exercises", href: "/exercises" },
+    { label: "How It Works", href: "#how-it-works" },
+  ];
+
   // In demo mode, link directly to dashboard
   const signupHref = isDemoMode ? "/dashboard" : "/signup";
 

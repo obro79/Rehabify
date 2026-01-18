@@ -185,16 +185,15 @@ async function handleGetFormStatus(
 async function handleGetExerciseInfo(
   exerciseId: string | undefined
 ): Promise<Record<string, unknown>> {
-  if (!exerciseId) {
-    return { error: 'exercise_id required' };
-  }
+  // Fallback to bodyweight-squat if no ID provided
+  const targetId = exerciseId || 'bodyweight-squat';
 
   const exercise = exercisesData.exercises.find(
-    (ex) => ex.id === exerciseId || ex.slug === exerciseId
+    (ex) => ex.id === targetId || ex.slug === targetId
   );
 
   if (!exercise) {
-    return { error: `Exercise not found: ${exerciseId}` };
+    return { error: `Exercise not found: ${targetId}` };
   }
 
   return {

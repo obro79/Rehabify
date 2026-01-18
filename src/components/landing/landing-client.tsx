@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +21,7 @@ import {
 import { ArrowRight } from "lucide-react";
 import exerciseData from "@/lib/exercises/data.json";
 import { mapDifficultyToStars, type Exercise } from "@/lib/exercises/types";
+import { getExerciseImage } from "@/lib/exercise-utils";
 import { FadeIn, ScrollReveal } from "@/components/motion";
 import { ClinicalTrustSection } from "./clinical-trust-section";
 import { clientEnv } from "@/lib/env";
@@ -327,11 +329,21 @@ export function LandingClient() {
                           index === 0 ? "lg:row-span-2 lg:p-8" : ""
                         }`}
                       >
-                        {/* Icon area */}
-                        <div className={`flex items-center justify-center bg-sage-50 rounded-2xl mb-5 group-hover:bg-sage-100 transition-colors ${
+                        {/* Image area */}
+                        <div className={`relative flex items-center justify-center bg-sage-50 rounded-2xl mb-5 group-hover:bg-sage-100 transition-colors overflow-hidden ${
                           index === 0 ? "h-40" : "h-28"
                         }`}>
-                          <LibraryIcon size={index === 0 ? "lg" : "md"} variant="sage" />
+                          {getExerciseImage(exercise.slug) ? (
+                            <Image
+                              src={getExerciseImage(exercise.slug)!}
+                              alt={exercise.name}
+                              fill
+                              className="object-cover"
+                              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                            />
+                          ) : (
+                            <LibraryIcon size={index === 0 ? "lg" : "md"} variant="sage" />
+                          )}
                         </div>
 
                         {/* Content */}

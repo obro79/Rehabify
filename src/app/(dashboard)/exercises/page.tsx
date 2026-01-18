@@ -25,41 +25,10 @@ import {
   getCategoryIcon,
   getCategoryBadgeVariant,
   getCategoryLabel,
+  getExerciseImage,
 } from "@/lib/exercise-utils";
 import { FadeIn, StaggerContainer, StaggerItem } from "@/components/motion";
 import { AnimatePresence } from "framer-motion";
-
-// Available exercise images (by slug)
-const EXERCISE_IMAGES = new Set([
-  "90-90-stretch",
-  "bicycle-crunch",
-  "bird-dog",
-  "child-pose",
-  "double-knee-to-chest",
-  "figure-four-stretch",
-  "fire-hydrant",
-  "glute-bridge",
-  "hamstring-stretch-supine",
-  "knee-to-chest",
-  "pelvic-tilt",
-  "plank",
-  "prone-hip-extension",
-  "quadruped-hip-extension",
-  "side-plank",
-  "side-plank-elbow",
-  "sphinx-pose",
-  "standing-back-extension",
-  "standing-hip-flexor-stretch",
-  "supine-leg-lower",
-  "supine-twist",
-]);
-
-function getExerciseImage(slug: string): string | null {
-  if (EXERCISE_IMAGES.has(slug)) {
-    return `/exercise-images/${slug}.jpg`;
-  }
-  return null;
-}
 
 // Constants
 const CATEGORIES = [
@@ -151,6 +120,12 @@ export default function ExercisesPage() {
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, filteredExercises.length);
   const paginatedExercises = filteredExercises.slice(startIndex, endIndex);
+
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1);
+    }
+  }, [currentPage, totalPages]);
 
   // Generate page numbers to display (smart range with ellipsis)
   const getPageNumbers = (): (number | string)[] => {
@@ -284,7 +259,7 @@ export default function ExercisesPage() {
             <>
             <AnimatePresence mode="wait">
               <StaggerContainer
-                key={`${selectedCategory}-${selectedBodyPart}-${selectedDifficulty}-${currentPage}`}
+                key={`${selectedCategory}-${selectedBodyPart}-${selectedDifficulty}-${debouncedSearch}-${currentPage}`}
                 className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-4"
               >
                 {paginatedExercises.map((exercise) => (
