@@ -184,9 +184,8 @@ export default function DashboardPage() {
   }, []);
 
   const handleStartRoutine = () => {
-    // Use first exercise slug if available, otherwise default to cat-camel
-    const slug = firstExerciseSlug || 'cat-camel';
-    router.push(`/workout/${slug}`);
+    // Always start with squat
+    router.push('/workout/bodyweight-squat');
   };
 
   return (

@@ -19,12 +19,13 @@ const VIDEO_MAPPINGS: Record<string, string[]> = {
     'bosu-squat',
   ],
 
-  // Back extension video
+  // Back extension video (includes assessment movement)
   '/videos/back-extension.mp4': [
     'cobra-stretch',
     'prone-press-up',
     'sphinx-pose',
     'standing-back-extension',
+    'standing-lumbar-extension',
     'prone-extension-shoulder',
     'superman',
     'prone-swimming',
@@ -32,6 +33,7 @@ const VIDEO_MAPPINGS: Record<string, string[]> = {
 
   // Lunge video
   '/videos/lunge.mp4': [
+    'lunge',
     'split-squat',
     'reverse-lunge',
     'walking-lunges-ankle',
@@ -40,7 +42,7 @@ const VIDEO_MAPPINGS: Record<string, string[]> = {
     'curtsy-lunge',
   ],
 
-  // Forward bending video
+  // Forward bending video (includes assessment movement)
   '/videos/bending.mp4': [
     'standing-lumbar-flexion',
     'seated-forward-fold',

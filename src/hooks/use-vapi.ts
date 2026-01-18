@@ -17,6 +17,8 @@ export interface UseVapiOptions {
   assistantId?: string;
   /** Called when connection state changes */
   onConnectionChange?: (connected: boolean) => void;
+  /** Called when the call ends (for any reason) */
+  onCallEnd?: () => void;
   /** Called when an error occurs */
   onError?: (error: Error) => void;
   /** Called when user confirms they are ready (says "ready", "yes", etc.) */
@@ -63,7 +65,7 @@ export interface UseVapiReturn {
  * ```
  */
 export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
-  const { assistantId, onConnectionChange, onError, onUserReady, onFunctionCall } = options;
+  const { assistantId, onConnectionChange, onCallEnd, onError, onUserReady, onFunctionCall } = options;
 
   // Phrases that indicate user is ready to start
   const READY_PHRASES = ['ready', 'yes', "let's go", 'start', 'begin', 'ok', 'okay', 'yep', 'sure', 'go ahead'];
@@ -89,10 +91,12 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
 
   // Store callbacks in refs to prevent useEffect reinitializing when they change
   const onConnectionChangeRef = useRef(onConnectionChange);
+  const onCallEndRef = useRef(onCallEnd);
   const onErrorRef = useRef(onError);
   const onUserReadyRef = useRef(onUserReady);
   const onFunctionCallRef = useRef(onFunctionCall);
   onConnectionChangeRef.current = onConnectionChange;
+  onCallEndRef.current = onCallEnd;
   onErrorRef.current = onError;
   onUserReadyRef.current = onUserReady;
   onFunctionCallRef.current = onFunctionCall;
@@ -134,6 +138,7 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
         setConnectionState('disconnected');
         setSpeakingStatus('idle');
         onConnectionChangeRef.current?.(false);
+        onCallEndRef.current?.();
       });
 
       // Speech events

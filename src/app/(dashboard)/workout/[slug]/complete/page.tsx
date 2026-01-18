@@ -42,9 +42,8 @@ const MOCK_SESSION_DATA = {
   coachSummary:
     "Excellent session! Your spine mobility is improving. Focus on keeping your hips more stable during the camel phase next time. Overall, this was a great workout!",
   nextExercise: {
-    name: "Cobra Extension",
-    slug: "cobra",
-    duration: "5 min",
+    name: "Lunge",
+    slug: "lunge",
   },
 };
 

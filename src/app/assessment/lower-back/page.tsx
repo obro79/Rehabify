@@ -28,6 +28,7 @@ import {
 import { useAssessmentVapi } from "@/hooks/use-assessment-vapi";
 import exercisesData from "@/lib/exercises/data.json";
 import type { Exercise } from "@/lib/exercises/types";
+import { getExerciseVideoUrl } from "@/lib/exercises/video-map";
 
 type VoiceState = "idle" | "connecting" | "listening" | "thinking" | "speaking";
 
@@ -360,7 +361,36 @@ function AssessmentStatsPanel({
 // ============================================================================
 // Center Panel - Exercise Demo Placeholder
 // ============================================================================
-function ExerciseDemoPlaceholder() {
+interface ExerciseDemoPlaceholderProps {
+  isMovementPhase: boolean;
+  currentExercise?: Exercise;
+}
+
+function ExerciseDemoPlaceholder({
+  isMovementPhase,
+  currentExercise,
+}: ExerciseDemoPlaceholderProps) {
+  const videoUrl = currentExercise
+    ? getExerciseVideoUrl(currentExercise.slug)
+    : null;
+
+  // Show video if in movement phase and video exists
+  if (isMovementPhase && videoUrl) {
+    return (
+      <div className="h-full flex items-center justify-center bg-gradient-to-br from-sage-50 to-sage-100">
+        <video
+          src={videoUrl}
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="w-full h-full object-contain"
+        />
+      </div>
+    );
+  }
+
+  // Default placeholder
   return (
     <div className="h-full flex items-center justify-center bg-gradient-to-br from-sage-50 to-sage-100">
       <div className="text-center p-8">
@@ -604,9 +634,9 @@ export default function LowerBackAssessmentPage() {
   // Handle start/stop
   const handleStartStop = async () => {
     if (isConnected) {
+      // Just stop - onCallEnd will trigger save and navigate
       stopVapi();
-      resetAssessment();
-      setIsMovementPhase(false);
+      // Don't reset here - let onComplete/saveAssessment handle it
     } else {
       await startVapi();
     }
@@ -718,7 +748,10 @@ export default function LowerBackAssessmentPage() {
 
             {/* Exercise Demo - more vertical space */}
             <Card className="flex-1 overflow-hidden">
-              <ExerciseDemoPlaceholder />
+              <ExerciseDemoPlaceholder
+                isMovementPhase={isMovementPhase}
+                currentExercise={currentMovementExercise}
+              />
             </Card>
           </div>
 
@@ -811,9 +844,8 @@ export default function LowerBackAssessmentPage() {
               isMuted={isMuted}
               onStartVoice={handleStartStop}
               onStopVoice={() => {
+                // Just stop - onCallEnd will trigger save and navigate
                 stopVapi();
-                resetAssessment();
-                setIsMovementPhase(false);
               }}
               onToggleMute={handleToggleMute}
               isMovementPhase={isMovementPhase}

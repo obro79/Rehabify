@@ -16,7 +16,7 @@ import { getPhaseFromNode } from "@/lib/vapi/assessment-workflow";
  * Feature flag: Set to true for full demo workflow, false for short version
  * Toggle this back to false after demo recording
  */
-const USE_FULL_WORKFLOW = true;
+const USE_FULL_WORKFLOW = false;
 
 export interface UseAssessmentVapiOptions {
   /** Assessment workflow/assistant ID (optional - uses inline config by default) */
@@ -546,10 +546,13 @@ export function useAssessmentVapi(
           break;
 
         case "completeAssessment":
-          setWantsToStart(args.wantsToStartExercise as boolean);
-          setComplete();
-          onCompleteRef.current?.();
-          console.log("[useAssessmentVapi] ✅ Assessment complete!");
+          if (!hasCompletedRef.current) {
+            hasCompletedRef.current = true;
+            setWantsToStart(args.wantsToStartExercise as boolean);
+            setComplete();
+            onCompleteRef.current?.();
+            console.log("[useAssessmentVapi] ✅ Assessment complete!");
+          }
           break;
 
         default:
@@ -568,6 +571,9 @@ export function useAssessmentVapi(
     ]
   );
 
+  // Track if already completed to avoid double-saving
+  const hasCompletedRef = useRef(false);
+
   // Base Vapi hook
   const {
     start: vapiStart,
@@ -581,6 +587,16 @@ export function useAssessmentVapi(
       if (connected) {
         // Initialize assessment when connected
         startAssessment(`workflow_${Date.now()}`);
+        hasCompletedRef.current = false;
+      }
+    },
+    onCallEnd: () => {
+      // When call ends, auto-complete if not already done
+      if (!hasCompletedRef.current) {
+        console.log("[useAssessmentVapi] Call ended - auto-completing assessment");
+        hasCompletedRef.current = true;
+        setComplete();
+        onCompleteRef.current?.();
       }
     },
     onFunctionCall: handleFunctionCall,
@@ -593,11 +609,12 @@ export function useAssessmentVapi(
     await vapiStart(ASSESSMENT_ASSISTANT_CONFIG as unknown as string);
   }, [vapiStart, resetAssessment]);
 
-  // Stop assessment
+  // Stop assessment - just stop the call, onCallEnd will handle completion
   const stop = useCallback(() => {
     vapiStop();
-    resetAssessment();
-  }, [vapiStop, resetAssessment]);
+    // Don't reset here - let onCallEnd trigger save first
+    // The page component will reset after save completes
+  }, [vapiStop]);
 
   // Handle extracted variables from workflow
   // This would be called by the webhook when Vapi sends variable extractions
