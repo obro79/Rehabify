@@ -310,23 +310,33 @@ export function analyzeStandingLumbarFlexion(
   const midAnkle = midpoint(leftAnkle, rightAnkle);
 
   const hipAngle = angleBetween3D(midShoulder, midHip, midKnee);
-  const kneeAngle = angleBetween3D(midHip, midKnee, midKnee);
-  // const spineDepth = midShoulder.z - midHip.z; // Less reliable than angle
+  const kneeAngle = angleBetween3D(midHip, midKnee, midAnkle);
 
   const flexionPhaseAngle = 145; // Relaxed threshold (was 135)
   const neutralAngle = 160; // Relaxed return threshold
-  const kneeAngleMin = 160; // Keep legs relatively straight
+  const kneeAngleMin = 120; // Allow moderate knee bend - only warn for significant bend
 
+  // Simple phase detection: neutral → flexion → neutral
   let phase = "neutral";
-  // Enter flexion only when bent significantly
-  if (hipAngle <= flexionPhaseAngle) phase = "flexion";
-  // Return to neutral
-  if (state.lastPhase === "flexion" && hipAngle >= neutralAngle) phase = "return";
 
-  // Debounce rapid phase changes or check for meaningful duration?
-  // For now, stricter angle should help "too early" detection.
+  if (hipAngle <= flexionPhaseAngle) {
+    phase = "flexion";
+  } else if (hipAngle < neutralAngle && state.lastPhase === "flexion") {
+    // Stay in flexion until we cross back to neutral threshold
+    phase = "flexion";
+  }
+  // else: hipAngle >= neutralAngle → phase = "neutral"
 
-  const repIncremented = state.lastPhase === "flexion" && phase === "return";
+  // Rep counts when going from flexion back to neutral
+  const repIncremented = state.lastPhase === "flexion" && phase === "neutral";
+
+  if (state.lastPhase !== phase) {
+    console.log(`[LUMBAR_FLEX] ${state.lastPhase} → ${phase} | hipAngle=${hipAngle.toFixed(0)}° kneeAngle=${kneeAngle.toFixed(0)}°`);
+  }
+
+  if (repIncremented) {
+    console.log(`[LUMBAR_FLEX] ✓ REP COUNTED`);
+  }
 
   const formScore = baseFormScore(landmarks);
 
@@ -422,6 +432,14 @@ function analyzeStandingLumbarExtension(
   if (state.lastPhase === "extension" && spineDepth < extensionDepthThreshold / 2) phase = "return";
 
   const repIncremented = state.lastPhase === "extension" && phase === "return";
+
+  if (state.lastPhase !== phase) {
+    console.log(`[LUMBAR_EXT] ${state.lastPhase} → ${phase} | spineDepth=${spineDepth.toFixed(3)} (threshold=${extensionDepthThreshold})`);
+  }
+
+  if (repIncremented) {
+    console.log(`[LUMBAR_EXT] ✓ REP COUNTED`);
+  }
 
   const formScore = baseFormScore(landmarks);
 
@@ -803,6 +821,14 @@ export function createFormEngine(exercise: Exercise) {
     }
 
     state.lastPhase = result.phase;
+
+    // Block rep counting if there are any warning-severity errors
+    const hasWarning = result.errors.some(e => e.severity === "warning");
+    if (hasWarning && result.repIncremented) {
+      console.log(`[FORM_ENGINE] ⚠ REP BLOCKED due to warnings:`, result.errors.filter(e => e.severity === "warning").map(e => e.message));
+      result.repIncremented = false;
+    }
+
     if (result.repIncremented) {
       state.lastRepPhase = result.phase;
     }

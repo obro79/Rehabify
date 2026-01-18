@@ -177,7 +177,14 @@ export function ExerciseCamera({
             if (now - lastEmitRef.current > 500) {
               lastEmitRef.current = now;
 
-              if (analysis.feedback) {
+              // Show warning errors on overlay (they block reps, so user needs to see them)
+              const warningError = analysis.errors.find(e => e.severity === "warning");
+              if (warningError) {
+                setFormFeedback({
+                  message: warningError.message,
+                  type: "warning"
+                });
+              } else if (analysis.feedback) {
                 setFormFeedback({
                   message: analysis.feedback,
                   type: analysis.feedback.includes("Excellent") || analysis.feedback.includes("Good") ? "success" : "info"
