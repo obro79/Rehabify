@@ -163,9 +163,16 @@ export function ExerciseCamera({
               lastEmitRef.current = now;
               
               if (analysis.feedback) {
+                let type: "success" | "info" | "warning" = "info";
+                if (analysis.feedback.includes("Excellent") || analysis.feedback.includes("Good")) {
+                  type = "success";
+                } else if (analysis.feedback.includes("Turn") || analysis.feedback.includes("Face")) {
+                  type = "warning";
+                }
+                
                 setFormFeedback({ 
                   message: analysis.feedback, 
-                  type: analysis.feedback.includes("Excellent") || analysis.feedback.includes("Good") ? "success" : "info" 
+                  type
                 });
               } else {
                 setFormFeedback(null);
