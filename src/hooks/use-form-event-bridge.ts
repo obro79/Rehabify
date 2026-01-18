@@ -48,8 +48,8 @@ export function useFormEventBridge(options: UseFormEventBridgeOptions): void {
   const lastFeedbackTimeRef = useRef<number>(0);
   const pendingContextRef = useRef<string | null>(null);
 
-  // Minimum time between feedback (ms) to avoid overwhelming the user
-  const FEEDBACK_COOLDOWN = 3000;
+  // Minimum time between feedback (ms) - set to 0 to allow feedback on every rep
+  const FEEDBACK_COOLDOWN = 0;
 
   // Send pending context when assistant stops speaking
   useEffect(() => {
