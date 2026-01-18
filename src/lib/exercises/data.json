@@ -1449,7 +1449,7 @@
       "equipment": "yoga_mat",
       "video_url": null,
       "thumbnail_url": null,
-      "form_detection_enabled": false
+      "form_detection_enabled": true
     },
     {
       "id": "standing-hip-flexor-stretch",
@@ -4272,6 +4272,51 @@
       "form_detection_enabled": false
     },
     {
+      "id": "lunge",
+      "name": "Lunge",
+      "slug": "lunge",
+      "tier": 2,
+      "body_region": "knee",
+      "category": "strengthening",
+      "target_area": "quadriceps",
+      "difficulty": "beginner",
+      "description": "A fundamental lower body unilateral exercise that strengthens quadriceps, glutes, and hamstrings while improving balance and hip stability.",
+      "instructions": [
+        "Stand tall with feet hip-width apart",
+        "Step forward with one leg, lowering hips until both knees are bent at approximately 90 degrees",
+        "Keep front knee directly above ankle, not pushing past toes",
+        "Keep torso upright and core engaged",
+        "Push off front foot to return to starting position",
+        "Repeat on the other side"
+      ],
+      "common_mistakes": [
+        "Front knee extending past toes",
+        "Rear knee touching the ground hard",
+        "Leaning torso forward",
+        "Feet too narrow (walking on a tightrope)",
+        "Collapsing knees inward"
+      ],
+      "modifications": {
+        "easier": "Reverse lunge (step back instead of forward), hold onto chair for balance",
+        "harder": "Walking lunges, add weights"
+      },
+      "contraindications": [
+        "Acute knee pain",
+        "Severe balance issues"
+      ],
+      "default_reps": 10,
+      "default_sets": 3,
+      "default_hold_seconds": 0,
+      "rep_type": "alternating",
+      "equipment": "none",
+      "video_url": null,
+      "thumbnail_url": null,
+      "form_detection_enabled": true,
+      "detection_config": {
+        "phases": ["standing", "lunge_hold"]
+      }
+    },
+    {
       "id": "lunge-with-rotation",
       "name": "Lunge with Trunk Rotation",
       "slug": "lunge-with-rotation",
@@ -4313,7 +4358,7 @@
       "equipment": "none",
       "video_url": null,
       "thumbnail_url": null,
-      "form_detection_enabled": false
+      "form_detection_enabled": true
     },
     {
       "id": "leg-press",

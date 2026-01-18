@@ -93,6 +93,7 @@ const IMAGE_FALLBACKS: Record<string, string> = {
   "half-kneeling-ankle-mob": "standing-hip-flexor-stretch",
   "banded-ankle-distraction": "standing-hip-flexor-stretch",
   "lunge-with-rotation": "standing-hip-flexor-stretch",
+  "lunge": "standing-hip-flexor-stretch",
   "reverse-lunge": "standing-hip-flexor-stretch",
   "curtsy-lunge": "standing-hip-flexor-stretch",
   "walking-lunges-ankle": "standing-hip-flexor-stretch",

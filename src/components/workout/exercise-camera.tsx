@@ -272,7 +272,7 @@ export function ExerciseCamera({
     >
       <video
         ref={videoRef}
-        className="absolute inset-0 h-full w-full object-cover scale-x-[-1]"
+        className="absolute inset-0 h-full w-full object-contain scale-x-[-1]"
         playsInline
         muted
       />
@@ -282,11 +282,10 @@ export function ExerciseCamera({
       />
 
       {/* Debug Overlay for tuning thresholds */}
-      {debugValues && (
+      {/* {debugValues && (
         <div className="absolute top-24 left-2 bg-black/95 text-green-400 p-4 rounded-xl font-mono z-30 space-y-1 min-w-[200px]">
           <div className="text-yellow-400 font-bold text-2xl mb-2 uppercase">{debugValues.phase}</div>
 
-          {/* Squat measurements */}
           {debugValues.trunkLean !== undefined && (
             <>
               <div className="text-xl font-bold">thigh: {debugValues.kneeAngle?.toFixed(0) ?? 'N/A'}°</div>
@@ -297,7 +296,6 @@ export function ExerciseCamera({
             </>
           )}
 
-          {/* Lumbar extension measurements */}
           {debugValues.hipAngle !== undefined && (
             <>
               <div className="text-xl font-bold">hip: {debugValues.hipAngle.toFixed(0)}°</div>
@@ -310,7 +308,6 @@ export function ExerciseCamera({
             </>
           )}
 
-          {/* Side bend measurements */}
           {debugValues.shoulderTilt !== undefined && (
             <>
               <div className="text-xl font-bold">shoulder: {debugValues.shoulderTilt.toFixed(1)}°</div>
@@ -322,7 +319,6 @@ export function ExerciseCamera({
             </>
           )}
 
-          {/* Queued errors */}
           {debugValues.queuedErrors.length > 0 && (
             <div className="mt-2 pt-2 border-t border-orange-500/50">
               <div className="text-orange-400 text-sm font-bold mb-1">QUEUED:</div>
@@ -332,7 +328,7 @@ export function ExerciseCamera({
             </div>
           )}
         </div>
-      )}
+      )} */}
 
       {/* Feedback Overlay (Camera Positioning or Exercise Form) */}
       {activeFeedback && status === "ready" && (
