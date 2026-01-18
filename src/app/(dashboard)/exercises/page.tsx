@@ -16,7 +16,6 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { DifficultyStars } from "@/components/ui/difficulty-stars";
 import { EmptyState } from "@/components/ui/empty-state";
 import exerciseData from "@/lib/exercises/data.json";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -56,6 +55,19 @@ const ITEMS_PER_PAGE = 24;
 
 function getDifficultyLevel(difficulty: string): number {
   return DIFFICULTY_LEVELS[difficulty as keyof typeof DIFFICULTY_LEVELS] ?? 2;
+}
+
+function getDifficultyBadgeVariant(difficulty: string): "easy" | "medium" | "hard" {
+  switch (difficulty) {
+    case "beginner":
+      return "easy";
+    case "intermediate":
+      return "medium";
+    case "advanced":
+      return "hard";
+    default:
+      return "medium";
+  }
 }
 
 export default function ExercisesPage() {
@@ -290,13 +302,6 @@ export default function ExercisesPage() {
                         ) : (
                           getCategoryIcon(exercise.category, "md")
                         )}
-                        {exercise.tier === 1 && (
-                          <div className="absolute top-2 right-2 z-10">
-                            <Badge variant="success" size="sm">
-                              AI-Powered
-                            </Badge>
-                          </div>
-                        )}
                       </div>
 
                       {/* Content */}
@@ -314,9 +319,12 @@ export default function ExercisesPage() {
                           >
                             {getCategoryLabel(exercise.category)}
                           </Badge>
-                          <DifficultyStars
-                            level={getDifficultyLevel(exercise.difficulty)}
-                          />
+                          <Badge
+                            variant={getDifficultyBadgeVariant(exercise.difficulty)}
+                            size="sm"
+                          >
+                            {exercise.difficulty.charAt(0).toUpperCase() + exercise.difficulty.slice(1)}
+                          </Badge>
                         </div>
 
                         <div className="text-sm text-muted-foreground">
@@ -326,7 +334,7 @@ export default function ExercisesPage() {
                         </div>
 
                         <Link href={`/workout/${exercise.slug}`}>
-                          <Button variant="primary" size="sm" className="w-full mt-2">
+                          <Button variant="ghost" size="sm" className="w-full mt-2 h-8 px-2 text-xs font-normal text-muted-foreground hover:text-foreground">
                             Start
                           </Button>
                         </Link>

@@ -13,7 +13,6 @@ import { StatsCard } from "@/components/ui/stats-card";
 import { Card } from "@/components/ui/card";
 import { ProgressRing } from "@/components/ui/progress-ring";
 import { WeeklyCalendar } from "@/components/ui/weekly-calendar";
-import { DifficultyStars } from "@/components/ui/difficulty-stars";
 import {
   Table,
   TableHeader,
@@ -29,7 +28,6 @@ import {
 } from "@/components/ui/icons";
 import {
   ArrowRight,
-  Play,
 } from "lucide-react";
 import {
   mockExercises,
@@ -51,6 +49,19 @@ function getTimeOfDayGreeting() {
   if (hour < 12) return "Good morning";
   if (hour < 17) return "Good afternoon";
   return "Good evening";
+}
+
+function getDifficultyBadgeVariant(difficulty: string): "easy" | "medium" | "hard" {
+  switch (difficulty) {
+    case "beginner":
+      return "easy";
+    case "intermediate":
+      return "medium";
+    case "advanced":
+      return "hard";
+    default:
+      return "medium";
+  }
 }
 
 export default function DashboardPage() {
@@ -197,7 +208,7 @@ export default function DashboardPage() {
 
       {/* Welcome Section - Full Width Card */}
       <FadeIn>
-        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-sage-100 via-sage-50 to-white p-6 shadow-sm border border-sage-200/50">
+        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-sage-100 via-sage-50 to-white p-6 shadow-sm">
           <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-sage-200/30 to-terracotta-100/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 animate-sanctuary-breathe" aria-hidden="true" />
           <div className="relative flex items-center justify-between">
             <div className="space-y-2">
@@ -208,7 +219,7 @@ export default function DashboardPage() {
                 &ldquo;{quote}&rdquo;
               </p>
             </div>
-            <div className="bg-white/80 backdrop-blur rounded-3xl p-4 shadow-sm border border-sage-200/50">
+            <div className="bg-white/80 backdrop-blur rounded-3xl p-4 shadow-sm">
               <StreakDisplay currentStreak={5} bestStreak={12} />
             </div>
           </div>
@@ -267,12 +278,19 @@ export default function DashboardPage() {
 
                   <div className="flex items-center justify-between text-sm text-muted-foreground">
                     <span>{exercise.duration} • {exercise.reps} reps</span>
-                    <DifficultyStars level={exercise.difficulty} />
+                    {(() => {
+                      const fullExercise = getExerciseById(exercise.id);
+                      const difficulty = fullExercise?.difficulty || "intermediate";
+                      return (
+                        <Badge variant={getDifficultyBadgeVariant(difficulty)} size="sm">
+                          {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+                        </Badge>
+                      );
+                    })()}
                   </div>
 
-                  <Button variant="secondary" size="sm" className="w-full mt-2" asChild>
+                  <Button variant="ghost" size="sm" className="w-full mt-2 h-8 px-2 text-xs font-normal text-muted-foreground hover:text-foreground" asChild>
                     <Link href={`/workout/${exercise.slug}`}>
-                      <Play size={14} className="mr-1" />
                       Start
                     </Link>
                   </Button>
@@ -283,14 +301,15 @@ export default function DashboardPage() {
         </StaggerContainer>
       </section>
 
-      {/* Progress Section - Stats + Visual Elements */}
+      {/* Progress Section - Bento Style Grid */}
       <section className="space-y-4">
         <FadeIn>
           <h2 className="text-lg font-semibold text-foreground">This Week</h2>
         </FadeIn>
 
         <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <StaggerItem className="h-full">
+          {/* Row 1: Three Stats Cards */}
+          <StaggerItem>
             <StatsCard
               title="Sessions Completed"
               value="4/7"
@@ -299,7 +318,7 @@ export default function DashboardPage() {
               className="h-full"
             />
           </StaggerItem>
-          <StaggerItem className="h-full">
+          <StaggerItem>
             <StatsCard
               title="Total Reps"
               value={120}
@@ -309,7 +328,7 @@ export default function DashboardPage() {
               className="h-full"
             />
           </StaggerItem>
-          <StaggerItem className="h-full">
+          <StaggerItem>
             <StatsCard
               title="Time Exercising"
               value="45 min"
@@ -318,13 +337,10 @@ export default function DashboardPage() {
               className="h-full"
             />
           </StaggerItem>
-        </StaggerContainer>
 
-        {/* Form Score + Weekly Calendar Side by Side */}
-        <StaggerContainer className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Form Score with Progress Ring */}
+          {/* Row 2: Form Score and Weekly Activity */}
           <StaggerItem>
-            <Card variant="organic" className="p-6">
+            <Card variant="organic" className="p-6 h-full">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold">Average Form Score</h3>
                 <span className="text-sm text-muted-foreground">Last 7 days</span>
@@ -347,9 +363,8 @@ export default function DashboardPage() {
             </Card>
           </StaggerItem>
 
-          {/* Weekly Activity Calendar */}
-          <StaggerItem>
-            <Card variant="organic" className="p-6">
+          <StaggerItem className="md:col-span-2">
+            <Card variant="organic" className="p-6 h-full">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold">Weekly Activity</h3>
                 <span className="text-sm text-muted-foreground">4 of 7 days</span>
@@ -368,13 +383,13 @@ export default function DashboardPage() {
         <section className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-foreground">Recent Sessions</h2>
-            <Button variant="ghost" size="sm">
+            <Link href="/history" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
               View All
-              <ArrowRight className="ml-1 h-4 w-4" />
-            </Button>
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
 
-          <Card className="overflow-hidden rounded-3xl">
+          <Card variant="organic" className="overflow-hidden rounded-3xl">
             <Table>
               <TableHeader>
                 <TableRow>
