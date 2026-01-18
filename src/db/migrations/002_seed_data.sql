@@ -2345,6 +2345,31 @@ INSERT INTO exercises (
   '{}'::JSONB
 ),
 
+-- Lunge
+(
+  'Lunge',
+  'lunge',
+  'strengthening',
+  'knee',
+  'quadriceps',
+  'beginner',
+  2,
+  'A fundamental lower body unilateral exercise that strengthens quadriceps, glutes, and hamstrings while improving balance and hip stability.',
+  ARRAY['Stand tall with feet hip-width apart', 'Step forward with one leg, lowering hips until both knees are bent at approximately 90 degrees', 'Keep front knee directly above ankle, not pushing past toes', 'Keep torso upright and core engaged', 'Push off front foot to return to starting position', 'Repeat on the other side'],
+  ARRAY['Front knee extending past toes', 'Rear knee touching the ground hard', 'Leaning torso forward', 'Feet too narrow (walking on a tightrope)', 'Collapsing knees inward'],
+  '{"easier":"Reverse lunge (step back instead of forward), hold onto chair for balance","harder":"Walking lunges, add weights"}'::JSONB,
+  ARRAY['Acute knee pain', 'Severe balance issues'],
+  10,
+  3,
+  0,
+  'alternating',
+  'none',
+  NULL,
+  NULL,
+  TRUE,
+  '{}'::JSONB
+),
+
 -- Lunge with Trunk Rotation
 (
   'Lunge with Trunk Rotation',
