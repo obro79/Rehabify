@@ -181,8 +181,8 @@ export default function DashboardPage() {
           // Default plan created, set slug to bodyweight-squat
           setFirstExerciseSlug('bodyweight-squat');
         } else {
-          // If creation fails, still set to squat as fallback
-          setFirstExerciseSlug('squat');
+          // If creation fails, still set to bodyweight-squat as fallback
+          setFirstExerciseSlug('bodyweight-squat');
         }
       } catch (error) {
         console.error("[Dashboard] Failed to create default plan:", error);
