@@ -164,14 +164,38 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
       setError(err instanceof Error ? err.message : 'Failed to initialize Vapi');
     }
 
-    // Cleanup on unmount
-    return () => {
+    // Cleanup function - ensures call is always disconnected
+    const cleanup = () => {
       if (vapiRef.current) {
+        console.log('[useVapi] Cleanup: stopping call');
         vapiRef.current.stop();
         vapiRef.current = null;
         isInitializedRef.current = false;
         reset();
       }
+    };
+
+    // Handle browser/tab close
+    const handleBeforeUnload = () => {
+      cleanup();
+    };
+
+    // Handle page visibility change (optional - disconnect when tab hidden)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden' && vapiRef.current) {
+        console.log('[useVapi] Page hidden, stopping call');
+        vapiRef.current.stop();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Cleanup on unmount
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      cleanup();
     };
   }, [
     isVoiceEnabled,
