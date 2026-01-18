@@ -2,16 +2,24 @@
 
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Pause, Play, X } from "lucide-react";
+import { Pause, Play, X, MicOff, Mic, Volume2, AlertTriangle, ImageIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { SessionTimer } from "@/components/ui/session-timer";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { VoiceIndicator } from "@/components/ui/voice-indicator";
+import { RepCounter } from "@/components/ui/rep-counter";
+import { ProgressRing } from "@/components/ui/progress-ring";
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import exercisesData from "@/lib/exercises/data.json";
 import {
   ExerciseCamera,
-  ExerciseDemoPanel,
   WorkoutStatsPanel,
 } from "@/components/workout";
 import { useExerciseStore } from "@/stores/exercise-store";
@@ -30,6 +38,19 @@ type SessionState = "active" | "paused" | "complete";
 type VoiceState = "idle" | "connecting" | "listening" | "thinking" | "speaking";
 type VoicePhase = "explaining" | "analyzing" | "finished";
 
+// Helper functions for form score
+function getFormScoreColor(score: number): "sage" | "coral" {
+  return score >= 70 ? "sage" : "coral";
+}
+
+function getFormFeedback(score: number): string {
+  if (score >= 90) return "Perfect form!";
+  if (score >= 80) return "Great form!";
+  if (score >= 70) return "Good work!";
+  if (score >= 60) return "Keep practicing!";
+  return "Review the basics";
+}
+
 export default function WorkoutSessionPage() {
   const params = useParams();
   const router = useRouter();
@@ -45,6 +66,7 @@ export default function WorkoutSessionPage() {
   const [sessionState, setSessionState] = React.useState<SessionState>("active");
   const [isPaused, setIsPaused] = React.useState(false);
   const [showEndDialog, setShowEndDialog] = React.useState(false);
+  const [showGuideImage, setShowGuideImage] = React.useState(false);
   const [startTime] = React.useState(new Date());
   const [sessionId] = React.useState(
     () => `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
@@ -324,7 +346,7 @@ Keep corrections to 5-15 words max. Focus on what TO do, not what's wrong.`;
                   <div className="absolute -top-2 left-6 w-4 h-4 bg-white border-t border-l border-sage-200 transform rotate-45 z-10"></div>
                   <div className="bg-white rounded-2xl p-4 shadow-sm relative z-0">
                     <p className="text-sm text-sage-800 font-medium leading-relaxed">
-                      "{transcript}"
+                      &ldquo;{transcript}&rdquo;
                     </p>
                   </div>
                 </div>
