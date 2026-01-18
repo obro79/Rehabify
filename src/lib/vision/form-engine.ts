@@ -274,16 +274,14 @@ function analyzeStandingLumbarFlexion(
   
   // Check Orientation first
   const orientation = checkOrientation(landmarks, "side");
-  if (!orientation.isCorrect) {
-    return {
-      phase: "neutral",
-      formScore: 0,
-      errors: [],
-      feedback: orientation.feedback,
-      isCorrect: false,
-      repIncremented: false,
-      confidence: 0
-    };
+  if (!orientation.isCorrect && orientation.feedback) {
+    errors.push({
+      type: "orientation",
+      message: orientation.feedback,
+      severity: "warning",
+      timestamp: Date.now(),
+      bodyPart: "body",
+    });
   }
 
   const leftShoulder = landmarks[LANDMARKS.leftShoulder];
@@ -300,8 +298,8 @@ function analyzeStandingLumbarFlexion(
   const midKnee = midpoint(leftKnee, rightKnee);
   const midAnkle = midpoint(leftAnkle, rightAnkle);
 
-  const hipAngle = angleBetween3D(midShoulder, midHip, midAnkle);
-  const kneeAngle = angleBetween3D(midHip, midKnee, midAnkle);
+  const hipAngle = angleBetween3D(midShoulder, midHip, midKnee);
+  const kneeAngle = angleBetween3D(midHip, midKnee, midKnee);
   // const spineDepth = midShoulder.z - midHip.z; // Less reliable than angle
 
   const flexionPhaseAngle = 145; // Relaxed threshold (was 135)
@@ -356,16 +354,14 @@ function analyzeStandingLumbarExtension(
   
   // Check Orientation
   const orientation = checkOrientation(landmarks, "side");
-  if (!orientation.isCorrect) {
-    return {
-      phase: "neutral",
-      formScore: 0,
-      errors: [],
-      feedback: orientation.feedback,
-      isCorrect: false,
-      repIncremented: false,
-      confidence: 0
-    };
+  if (!orientation.isCorrect && orientation.feedback) {
+    errors.push({
+      type: "orientation",
+      message: orientation.feedback,
+      severity: "warning",
+      timestamp: Date.now(),
+      bodyPart: "body",
+    });
   }
 
   const leftShoulder = landmarks[LANDMARKS.leftShoulder];
@@ -453,16 +449,14 @@ function analyzeStandingLumbarSideBend(
   
   // Check Orientation
   const orientation = checkOrientation(landmarks, "front");
-  if (!orientation.isCorrect) {
-    return {
-      phase: "neutral",
-      formScore: 0,
-      errors: [],
-      feedback: orientation.feedback,
-      isCorrect: false,
-      repIncremented: false,
-      confidence: 0
-    };
+  if (!orientation.isCorrect && orientation.feedback) {
+    errors.push({
+      type: "orientation",
+      message: orientation.feedback,
+      severity: "warning",
+      timestamp: Date.now(),
+      bodyPart: "body",
+    });
   }
 
   const leftShoulder = landmarks[LANDMARKS.leftShoulder];
