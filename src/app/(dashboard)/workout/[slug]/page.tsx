@@ -208,9 +208,9 @@ Keep corrections to 5-15 words max. Focus on what TO do, not what's wrong.`;
     if (sessionState !== "active") return;
     if (repCount >= targetReps) {
       setSessionState("complete");
-      router.push(`/workout/${slug}/complete`);
+      router.push(`/workout/${slug}/complete?score=${formScore}&reps=${repCount}`);
     }
-  }, [repCount, router, sessionState, slug, targetReps]);
+  }, [repCount, router, sessionState, slug, targetReps, formScore]);
 
   // Demo mode for non-vision exercises
   React.useEffect(() => {
@@ -240,7 +240,7 @@ Keep corrections to 5-15 words max. Focus on what TO do, not what's wrong.`;
 
   const handlePauseToggle = () => setIsPaused(!isPaused);
   const handleEndSession = () => setShowEndDialog(true);
-  const handleConfirmEnd = () => router.push(`/workout/${slug}/complete`);
+  const handleConfirmEnd = () => router.push(`/workout/${slug}/complete?score=${formScore}&reps=${repCount}`);
 
   const handleStartVoice = () => {
     startVapi(undefined, {
