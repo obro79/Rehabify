@@ -1,4 +1,3 @@
-export { ExerciseCard } from "./exercise-card";
 export { FormScoreCard } from "./form-score-card";
 export { WeeklyActivityCard } from "./weekly-activity-card";
 export { RecentSessionsTable } from "./recent-sessions-table";
