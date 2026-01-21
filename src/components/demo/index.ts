@@ -1,9 +1,0 @@
-export { DemoSection } from "./demo-section";
-export { IconShowcase } from "./icon-showcase";
-export { LabeledItem } from "./labeled-item";
-export { IconSections } from "./icon-sections";
-export { AlertSection } from "./alert-section";
-export { BadgeSection } from "./badge-section";
-export { TableSection } from "./table-section";
-export { CardSection } from "./card-section";
-export { AccordionSection } from "./accordion-section";
