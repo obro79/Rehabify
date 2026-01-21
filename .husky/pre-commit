@@ -1,1 +1,1 @@
-pnpm build && pnpm lint
+npm run build

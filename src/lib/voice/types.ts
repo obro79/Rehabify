@@ -135,6 +135,14 @@ export interface VapiContextMessage {
 }
 
 /**
+ * Interface for Vapi methods used by event handlers
+ */
+export interface VapiMethods {
+  say: (text: string) => void;
+  injectContext: (context: string) => void;
+}
+
+/**
  * Correction phrase mapping for form errors
  */
 export const FORM_ERROR_CORRECTIONS: Record<FormErrorType, string> = {
