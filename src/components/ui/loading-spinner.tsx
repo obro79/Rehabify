@@ -27,12 +27,11 @@ const LoadingSpinner = React.forwardRef<HTMLDivElement, LoadingSpinnerProps>(
       >
         {/* Static track with pillowy shadow */}
         <svg
-          className="absolute"
+          className="absolute drop-shadow-[0_1px_1px_rgba(0,0,0,0.1)]"
           width={config.dimension}
           height={config.dimension}
           viewBox="0 0 24 24"
           fill="none"
-          style={{ filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.1))" }}
         >
           <circle
             cx="12"

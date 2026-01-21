@@ -1,66 +1,17 @@
 "use client";
 
-import { Card, CardContent } from "@/components/ui/card";
+import { ReactElement } from "react";
 import { ProgressRing } from "@/components/ui/progress-ring";
 import { RepsIcon, TimerIcon } from "@/components/ui/icons";
-import { ReactElement, ReactNode } from "react";
+import { StatCardWrapper } from "@/components/ui/stat-card-wrapper";
+import { IconContainer } from "@/components/ui/icon-container";
+import { StatDisplay } from "@/components/ui/stat-display";
 
-interface StatCardProps {
-  animationDelay: string;
-}
-
-interface StatCardWrapperProps {
-  animationDelay: string;
-  children: ReactNode;
-}
-
-function StatCardWrapper({ animationDelay, children }: StatCardWrapperProps): ReactElement {
-  return (
-    <Card
-      className="surface-organic flex flex-col items-center justify-center p-6 animate-celebration-fade-in-up [animation-delay:var(--delay)]"
-      style={{ "--delay": animationDelay } as React.CSSProperties}
-    >
-      <CardContent className="flex flex-col items-center gap-3 p-0 text-center">
-        {children}
-      </CardContent>
-    </Card>
-  );
-}
-
-function IconContainer({ children }: { children: ReactNode }): ReactElement {
-  return (
-    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sage-100">
-      {children}
-    </div>
-  );
-}
-
-interface StatDisplayProps {
-  label: string;
-  value: ReactNode;
-  subtitle?: string;
-  status?: string;
-}
-
-function StatDisplay({ label, value, subtitle, status }: StatDisplayProps): ReactElement {
-  return (
-    <div className="space-y-1">
-      <span className="block text-sm font-medium text-muted-foreground">{label}</span>
-      <span className="block text-3xl font-bold text-foreground">{value}</span>
-      {subtitle && (
-        <span className="block text-xs text-muted-foreground">{subtitle}</span>
-      )}
-      {status && (
-        <div className="text-xs font-medium text-sage-600">{status}</div>
-      )}
-    </div>
-  );
-}
-
-interface FormScoreCardProps extends StatCardProps {
+interface FormScoreCardProps {
   score: number;
   color: "sage" | "coral";
   message: string;
+  animationDelay: string;
 }
 
 export function FormScoreCard({
@@ -78,9 +29,10 @@ export function FormScoreCard({
   );
 }
 
-interface RepsCardProps extends StatCardProps {
+interface RepsCardProps {
   completed: number;
   target: number;
+  animationDelay: string;
 }
 
 function getCompletionStatus(completed: number, target: number): string {
@@ -107,8 +59,9 @@ export function RepsCard({
   );
 }
 
-interface DurationCardProps extends StatCardProps {
+interface DurationCardProps {
   duration: string;
+  animationDelay: string;
 }
 
 export function DurationCard({
