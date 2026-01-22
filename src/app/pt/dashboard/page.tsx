@@ -7,13 +7,7 @@ import { PatientList } from "@/components/pt/patient-list";
 import { usePTStore } from "@/stores/pt-store";
 import { GuideIcon, UsersIcon, AlertIcon } from "@/components/ui/icons";
 import { SanctuaryBackground } from "@/components/ui/sanctuary-background";
-
-function getTimeOfDayGreeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
-}
+import { getTimeOfDayGreeting } from "@/lib/date-utils";
 
 export default function PTDashboardPage() {
   const router = useRouter();

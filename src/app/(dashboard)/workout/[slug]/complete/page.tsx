@@ -18,6 +18,7 @@ import { RepsIcon, TimerIcon, TrophyIcon } from "@/components/ui/icons";
 import { CelebrationAnimation } from "@/components/ui/celebration-animation";
 import { SanctuaryBackground } from "@/components/ui/sanctuary-background";
 import { getExerciseBySlug } from "@/lib/exercises";
+import { getFormScoreColor, getFormFeedback } from "@/lib/exercise-utils";
 
 // Mock data - in production this would come from session state/API
 const MOCK_SESSION_DATA = {
@@ -47,18 +48,6 @@ const MOCK_SESSION_DATA = {
     duration: "5 min",
   },
 };
-
-function getFormScoreMessage(score: number): string {
-  if (score >= 90) return "Perfect form!";
-  if (score >= 80) return "Great form!";
-  if (score >= 70) return "Good work!";
-  if (score >= 60) return "Keep practicing!";
-  return "Review the basics";
-}
-
-function getFormScoreColor(score: number): "sage" | "coral" {
-  return score >= 70 ? "sage" : "coral";
-}
 
 export default function SessionCompletePage() {
   return (
@@ -137,7 +126,7 @@ function SessionCompleteContent() {
     coachSummary,
   } = MOCK_SESSION_DATA;
 
-  const formScoreMessage = getFormScoreMessage(formScore);
+  const formScoreMessage = getFormFeedback(formScore);
   const formScoreColor = getFormScoreColor(formScore);
 
   return (

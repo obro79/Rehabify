@@ -4,15 +4,9 @@
  */
 
 import { create } from 'zustand';
-import type { MockPatient, Plan, PlanExercise } from '@/lib/mock-data/pt-data';
+import type { MockPatient, Plan, PlanExercise, ExerciseConfig } from '@/lib/mock-data/pt-data';
 import type { PlanStructure } from '@/lib/gemini/types';
 import { mockPatients } from '@/lib/mock-data/pt-data';
-
-interface ExerciseConfig {
-  sets?: number;
-  reps?: number;
-  holdSeconds?: number;
-}
 
 interface PTStore {
   // State

@@ -5,38 +5,14 @@
  * This config is used to create/update the workflow via Vapi API.
  */
 
-export interface WorkflowNode {
-  id: string;
-  type: 'conversation';
-  name: string;
-  isStart?: boolean;
-  prompt: string;
-  model?: {
-    provider: string;
-    model: string;
-  };
-  extractVariables?: Array<{
-    name: string;
-    type: 'string' | 'number' | 'boolean' | 'array';
-    description: string;
-    enum?: string[];
-  }>;
-}
+import type {
+  WorkflowNode,
+  WorkflowEdge,
+  AssessmentWorkflowConfig,
+} from './workflow-types';
 
-export interface WorkflowEdge {
-  from: string;
-  to: string;
-  condition: {
-    type: 'ai';
-    prompt: string;
-  };
-}
-
-export interface AssessmentWorkflowConfig {
-  name: string;
-  nodes: WorkflowNode[];
-  edges: WorkflowEdge[];
-}
+// Re-export types for convenience
+export type { WorkflowNode, WorkflowEdge, AssessmentWorkflowConfig };
 
 /**
  * Lower back pain assessment workflow

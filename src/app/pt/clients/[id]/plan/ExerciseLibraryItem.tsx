@@ -4,20 +4,7 @@ import React from "react";
 import { Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatCategory, getCategoryBadgeVariant } from "./plan-utils";
-
-export interface Exercise {
-  id: string;
-  name: string;
-  slug: string;
-  tier: number;
-  body_region: string;
-  category: string;
-  difficulty: string;
-  default_reps: number;
-  default_sets: number;
-  default_hold_seconds?: number;
-  description?: string;
-}
+import type { Exercise } from "@/lib/exercises/types";
 
 interface ExerciseLibraryItemProps {
   exercise: Exercise;

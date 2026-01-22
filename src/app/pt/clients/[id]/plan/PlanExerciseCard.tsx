@@ -9,12 +9,7 @@ import {
   getCategoryBadgeVariant,
   formatDaysToLabels,
 } from "./plan-utils";
-
-interface ExerciseConfig {
-  sets?: number;
-  reps?: number;
-  holdSeconds?: number;
-}
+import type { ExerciseConfig } from "@/lib/mock-data/pt-data";
 
 interface PlanExerciseCardProps {
   exerciseId: string;

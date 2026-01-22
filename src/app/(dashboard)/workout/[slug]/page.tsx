@@ -28,6 +28,7 @@ import {
   selectActiveErrors,
 } from "@/stores/exercise-store-selectors";
 import type { Exercise } from "@/lib/exercises/types";
+import { getFormScoreColor, getFormFeedback } from "@/lib/exercise-utils";
 import { useVapi } from "@/hooks/use-vapi";
 import { useFormEventBridge } from "@/hooks/use-form-event-bridge";
 import { useVoiceStore } from "@/stores/voice-store";
@@ -35,19 +36,6 @@ import { useVoiceStore } from "@/stores/voice-store";
 type SessionState = "active" | "paused" | "complete";
 type VoiceState = "idle" | "connecting" | "listening" | "thinking" | "speaking";
 type VoicePhase = "explaining" | "analyzing" | "finished";
-
-// Helper functions for form score
-function getFormScoreColor(score: number): "sage" | "coral" {
-  return score >= 70 ? "sage" : "coral";
-}
-
-function getFormFeedback(score: number): string {
-  if (score >= 90) return "Perfect form!";
-  if (score >= 80) return "Great form!";
-  if (score >= 70) return "Good work!";
-  if (score >= 60) return "Keep practicing!";
-  return "Review the basics";
-}
 
 export default function WorkoutSessionPage() {
   const params = useParams();

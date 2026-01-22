@@ -6,6 +6,7 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { DifficultyStars } from "@/components/ui/difficulty-stars";
 import { LibraryIcon } from "@/components/ui/icons";
 import { ArrowRight } from "lucide-react";
@@ -34,12 +35,13 @@ function ExerciseCard({
       <div className={offsetClass}>
         <Card
           variant="organic"
-          className={`group p-6 hover-lift h-full ${isFirst ? "lg:row-span-2 lg:p-8" : ""}`}
+          className={cn("group p-6 hover-lift h-full", isFirst && "lg:row-span-2 lg:p-8")}
         >
           <div
-            className={`relative flex items-center justify-center bg-sage-50 rounded-2xl mb-5 group-hover:bg-sage-100 transition-colors overflow-hidden ${
+            className={cn(
+              "relative flex items-center justify-center bg-sage-50 rounded-2xl mb-5 group-hover:bg-sage-100 transition-colors overflow-hidden",
               isFirst ? "h-40" : "h-28"
-            }`}
+            )}
           >
             {imageSrc ? (
               <Image
@@ -56,9 +58,10 @@ function ExerciseCard({
 
           <div className="space-y-3">
             <h3
-              className={`font-display font-semibold text-sage-900 ${
+              className={cn(
+                "font-display font-semibold text-sage-900",
                 isFirst ? "text-xl" : "text-lg"
-              }`}
+              )}
             >
               {exercise.name}
             </h3>
@@ -75,7 +78,7 @@ function ExerciseCard({
             </div>
 
             <p
-              className={`text-sage-600 line-clamp-2 ${isFirst ? "text-base" : "text-sm"}`}
+              className={cn("text-sage-600 line-clamp-2", isFirst ? "text-base" : "text-sm")}
             >
               {exercise.description}
             </p>

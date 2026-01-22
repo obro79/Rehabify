@@ -5,7 +5,8 @@ import { Search } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ExerciseLibraryItem, type Exercise } from "./ExerciseLibraryItem";
+import { ExerciseLibraryItem } from "./ExerciseLibraryItem";
+import type { Exercise } from "@/lib/exercises/types";
 import { formatCategory } from "./plan-utils";
 
 interface ExerciseLibraryPanelProps {

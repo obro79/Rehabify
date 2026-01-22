@@ -67,6 +67,13 @@ body {
 
 /* ===== REUSABLE 3D SURFACE STYLES ===== */
 
+@layer utilities {
+  /* Hover lift animation for cards */
+  .hover-lift {
+    @apply transition-all duration-200 hover:-translate-y-1 hover:shadow-lg;
+  }
+}
+
 @layer components {
   /* Light/neutral pillowy surface (for cards, ghost buttons) */
   .surface-soft {

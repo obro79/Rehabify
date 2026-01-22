@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { cn } from "@/lib/utils";
 import { ScrollReveal } from "@/components/motion";
 import { testimonials } from "./landing-data";
 
@@ -50,11 +51,12 @@ export function TestimonialsSection(): React.ReactElement {
                     key={index}
                     onClick={() => setCurrentTestimonial(index)}
                     aria-label={`Go to testimonial ${index + 1}`}
-                    className={`h-2 rounded-full transition-all duration-300 ${
+                    className={cn(
+                      "h-2 rounded-full transition-all duration-300",
                       index === currentTestimonial
                         ? "w-12 bg-terracotta-400"
                         : "w-2 bg-sage-200 hover:bg-sage-300"
-                    }`}
+                    )}
                   />
                 ))}
               </div>

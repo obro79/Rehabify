@@ -28,6 +28,7 @@ import {
 import { useAssessmentVapi } from "@/hooks/use-assessment-vapi";
 import exercisesData from "@/lib/exercises/data.json";
 import type { Exercise } from "@/lib/exercises/types";
+import { getFormScoreColor } from "@/lib/exercise-utils";
 
 type VoiceState = "idle" | "connecting" | "listening" | "thinking" | "speaking";
 
@@ -251,10 +252,6 @@ function AssessmentStatsPanel({
   formScore,
   exercisePhase,
 }: AssessmentStatsPanelProps) {
-  const getFormScoreColor = (score: number): "sage" | "coral" => {
-    return score >= 70 ? "sage" : "coral";
-  };
-
   return (
     <div className="flex flex-col h-full gap-4">
       {/* Voice Coach Card */}

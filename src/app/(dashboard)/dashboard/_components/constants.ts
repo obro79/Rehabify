@@ -22,9 +22,5 @@ export const WEEKLY_ACTIVITY_CONFIG = {
   remainingDays: 3,
 } as const;
 
-export function getTimeOfDayGreeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
-}
+// Re-export from centralized date-utils
+export { getTimeOfDayGreeting } from "@/lib/date-utils";

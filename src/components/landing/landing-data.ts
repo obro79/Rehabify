@@ -1,6 +1,9 @@
 import type { Exercise } from "@/lib/exercises/types";
 import exerciseData from "@/lib/exercises/data.json";
 
+// Re-export from canonical source
+export { getCategoryBadgeVariant } from "@/lib/exercise-utils";
+
 export interface Testimonial {
   quote: string;
   author: string;
@@ -38,13 +41,3 @@ export const carouselTexts = [
 export const previewExercises = exerciseData.exercises.slice(0, 4) as Exercise[];
 
 export const totalExerciseCount = exerciseData.exercises.length;
-
-export function getCategoryBadgeVariant(
-  category: string
-): "info" | "coral" | "success" | "muted" {
-  const lowerCategory = category.toLowerCase();
-  if (lowerCategory === "mobility") return "info";
-  if (lowerCategory === "extension" || lowerCategory === "strength") return "coral";
-  if (lowerCategory === "stability") return "success";
-  return "muted";
-}

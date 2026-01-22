@@ -6,6 +6,9 @@
 
 import type { PlanWeek } from "@/lib/gemini/types";
 
+// Re-export from canonical source
+export { getCategoryBadgeVariant } from "@/lib/exercise-utils";
+
 /**
  * Day configuration for weekly plan tabs
  */
@@ -29,26 +32,6 @@ export function formatCategory(category: string): string {
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
-}
-
-/**
- * Get badge variant for exercise category
- */
-export function getCategoryBadgeVariant(
-  category: string
-): "default" | "success" | "info" | "warning" | "coral" | "muted" {
-  const variants: Record<
-    string,
-    "default" | "success" | "info" | "warning" | "coral" | "muted"
-  > = {
-    mobility: "info",
-    extension: "success",
-    stretch: "warning",
-    strengthening: "coral",
-    core_stability: "success",
-    neural_mobilization: "muted",
-  };
-  return variants[category] || "default";
 }
 
 /**
