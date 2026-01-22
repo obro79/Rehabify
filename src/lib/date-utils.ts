@@ -58,6 +58,42 @@ export function formatRelativeTime(date: Date | string): string {
 }
 
 /**
+ * Format a date as a timestamp with time of day
+ * Best for message threads where exact time matters
+ * @param date - The date to format (Date object or ISO string)
+ * @returns Formatted timestamp (e.g., "3:45 PM", "Yesterday 3:45 PM", "Mon 3:45 PM")
+ */
+export function formatTimestamp(date: Date | string): string {
+  const dateObj = typeof date === "string" ? new Date(date) : date;
+  const now = new Date();
+  const diffDays = Math.floor(
+    (now.getTime() - dateObj.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  if (diffDays === 0) {
+    return dateObj.toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  } else if (diffDays === 1) {
+    return `Yesterday ${dateObj.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+  } else if (diffDays < 7) {
+    return dateObj.toLocaleDateString([], {
+      weekday: "short",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  } else {
+    return dateObj.toLocaleDateString([], {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+}
+
+/**
  * Format a date as relative date (e.g., "Today", "Yesterday", "3 days ago")
  * Best for displaying dates in lists or activity feeds
  * @param date - The date to format

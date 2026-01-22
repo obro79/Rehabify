@@ -2,28 +2,22 @@
 
 import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
-import { Message } from '@/stores/message-store';
+import { formatTimestamp } from '@/lib/date-utils';
+
+interface Message {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderRole: 'pt' | 'patient';
+  content: string;
+  imageUrl: string | null;
+  createdAt: string;
+}
 
 interface MessageThreadProps {
   messages: Message[];
   currentUserId: string;
   isLoading?: boolean;
-}
-
-function formatTimestamp(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) {
-    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  } else if (diffDays === 1) {
-    return `Yesterday ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
-  } else if (diffDays < 7) {
-    return date.toLocaleDateString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
-  } else {
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-  }
 }
 
 function MessageBubble({ message, isOwn }: { message: Message; isOwn: boolean }) {

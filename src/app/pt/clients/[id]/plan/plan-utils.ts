@@ -35,13 +35,6 @@ export function formatCategory(category: string): string {
 }
 
 /**
- * Get the full day label for a day value
- */
-export function getDayLabel(dayValue: number): string {
-  return DAYS_OF_WEEK.find((d) => d.value === dayValue)?.fullLabel || "";
-}
-
-/**
  * Get the short day label for a day value
  */
 export function getShortDayLabel(dayValue: number): string {
@@ -56,13 +49,6 @@ export function formatDaysToLabels(days: number[]): string {
 }
 
 /**
- * Generate a unique exercise ID
- */
-export function generateExerciseId(): string {
-  return `pe-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
-
-/**
  * Get exercise count for a specific day in a week
  */
 export function getExerciseCountForDay(
@@ -74,28 +60,4 @@ export function getExerciseCountForDay(
     return currentWeek.exercises.filter((ex) => ex.days.includes(day)).length;
   }
   return legacyPlan.filter((ex) => ex.dayOfWeek === day).length;
-}
-
-/**
- * Get the focus description for a week number
- */
-export function getWeekFocus(weekNum: number): string {
-  if (weekNum <= 2) return "Pain relief and gentle mobility";
-  if (weekNum <= 4) return "Core activation and stability basics";
-  if (weekNum <= 6) return "Progressive strengthening";
-  if (weekNum <= 8) return "Functional movement patterns";
-  if (weekNum <= 10) return "Advanced stability and endurance";
-  return "Maintenance and independence";
-}
-
-/**
- * Get the notes for a week number
- */
-export function getWeekNotes(weekNum: number): string {
-  if (weekNum <= 2) return "Focus on pain-free movement. Stop if pain increases.";
-  if (weekNum <= 4) return "Begin engaging core muscles. Maintain neutral spine.";
-  if (weekNum <= 6) return "Increase difficulty gradually. Monitor fatigue.";
-  if (weekNum <= 8) return "Apply exercises to daily movements.";
-  if (weekNum <= 10) return "Build endurance. Longer holds, more reps.";
-  return "You're ready for independent maintenance!";
 }

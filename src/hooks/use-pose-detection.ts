@@ -55,7 +55,6 @@ export function usePoseDetection({
   const incrementRep = useExerciseStore((state) => state.incrementRep);
   const clearAllErrors = useExerciseStore((state) => state.clearAllErrors);
   const addError = useExerciseStore((state) => state.addError);
-  const updateLastFrame = useExerciseStore((state) => state.updateLastFrame);
 
   // Initialize form engine when exercise changes
   useEffect(() => {
@@ -156,7 +155,6 @@ export function usePoseDetection({
               setConfidence(analysis.confidence);
               clearAllErrors();
               analysis.errors.forEach((error) => addError(error));
-              updateLastFrame();
             }
           }
         }
@@ -185,7 +183,6 @@ export function usePoseDetection({
     status,
     addError,
     clearAllErrors,
-    updateLastFrame,
     videoRef,
     onLandmarksDetected,
     onCameraFeedback,

@@ -4,7 +4,8 @@
  * Reusable selectors for useVoiceStore(selector) to prevent unnecessary re-renders.
  */
 
-import type { VoiceState, ConnectionState, SpeakingStatus } from './voice-store';
+import type { ConnectionState } from '@/types/voice';
+import type { VoiceState, SpeakingStatus } from './voice-store';
 
 // Atomic Selectors
 
@@ -13,7 +14,6 @@ export const selectSpeakingStatus = (state: VoiceState): SpeakingStatus => state
 export const selectIsMuted = (state: VoiceState): boolean => state.isMuted;
 export const selectVolumeLevel = (state: VoiceState): number => state.volumeLevel;
 export const selectTranscript = (state: VoiceState) => state.transcript;
-export const selectLastSpokenFeedback = (state: VoiceState): string | null => state.lastSpokenFeedback;
 export const selectError = (state: VoiceState): string | null => state.error;
 
 // Derived Selectors

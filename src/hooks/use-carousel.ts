@@ -1,4 +1,5 @@
 import * as React from "react";
+import { UI_CONFIG } from "@/config/ui";
 
 export interface UseCarouselOptions {
   /** Total number of items in the carousel */
@@ -48,7 +49,7 @@ export interface UseCarouselReturn {
  */
 export function useCarousel({
   itemsLength,
-  intervalMs = 5000,
+  intervalMs = UI_CONFIG.CAROUSEL_INTERVAL_MS,
   autoPlay = true,
   transitionDuration,
 }: UseCarouselOptions): UseCarouselReturn {

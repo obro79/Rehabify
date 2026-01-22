@@ -53,6 +53,9 @@ export {
 } from './auth';
 export type { AuthenticatedUser } from './auth';
 
+// Patient access utilities
+export { getTargetPatientId } from './patient-access';
+
 // Types
 export type {
   SuccessResponse,

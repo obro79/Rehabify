@@ -54,7 +54,6 @@ export function useFormEventBridge(options: UseFormEventBridgeOptions): void {
   // Send pending context when assistant stops speaking
   useEffect(() => {
     if (!isSpeaking && pendingContextRef.current && isConnected) {
-      console.log(`[useFormEventBridge] 🎤 Assistant stopped speaking, sending queued context`);
       injectContext(pendingContextRef.current);
       lastFeedbackTimeRef.current = Date.now();
       pendingContextRef.current = null;
@@ -74,10 +73,6 @@ export function useFormEventBridge(options: UseFormEventBridgeOptions): void {
       newErrors.forEach((errorType) => {
         repErrorsRef.current.add(errorType);
       });
-
-      if (debug && newErrors.length > 0) {
-        console.log(`[useFormEventBridge] Errors queued: ${Array.from(repErrorsRef.current).join(', ')}`);
-      }
 
       prevErrors = currentErrorTypes;
 
@@ -102,8 +97,6 @@ export function useFormEventBridge(options: UseFormEventBridgeOptions): void {
         const formScore = state.formScore;
         const errors = Array.from(repErrorsRef.current);
         const phase = state.phase;
-
-        console.log(`[useFormEventBridge] Rep ${state.repCount}/${targetReps} | Score: ${formScore}% | Errors: ${errors.join(', ') || 'none'}`);
 
         // Build context for LLM
         let context = '';
@@ -162,22 +155,14 @@ Form was good. Brief encouragement (3-5 words max). Examples: "Nice!", "Good rep
 
         // Send context to LLM if we have any
         if (context) {
-          console.log(`[useFormEventBridge] 📤 Preparing context for Vapi:\n${context}`);
-          console.log(`[useFormEventBridge] ⏱️ Time since last feedback: ${timeSinceLastFeedback}ms`);
-          console.log(`[useFormEventBridge] 🎤 Assistant speaking: ${isSpeaking}`);
-
           if (isSpeaking) {
             // Queue context to send when assistant stops speaking
-            console.log(`[useFormEventBridge] ⏸️ Assistant is speaking, queuing context...`);
             pendingContextRef.current = context;
           } else {
             // Send immediately
             injectContext(context);
             lastFeedbackTimeRef.current = now;
-            console.log(`[useFormEventBridge] ✅ Context injection complete`);
           }
-        } else {
-          console.log(`[useFormEventBridge] ⏭️ No context to inject (score=${formScore}%, errors=${errors.length}, rep=${state.repCount})`);
         }
 
         // Reset errors for next rep
@@ -196,7 +181,6 @@ Form was good. Brief encouragement (3-5 words max). Examples: "Nice!", "Good rep
     prevRepCountRef.current = 0;
     repErrorsRef.current.clear();
     lastFeedbackTimeRef.current = 0;
-    console.log(`[useFormEventBridge] Reset for exercise: ${exerciseName}`);
   }, [exerciseName]);
 }
 

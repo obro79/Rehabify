@@ -72,6 +72,27 @@ body {
   .hover-lift {
     @apply transition-all duration-200 hover:-translate-y-1 hover:shadow-lg;
   }
+
+  /* Common layout utilities */
+  .center {
+    @apply flex items-center justify-center;
+  }
+
+  /* Label typography utilities */
+  .label-xs {
+    @apply text-xs font-medium;
+  }
+  .label-sm {
+    @apply text-sm font-medium;
+  }
+
+  /* Heading typography utilities */
+  .heading-lg {
+    @apply text-lg font-bold;
+  }
+  .heading-xl {
+    @apply text-2xl font-bold;
+  }
 }
 
 @layer components {
@@ -95,7 +116,7 @@ body {
 
   /* Outlined pillowy surface (for primary buttons, outlined cards) */
   .surface-outlined {
-    @apply bg-gradient-to-b from-white to-sage-50 border border-sage-200 rounded-pill;
+    @apply bg-gradient-to-b from-white to-sage-50 border border-sage-200 rounded-full;
     box-shadow: var(--shadow-pillowy), var(--inset-highlight-strong), var(--inset-shadow-subtle);
   }
 

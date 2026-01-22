@@ -8,7 +8,7 @@
 import type { MutableRefObject } from 'react';
 import type Vapi from '@vapi-ai/web';
 import type { VoiceActions } from '@/stores/voice-store';
-import { VapiMessage, isReadyPhrase, extractErrorMessage } from './constants';
+import { VapiWebhookMessage, isReadyPhrase, extractErrorMessage } from './constants';
 
 export interface VapiCallbacks {
   onConnectionChange?: (connected: boolean) => void;
@@ -62,7 +62,7 @@ export function attachVapiHandlers(vapi: Vapi, deps: HandlerDeps): void {
     store.setVolumeLevel(level);
   });
 
-  vapi.on('message', (message: VapiMessage) => {
+  vapi.on('message', (message: VapiWebhookMessage) => {
     handleMessage(message, store, callbackRefs);
   });
 
@@ -72,7 +72,7 @@ export function attachVapiHandlers(vapi: Vapi, deps: HandlerDeps): void {
 }
 
 function handleMessage(
-  message: VapiMessage,
+  message: VapiWebhookMessage,
   store: HandlerDeps['store'],
   callbackRefs: HandlerDeps['callbackRefs']
 ): void {

@@ -6,8 +6,9 @@
 
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
+import type { ConnectionState } from '@/types/voice';
 
-export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error';
+export type { ConnectionState };
 export type SpeakingStatus = 'idle' | 'listening' | 'thinking' | 'speaking';
 
 export interface TranscriptEntry {
@@ -22,7 +23,6 @@ export interface VoiceState {
   speakingStatus: SpeakingStatus;
   volumeLevel: number;
   transcript: TranscriptEntry[];
-  lastSpokenFeedback: string | null;
   isMuted: boolean;
 }
 
@@ -32,7 +32,6 @@ export interface VoiceActions {
   setSpeakingStatus: (status: SpeakingStatus) => void;
   setVolumeLevel: (level: number) => void;
   addTranscript: (entry: TranscriptEntry) => void;
-  setLastSpokenFeedback: (feedback: string) => void;
   clearTranscripts: () => void;
   setMuted: (muted: boolean) => void;
   reset: () => void;
@@ -44,7 +43,6 @@ const initialState: VoiceState = {
   speakingStatus: 'idle',
   volumeLevel: 0,
   transcript: [],
-  lastSpokenFeedback: null,
   isMuted: false,
 };
 
@@ -64,7 +62,6 @@ export const useVoiceStore = create<VoiceState & VoiceActions>()(
       addTranscript: (entry) =>
         set((state) => ({ transcript: [...state.transcript, entry] })),
 
-      setLastSpokenFeedback: (lastSpokenFeedback) => set({ lastSpokenFeedback }),
       clearTranscripts: () => set({ transcript: [] }),
       setMuted: (isMuted) => set({ isMuted }),
       reset: () => set(initialState),

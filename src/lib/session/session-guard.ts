@@ -6,12 +6,10 @@
  * session at a time.
  */
 
+import { SESSION_CONFIG } from '@/config/session';
 
 // Channel and timing constants
 export const CHANNEL_NAME = 'rehabify_workout_session';
-const CLAIM_TIMEOUT_MS = 300;
-const HEARTBEAT_INTERVAL_MS = 10_000;
-const HEARTBEAT_TIMEOUT_MS = 15_000;
 
 // Message types for BroadcastChannel communication
 export const MESSAGE_TYPES = {
@@ -107,7 +105,7 @@ export class SessionGuard {
           this.claimResolve(true);
           this.claimResolve = null;
         }
-      }, CLAIM_TIMEOUT_MS);
+      }, SESSION_CONFIG.CLAIM_TIMEOUT_MS);
 
       // Send CLAIM message AFTER setting up the resolver
       this.sendMessage(MESSAGE_TYPES.CLAIM);
@@ -197,7 +195,7 @@ export class SessionGuard {
     this.stopHeartbeat();
     this.heartbeatInterval = setInterval(() => {
       this.sendMessage(MESSAGE_TYPES.HEARTBEAT);
-    }, HEARTBEAT_INTERVAL_MS);
+    }, SESSION_CONFIG.HEARTBEAT_INTERVAL_MS);
   }
 
   /**
@@ -217,7 +215,7 @@ export class SessionGuard {
     if (this.lastHeartbeatAt === 0) {
       return false;
     }
-    return Date.now() - this.lastHeartbeatAt > HEARTBEAT_TIMEOUT_MS;
+    return Date.now() - this.lastHeartbeatAt > SESSION_CONFIG.HEARTBEAT_TIMEOUT_MS;
   }
 
   /**

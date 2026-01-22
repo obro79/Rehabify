@@ -182,4 +182,9 @@ export const schemas = {
 
   /** Date string (ISO format) */
   dateString: z.string().datetime('Invalid date format'),
+
+  /** Message content validation */
+  messageContent: z.object({
+    content: z.string().min(1, 'Message content is required').max(2000, 'Message content exceeds 2000 characters'),
+  }),
 };

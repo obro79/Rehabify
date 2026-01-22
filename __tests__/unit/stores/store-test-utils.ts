@@ -179,7 +179,6 @@ export function seedVoiceStore(options: {
   error?: string | null;
   volumeLevel?: number;
   transcripts?: TranscriptEntry[];
-  lastSpokenFeedback?: string;
   isMuted?: boolean;
 } = {}): void {
   const store = useVoiceStore.getState();
@@ -191,7 +190,6 @@ export function seedVoiceStore(options: {
   if (options.transcripts) {
     options.transcripts.forEach((entry) => store.addTranscript(entry));
   }
-  if (options.lastSpokenFeedback) store.setLastSpokenFeedback(options.lastSpokenFeedback);
   if (options.isMuted !== undefined) store.setMuted(options.isMuted);
 }
 

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { UI_CONFIG } from "@/config/ui";
 
 export interface ProgressRingProps {
   value: number;
@@ -70,7 +71,7 @@ const ProgressRing = React.forwardRef<HTMLDivElement, ProgressRingProps>(
       }
 
       // Animate from 0 to value over 1000ms with ease-out
-      const duration = 1000;
+      const duration = UI_CONFIG.PROGRESS_RING_ANIMATION_MS;
       const startTime = Date.now();
       const startValue = 0;
 

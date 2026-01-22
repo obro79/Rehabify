@@ -17,7 +17,6 @@ export const selectActiveErrors = (state: ExerciseState) => state.activeErrors;
 export const selectCurrentExercise = (state: ExerciseState) => state.currentExercise;
 export const selectIsInPosition = (state: ExerciseState): boolean => state.isInPosition;
 export const selectConfidence = (state: ExerciseState): number => state.confidence;
-export const selectLastFrameAt = (state: ExerciseState) => state.lastFrameAt;
 
 // Derived Selectors
 

@@ -18,8 +18,8 @@ export const READY_PHRASES = [
   'go ahead',
 ] as const;
 
-/** Vapi message event types */
-export interface VapiMessage {
+/** Vapi webhook message event types */
+export interface VapiWebhookMessage {
   type: 'transcript' | 'function-call' | 'hang' | string;
   role?: 'user' | 'assistant' | 'system';
   transcript?: string;
