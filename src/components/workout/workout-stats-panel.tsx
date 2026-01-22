@@ -9,6 +9,7 @@ import { ProgressRing } from "@/components/ui/progress-ring";
 import { RepCounter } from "@/components/ui/rep-counter";
 import { VoiceIndicator } from "@/components/ui/voice-indicator";
 import { cn } from "@/lib/utils";
+import { getFormScoreColor, getFormFeedback } from "@/lib/exercise-utils";
 
 type VoiceState = "idle" | "connecting" | "listening" | "thinking" | "speaking";
 
@@ -43,17 +44,6 @@ export function WorkoutStatsPanel({
   phase,
   className,
 }: WorkoutStatsPanelProps) {
-  const getFormScoreColor = (score: number): "sage" | "coral" => {
-    return score >= 70 ? "sage" : "coral";
-  };
-
-  const getFormFeedback = (score: number): string => {
-    if (score >= 90) return "Perfect!";
-    if (score >= 70) return "Great form";
-    if (score >= 50) return "Keep going";
-    return "Adjust form";
-  };
-
   return (
     <div className={cn("flex flex-col h-full gap-4", className)}>
       {/* Voice Coach Section */}

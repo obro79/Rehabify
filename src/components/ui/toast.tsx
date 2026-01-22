@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { UI_CONFIG } from "@/config/ui";
 import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from "lucide-react";
 
 export type ToastVariant = "default" | "success" | "warning" | "error";
@@ -38,7 +39,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     const id = Math.random().toString(36).slice(2);
     setToasts((prev) => [...prev, { ...toast, id }]);
 
-    const duration = toast.duration ?? 5000;
+    const duration = toast.duration ?? UI_CONFIG.TOAST_DURATION_MS;
     if (duration > 0) {
       const timeoutId = setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== id));

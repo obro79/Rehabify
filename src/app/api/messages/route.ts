@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { validateBody, schemas } from '@/lib/api';
 
 // Mock current user - in production, get from Neon Auth session
 const MOCK_CURRENT_USER = {
@@ -111,26 +112,12 @@ export async function GET(request: NextRequest) {
 // POST /api/messages - Send a new message
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { content } = body;
-
-    if (!content || !content.trim()) {
-      return NextResponse.json(
-        { error: 'Message content is required' },
-        { status: 400 }
-      );
-    }
-
-    if (content.length > 2000) {
-      return NextResponse.json(
-        { error: 'Message content exceeds 2000 characters' },
-        { status: 400 }
-      );
-    }
+    const { content } = await validateBody(request, schemas.messageContent);
 
     // In production: Insert into database and create notification
     const newMessage = {
       id: `msg-${Date.now()}`,
+      content,
       createdAt: new Date().toISOString(),
     };
 

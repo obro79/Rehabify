@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,10 +22,9 @@ import {
 import { ArrowRight } from "lucide-react";
 import exerciseData from "@/lib/exercises/data.json";
 import { mapDifficultyToStars, type Exercise } from "@/lib/exercises/types";
-import { getExerciseImage } from "@/lib/exercise-utils";
+import { getExerciseImage, getCategoryBadgeVariant } from "@/lib/exercise-utils";
 import { FadeIn, ScrollReveal } from "@/components/motion";
 import { ClinicalTrustSection } from "./clinical-trust-section";
-import { clientEnv } from "@/lib/env";
 
 // Get first 4 exercises for preview
 const previewExercises = exerciseData.exercises.slice(0, 4) as Exercise[];
@@ -59,7 +59,7 @@ export function LandingClient() {
   const [currentTestimonial, setCurrentTestimonial] = React.useState(0);
   const [currentCarouselIndex, setCurrentCarouselIndex] = React.useState(0);
   const [isTransitioning, setIsTransitioning] = React.useState(false);
-  const ctaHref = "/assessment/lower-back";
+  const ctaHref = "/assessment";
 
   // Auto-rotate testimonials
   React.useEffect(() => {
@@ -82,14 +82,6 @@ export function LandingClient() {
     }, 3500); // Change every 3.5 seconds
     return () => clearInterval(timer);
   }, []);
-
-  const getCategoryBadgeVariant = (category: string) => {
-    const lowerCategory = category.toLowerCase();
-    if (lowerCategory === "mobility") return "info";
-    if (lowerCategory === "extension" || lowerCategory === "strength") return "coral";
-    if (lowerCategory === "stability") return "success";
-    return "muted";
-  };
 
   return (
     <div className="flex flex-col min-h-screen overflow-x-hidden">
@@ -117,15 +109,14 @@ export function LandingClient() {
                         return (
                           <span
                             key={index}
-                            className={`absolute inset-0 bg-gradient-to-r from-sage-600 via-terracotta-500 to-coral-500 bg-clip-text text-transparent transition-all duration-500 ease-in-out ${
-                              isActive && !isTransitioning
-                                ? "opacity-100 translate-y-0"
-                                : isActive && isTransitioning
-                                ? "opacity-0 -translate-y-4"
-                                : isNext && isTransitioning
-                                ? "opacity-100 translate-y-0"
-                                : "opacity-0 translate-y-4"
-                            }`}
+                            className={cn(
+                              "absolute inset-0 bg-gradient-to-r from-sage-600 via-terracotta-500 to-coral-500 bg-clip-text text-transparent transition-all duration-500 ease-in-out",
+                              isActive && !isTransitioning && "opacity-100 translate-y-0",
+                              isActive && isTransitioning && "opacity-0 -translate-y-4",
+                              isNext && isTransitioning && "opacity-100 translate-y-0",
+                              !isActive && !isNext && "opacity-0 translate-y-4",
+                              !isActive && isNext && !isTransitioning && "opacity-0 translate-y-4"
+                            )}
                           >
                             {text}
                           </span>
@@ -325,14 +316,13 @@ export function LandingClient() {
                     <div className={index === 1 ? "lg:-mt-8" : index === 2 ? "lg:mt-4" : ""}>
                       <Card
                         variant="organic"
-                        className={`group p-6 hover-lift h-full ${
-                          index === 0 ? "lg:row-span-2 lg:p-8" : ""
-                        }`}
+                        className={cn("group p-6 hover-lift h-full", index === 0 && "lg:row-span-2 lg:p-8")}
                       >
                         {/* Image area */}
-                        <div className={`relative flex items-center justify-center bg-sage-50 rounded-2xl mb-5 group-hover:bg-sage-100 transition-colors overflow-hidden ${
+                        <div className={cn(
+                          "relative flex items-center justify-center bg-sage-50 rounded-2xl mb-5 group-hover:bg-sage-100 transition-colors overflow-hidden",
                           index === 0 ? "h-40" : "h-28"
-                        }`}>
+                        )}>
                           {getExerciseImage(exercise.slug) ? (
                             <Image
                               src={getExerciseImage(exercise.slug)!}
@@ -348,9 +338,10 @@ export function LandingClient() {
 
                         {/* Content */}
                         <div className="space-y-3">
-                          <h3 className={`font-display font-semibold text-sage-900 ${
+                          <h3 className={cn(
+                            "font-display font-semibold text-sage-900",
                             index === 0 ? "text-xl" : "text-lg"
-                          }`}>
+                          )}>
                             {exercise.name}
                           </h3>
 
@@ -365,9 +356,10 @@ export function LandingClient() {
                             )}
                           </div>
 
-                          <p className={`text-sage-600 line-clamp-2 ${
+                          <p className={cn(
+                            "text-sage-600 line-clamp-2",
                             index === 0 ? "text-base" : "text-sm"
-                          }`}>
+                          )}>
                             {exercise.description}
                           </p>
 
@@ -456,11 +448,12 @@ export function LandingClient() {
                         key={index}
                         onClick={() => setCurrentTestimonial(index)}
                         aria-label={`Go to testimonial ${index + 1}`}
-                        className={`h-2 rounded-full transition-all duration-300 ${
+                        className={cn(
+                          "h-2 rounded-full transition-all duration-300",
                           index === currentTestimonial
                             ? "w-12 bg-terracotta-400"
                             : "w-2 bg-sage-200 hover:bg-sage-300"
-                        }`}
+                        )}
                       />
                     ))}
                   </div>

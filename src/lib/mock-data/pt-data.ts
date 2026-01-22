@@ -11,6 +11,15 @@ export interface Alert {
   createdAt: Date;
 }
 
+/**
+ * Configuration overrides for an exercise in a plan
+ */
+export interface ExerciseConfig {
+  sets?: number;
+  reps?: number;
+  holdSeconds?: number;
+}
+
 export interface PlanExercise {
   id: string;
   exerciseId: string; // Reference to exercise library

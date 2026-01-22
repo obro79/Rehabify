@@ -43,13 +43,7 @@ import {
   getExerciseImage,
 } from "@/lib/exercise-utils";
 import { FadeIn, StaggerContainer, StaggerItem } from "@/components/motion";
-
-function getTimeOfDayGreeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
-}
+import { getTimeOfDayGreeting } from "@/lib/date-utils";
 
 function getDifficultyBadgeVariant(difficulty: string): "easy" | "medium" | "hard" {
   switch (difficulty) {

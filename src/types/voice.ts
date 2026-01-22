@@ -49,9 +49,9 @@ export interface VoiceContext {
 }
 
 /**
- * Vapi connection states
+ * Connection states for voice/Vapi
  */
-export type VapiConnectionState =
+export type ConnectionState =
   | 'disconnected'
   | 'connecting'
   | 'connected'
@@ -61,7 +61,7 @@ export type VapiConnectionState =
  * Voice store state (for Zustand)
  */
 export interface VoiceState {
-  connectionState: VapiConnectionState;
+  connectionState: ConnectionState;
   isSpeaking: boolean;
   isListening: boolean;
   transcript: string;

@@ -28,6 +28,7 @@ import {
 import { useAssessmentVapi } from "@/hooks/use-assessment-vapi";
 import exercisesData from "@/lib/exercises/data.json";
 import type { Exercise } from "@/lib/exercises/types";
+import { getFormScoreColor } from "@/lib/exercise-utils";
 
 type VoiceState = "idle" | "connecting" | "listening" | "thinking" | "speaking";
 
@@ -251,10 +252,6 @@ function AssessmentStatsPanel({
   formScore,
   exercisePhase,
 }: AssessmentStatsPanelProps) {
-  const getFormScoreColor = (score: number): "sage" | "coral" => {
-    return score >= 70 ? "sage" : "coral";
-  };
-
   return (
     <div className="flex flex-col h-full gap-4">
       {/* Voice Coach Card */}
@@ -492,7 +489,6 @@ export default function LowerBackAssessmentPage() {
       }
 
       const result = await response.json();
-      console.log("[AssessmentPage] Assessment saved:", result);
 
       // Navigate to dashboard or results
       router.push("/dashboard");
@@ -515,12 +511,11 @@ export default function LowerBackAssessmentPage() {
     currentPhase,
   } = useAssessmentVapi({
     onComplete: () => {
-      console.log("[AssessmentPage] Assessment complete");
       // Auto-save when complete
       saveAssessment();
     },
     onRedFlag: () => {
-      console.log("[AssessmentPage] Red flag detected");
+      // Red flag detected - UI overlay will show
     },
   });
 
@@ -536,7 +531,6 @@ export default function LowerBackAssessmentPage() {
             lowerContent.includes(kw.toLowerCase())
           );
           if (hasMovementKeyword) {
-            console.log("[AssessmentPage] Movement phase detected from transcript");
             setIsMovementPhase(true);
             break;
           }
@@ -548,7 +542,6 @@ export default function LowerBackAssessmentPage() {
   // Set exercise when entering movement phase
   React.useEffect(() => {
     if (isMovementPhase && currentMovementExercise) {
-      console.log("[AssessmentPage] Setting movement exercise:", currentMovementExercise.name);
       setExercise(currentMovementExercise);
     } else if (!isMovementPhase) {
       resetExercise();
@@ -561,8 +554,6 @@ export default function LowerBackAssessmentPage() {
   // Handle rep completion - signal voice to ask about pain
   React.useEffect(() => {
     if (isMovementPhase && repCount > prevRepCountRef.current && currentMovementExercise) {
-      console.log("[AssessmentPage] Rep completed:", repCount);
-
       // Save movement result
       addMovementResult({
         exerciseSlug: currentMovementExercise.slug,
@@ -637,9 +628,7 @@ export default function LowerBackAssessmentPage() {
   // Handle skip - skip to next phase or complete
   const handleSkip = () => {
     if (!isMovementPhase && currentPhase === "interview") {
-      // Skip interview → trigger movement phase WITHOUT voice
-      console.log("[AssessmentPage] Skipping to movement phase (no voice)");
-
+      // Skip interview - trigger movement phase WITHOUT voice
       // Stop voice if connected
       if (isConnected) {
         stopVapi();
@@ -654,16 +643,14 @@ export default function LowerBackAssessmentPage() {
       // Trigger movement phase
       setIsMovementPhase(true);
     } else if (isMovementPhase) {
-      // Skip movement → go to dashboard (complete)
-      console.log("[AssessmentPage] Skipping movement, completing assessment");
+      // Skip movement - go to dashboard (complete)
       updateMovementScreen(DEFAULT_ASSESSMENT_DATA.movementScreen);
       if (isConnected) {
         stopVapi();
       }
       router.push("/dashboard");
     } else {
-      // Summary or other → complete
-      console.log("[AssessmentPage] Completing assessment");
+      // Summary or other - complete
       if (isConnected) {
         stopVapi();
       }

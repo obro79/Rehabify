@@ -17,7 +17,6 @@ export interface ExerciseState {
   activeErrors: FormError[];
   isInPosition: boolean;
   confidence: number;
-  lastFrameAt: number | null;
 }
 
 export interface ExerciseActions {
@@ -30,7 +29,6 @@ export interface ExerciseActions {
   clearAllErrors: () => void;
   setInPosition: (inPosition: boolean) => void;
   setConfidence: (confidence: number) => void;
-  updateLastFrame: () => void;
   reset: () => void;
 }
 
@@ -42,7 +40,6 @@ const initialState: ExerciseState = {
   activeErrors: [],
   isInPosition: false,
   confidence: 0,
-  lastFrameAt: null,
 };
 
 export const useExerciseStore = create<ExerciseState & ExerciseActions>()(
@@ -68,7 +65,6 @@ export const useExerciseStore = create<ExerciseState & ExerciseActions>()(
       clearAllErrors: () => set({ activeErrors: [] }),
       setInPosition: (isInPosition) => set({ isInPosition }),
       setConfidence: (confidence) => set({ confidence }),
-      updateLastFrame: () => set({ lastFrameAt: Date.now() }),
       reset: () => set(initialState),
     }),
     { name: 'exercise-store', enabled: process.env.NODE_ENV === 'development' }

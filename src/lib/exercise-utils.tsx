@@ -353,3 +353,38 @@ export function getScoreBadgeVariant(score: number) {
   if (score >= 70) return "warning" as const;
   return "error" as const;
 }
+
+/**
+ * Get the badge variant for a difficulty level
+ */
+export function getDifficultyBadgeVariant(difficulty: string) {
+  switch (difficulty.toLowerCase()) {
+    case "beginner":
+      return "success" as const;
+    case "intermediate":
+      return "warning" as const;
+    case "advanced":
+      return "coral" as const;
+    default:
+      return "muted" as const;
+  }
+}
+
+/**
+ * Get the color variant for a form score (for ProgressRing)
+ */
+export function getFormScoreColor(score: number): "sage" | "coral" {
+  if (score >= 70) return "sage";
+  return "coral";
+}
+
+/**
+ * Get feedback text for a form score
+ */
+export function getFormFeedback(score: number): string {
+  if (score >= 90) return "Excellent form!";
+  if (score >= 80) return "Great form";
+  if (score >= 70) return "Good form";
+  if (score >= 60) return "Keep adjusting";
+  return "Focus on form";
+}

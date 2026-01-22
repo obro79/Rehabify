@@ -15,38 +15,15 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePTStore } from "@/stores/pt-store";
 import type { PlanExercise } from "@/lib/mock-data/pt-data";
 import type { PlanWeek } from "@/lib/gemini/types";
+import { DAYS_OF_WEEK, getCategoryBadgeVariant } from "./plan-utils";
 
 import exerciseData from "@/lib/exercises/data.json";
-
-interface Exercise {
-  id: string;
-  name: string;
-  slug: string;
-  tier: number;
-  body_region: string;
-  category: string;
-  difficulty: string;
-  default_reps: number;
-  default_sets: number;
-  default_hold_seconds?: number;
-  description?: string;
-}
+import type { Exercise } from "@/lib/exercises/types";
 
 // Extract unique categories from exercise data
 const categories = Array.from(
-  new Set(exerciseData.exercises.map((ex: Exercise) => ex.category))
+  new Set(exerciseData.exercises.map((ex) => ex.category))
 ).sort();
-
-// Day labels for weekly plan tabs
-const DAYS_OF_WEEK = [
-  { value: 1, label: "Mon", fullLabel: "Monday" },
-  { value: 2, label: "Tue", fullLabel: "Tuesday" },
-  { value: 3, label: "Wed", fullLabel: "Wednesday" },
-  { value: 4, label: "Thu", fullLabel: "Thursday" },
-  { value: 5, label: "Fri", fullLabel: "Friday" },
-  { value: 6, label: "Sat", fullLabel: "Saturday" },
-  { value: 0, label: "Sun", fullLabel: "Sunday" },
-];
 
 interface PlanBuilderPageProps {
   params: Promise<{ id: string }>;
@@ -389,19 +366,6 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
       .split("_")
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ");
-  };
-
-  // Get badge variant for category
-  const getCategoryBadgeVariant = (category: string) => {
-    const variants: Record<string, "default" | "success" | "info" | "warning" | "coral" | "muted"> = {
-      mobility: "info",
-      extension: "success",
-      stretch: "warning",
-      strengthening: "coral",
-      core_stability: "success",
-      neural_mobilization: "muted",
-    };
-    return variants[category] || "default";
   };
 
   if (!patient) {
