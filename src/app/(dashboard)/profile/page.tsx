@@ -16,12 +16,24 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
 
+interface ProfilePreferences {
+  voice_verbosity?: string;
+  voice_speed?: string;
+  mute_coach?: boolean;
+  high_contrast?: boolean;
+  reduced_motion?: boolean;
+  larger_text?: boolean;
+  [key: string]: unknown;
+}
+
 export default function ProfilePage() {
   const { addToast } = useToast();
 
   // Account Info state
-  const [displayName, setDisplayName] = React.useState("Sarah");
-  const [email] = React.useState("sarah@example.com");
+  const [displayName, setDisplayName] = React.useState("");
+  const [email, setEmail] = React.useState("");
+  const [loading, setLoading] = React.useState(true);
+  const [saving, setSaving] = React.useState(false);
 
   // Voice Coach Preferences state
   const [verbosity, setVerbosity] = React.useState("normal");
@@ -37,12 +49,80 @@ export default function ProfilePage() {
   const [showClearHistoryDialog, setShowClearHistoryDialog] = React.useState(false);
   const [showDeleteAccountDialog, setShowDeleteAccountDialog] = React.useState(false);
 
-  const handleSaveDisplayName = () => {
-    addToast({
-      title: "Settings updated",
-      description: "Display name updated (demo mode - not persisted)",
-      variant: "success",
-    });
+  // Load profile on mount
+  React.useEffect(() => {
+    async function loadProfile() {
+      try {
+        const response = await fetch("/api/profile");
+        if (response.ok) {
+          const result = await response.json();
+          const profile = result.data || result;
+          setDisplayName(profile.displayName || "");
+          setEmail(profile.email || "");
+
+          // Load preferences
+          const prefs = (profile.preferences || {}) as ProfilePreferences;
+          if (prefs.voice_verbosity) setVerbosity(prefs.voice_verbosity);
+          if (prefs.voice_speed) setSpeechSpeed(prefs.voice_speed);
+          if (prefs.mute_coach !== undefined) setMuteCoach(prefs.mute_coach);
+          if (prefs.high_contrast !== undefined) setHighContrast(prefs.high_contrast);
+          if (prefs.reduced_motion !== undefined) setReducedMotion(prefs.reduced_motion);
+          if (prefs.larger_text !== undefined) setLargerText(prefs.larger_text);
+        }
+      } catch (err) {
+        console.error("[Profile] Failed to load:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadProfile();
+  }, []);
+
+  // Helper to save preferences
+  const savePreferences = async (prefs: Partial<ProfilePreferences>) => {
+    try {
+      const response = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preferences: prefs }),
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleSaveDisplayName = async () => {
+    setSaving(true);
+    try {
+      const response = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ displayName }),
+      });
+
+      if (response.ok) {
+        addToast({
+          title: "Settings updated",
+          description: "Display name saved successfully",
+          variant: "success",
+        });
+      } else {
+        addToast({
+          title: "Error",
+          description: "Failed to save display name",
+          variant: "error",
+        });
+      }
+    } catch {
+      addToast({
+        title: "Error",
+        description: "Failed to save display name",
+        variant: "error",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleChangePassword = () => {
@@ -79,69 +159,75 @@ export default function ProfilePage() {
     });
   };
 
-  const handleVerbosityChange = (value: string | string[]) => {
+  const handleVerbosityChange = async (value: string | string[]) => {
     if (typeof value === "string") {
       setVerbosity(value);
+      const ok = await savePreferences({ voice_verbosity: value });
       addToast({
         title: "Settings updated",
-        description: `Voice verbosity set to ${value} (demo mode - not persisted)`,
-        variant: "success",
+        description: ok ? `Voice verbosity set to ${value}` : "Failed to save preference",
+        variant: ok ? "success" : "error",
       });
     }
   };
 
-  const handleSpeechSpeedChange = (value: string | string[]) => {
+  const handleSpeechSpeedChange = async (value: string | string[]) => {
     if (typeof value === "string") {
       setSpeechSpeed(value);
+      const ok = await savePreferences({ voice_speed: value });
       addToast({
         title: "Settings updated",
-        description: `Speech speed set to ${value} (demo mode - not persisted)`,
-        variant: "success",
+        description: ok ? `Speech speed set to ${value}` : "Failed to save preference",
+        variant: ok ? "success" : "error",
       });
     }
   };
 
-  const handleMuteCoachChange = (checked: boolean) => {
+  const handleMuteCoachChange = async (checked: boolean) => {
     setMuteCoach(checked);
+    const ok = await savePreferences({ mute_coach: checked });
     addToast({
       title: "Settings updated",
-      description: checked
-        ? "Voice coach muted (demo mode - not persisted)"
-        : "Voice coach enabled (demo mode - not persisted)",
-      variant: "success",
+      description: ok
+        ? checked ? "Voice coach muted" : "Voice coach enabled"
+        : "Failed to save preference",
+      variant: ok ? "success" : "error",
     });
   };
 
-  const handleHighContrastChange = (checked: boolean) => {
+  const handleHighContrastChange = async (checked: boolean) => {
     setHighContrast(checked);
+    const ok = await savePreferences({ high_contrast: checked });
     addToast({
       title: "Settings updated",
-      description: checked
-        ? "High contrast mode enabled (demo mode - not persisted)"
-        : "High contrast mode disabled (demo mode - not persisted)",
-      variant: "success",
+      description: ok
+        ? checked ? "High contrast mode enabled" : "High contrast mode disabled"
+        : "Failed to save preference",
+      variant: ok ? "success" : "error",
     });
   };
 
-  const handleReducedMotionChange = (checked: boolean) => {
+  const handleReducedMotionChange = async (checked: boolean) => {
     setReducedMotion(checked);
+    const ok = await savePreferences({ reduced_motion: checked });
     addToast({
       title: "Settings updated",
-      description: checked
-        ? "Reduced motion enabled (demo mode - not persisted)"
-        : "Reduced motion disabled (demo mode - not persisted)",
-      variant: "success",
+      description: ok
+        ? checked ? "Reduced motion enabled" : "Reduced motion disabled"
+        : "Failed to save preference",
+      variant: ok ? "success" : "error",
     });
   };
 
-  const handleLargerTextChange = (checked: boolean) => {
+  const handleLargerTextChange = async (checked: boolean) => {
     setLargerText(checked);
+    const ok = await savePreferences({ larger_text: checked });
     addToast({
       title: "Settings updated",
-      description: checked
-        ? "Larger text enabled (demo mode - not persisted)"
-        : "Larger text disabled (demo mode - not persisted)",
-      variant: "success",
+      description: ok
+        ? checked ? "Larger text enabled" : "Larger text disabled"
+        : "Failed to save preference",
+      variant: ok ? "success" : "error",
     });
   };
 

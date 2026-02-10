@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,6 @@ import {
 } from "@/components/ui/table";
 import { Pagination } from "@/components/ui/pagination";
 import { EmptyState } from "@/components/ui/empty-state";
-import { mockHistorySessions } from "@/lib/mock-data";
 import { Calendar } from "lucide-react";
 import {
   getCategoryIcon,
@@ -32,14 +31,113 @@ import {
 // Items per page
 const ITEMS_PER_PAGE = 10;
 
+interface SessionExercise {
+  exerciseName: string;
+  exerciseSlug: string;
+  category: string;
+  formScore: number;
+  repsCompleted: number;
+}
+
+interface SessionRecord {
+  id: string;
+  date: string;
+  exercises: SessionExercise[] | null;
+  durationSeconds: number;
+  overallFormScore: string | null;
+  createdAt: string;
+}
+
+interface HistorySession {
+  id: string;
+  date: Date;
+  dateString: string;
+  time: string;
+  exercise: string;
+  category: string;
+  reps: number;
+  score: number;
+  duration: string;
+}
+
+function formatRelativeDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const todayStr = now.toISOString().split("T")[0];
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+  if (dateStr === todayStr) return "Today";
+  if (dateStr === yesterdayStr) return "Yesterday";
+
+  const diffDays = Math.floor((now.getTime() - date.getTime()) / 86400000);
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 14) return "1 week ago";
+  return `${Math.floor(diffDays / 7)} weeks ago`;
+}
+
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function transformSessions(records: SessionRecord[]): HistorySession[] {
+  return records.map((record) => {
+    const ex = Array.isArray(record.exercises) ? record.exercises[0] : null;
+    const createdAt = record.createdAt ? new Date(record.createdAt) : new Date(record.date);
+
+    return {
+      id: record.id,
+      date: new Date(record.date),
+      dateString: formatRelativeDate(record.date),
+      time: createdAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+      exercise: ex ? ex.exerciseName : "Exercise",
+      category: ex ? ex.category : "general",
+      reps: ex ? ex.repsCompleted : 0,
+      score: record.overallFormScore ? Math.round(parseFloat(record.overallFormScore)) : 0,
+      duration: formatDuration(record.durationSeconds || 0),
+    };
+  });
+}
+
+function capitalizeFirst(str: string): string {
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+}
+
 export default function HistoryPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [dateRange, setDateRange] = useState("all");
   const [exerciseType, setExerciseType] = useState("all");
+  const [sessions, setSessions] = useState<HistorySession[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch real sessions
+  useEffect(() => {
+    async function fetchSessions() {
+      try {
+        const response = await fetch("/api/patient-records");
+        if (!response.ok) {
+          setLoading(false);
+          return;
+        }
+        const result = await response.json();
+        const data = result.data || result;
+        const records: SessionRecord[] = data?.sessions || [];
+        setSessions(transformSessions(records));
+      } catch (err) {
+        console.error("[History] Failed to fetch sessions:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchSessions();
+  }, []);
 
   // Filter sessions based on selected filters
   const filteredSessions = useMemo(() => {
-    let filtered = [...mockHistorySessions];
+    let filtered = [...sessions];
 
     // Filter by date range
     if (dateRange !== "all") {
@@ -63,7 +161,7 @@ export default function HistoryPage() {
     }
 
     return filtered;
-  }, [dateRange, exerciseType]);
+  }, [sessions, dateRange, exerciseType]);
 
   // Calculate pagination
   const totalPages = Math.ceil(filteredSessions.length / ITEMS_PER_PAGE);
@@ -83,6 +181,19 @@ export default function HistoryPage() {
     setExerciseType(value);
     setCurrentPage(1);
   };
+
+  if (loading) {
+    return (
+      <div className="max-w-5xl mx-auto space-y-6">
+        <div className="space-y-2">
+          <h1 className="text-2xl font-bold text-foreground">Session History</h1>
+          <p className="text-muted-foreground">Loading your sessions...</p>
+        </div>
+        <div className="h-16 rounded-3xl bg-sage-50 animate-pulse" />
+        <div className="h-64 rounded-3xl bg-sage-50 animate-pulse" />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 relative">
@@ -223,15 +334,15 @@ export default function HistoryPage() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div className="p-1.5 bg-sage-50 rounded-lg">
-                          {getCategoryIcon(session.category, "sm")}
+                          {getCategoryIcon(capitalizeFirst(session.category) as "Mobility" | "Strength" | "Stability", "sm")}
                         </div>
                         <div className="space-y-0.5">
                           <div className="font-medium">{session.exercise}</div>
                           <Badge
-                            variant={getCategoryBadgeVariant(session.category)}
+                            variant={getCategoryBadgeVariant(capitalizeFirst(session.category) as "Mobility" | "Strength" | "Stability")}
                             size="sm"
                           >
-                            {session.category}
+                            {capitalizeFirst(session.category)}
                           </Badge>
                         </div>
                       </div>
