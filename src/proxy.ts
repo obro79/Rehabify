@@ -9,7 +9,8 @@ export default function middleware(request: NextRequest) {
   }
 
   // Use Neon Auth middleware for production
-  return neonAuthMiddleware({ loginUrl: '/login' })(request);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return neonAuthMiddleware({ loginUrl: '/login' })(request as any);
 }
 
 export const config = {
