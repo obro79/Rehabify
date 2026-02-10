@@ -13,6 +13,8 @@ interface UseSessionVoiceOptions {
   exercise: Exercise | undefined;
   sessionId: string;
   targetReps: number;
+  nextExercise?: { name: string; slug: string } | null;
+  planName?: string;
 }
 
 interface UseSessionVoiceReturn {
@@ -30,6 +32,8 @@ export function useSessionVoice({
   exercise,
   sessionId,
   targetReps,
+  nextExercise = null,
+  planName,
 }: UseSessionVoiceOptions): UseSessionVoiceReturn {
   const [voicePhase, setVoicePhase] = React.useState<VoicePhase>("explaining");
   const voicePhaseRef = React.useRef<VoicePhase>("explaining");
@@ -64,6 +68,10 @@ export function useSessionVoice({
     isAnalyzing: voicePhase === "analyzing",
     exerciseName: exercise?.name,
     targetReps,
+    nextExercise,
+    planName,
+    commonMistakes: exercise?.common_mistakes,
+    exerciseInstructions: exercise?.instructions,
   });
 
   const voiceState = React.useMemo((): VoiceState => {
