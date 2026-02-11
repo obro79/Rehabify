@@ -81,7 +81,7 @@ export function PlanChat({ planContext, patientName, onAddExercise }: PlanChatPr
     try {
       const response = await fetch("/api/plans/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-demo-role": "pt" },
         body: JSON.stringify({
           message: trimmed,
           planContext,
