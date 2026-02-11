@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ChevronDown, LayoutDashboard, Users } from "lucide-react";
+import { ChevronDown } from "lucide-react";
+import { PTDashboardIcon, ClientsIcon } from "@/components/ui/icons";
 import { Logo } from "@/components/ui/logo";
 import { cn } from "@/lib/utils";
 import type { MockPatient } from "@/lib/mock-data/pt-data";
@@ -10,7 +11,7 @@ import type { MockPatient } from "@/lib/mock-data/pt-data";
 export interface PTNavItem {
   label: string;
   href: string;
-  icon?: React.ComponentType<{ className?: string }>;
+  icon?: React.ReactNode;
 }
 
 export interface PTSidebarNavProps {
@@ -21,8 +22,8 @@ export interface PTSidebarNavProps {
 }
 
 const DEFAULT_NAV_ITEMS: PTNavItem[] = [
-  { label: "Dashboard", href: "/pt/dashboard", icon: LayoutDashboard },
-  { label: "Clients", href: "/pt/clients", icon: Users },
+  { label: "Dashboard", href: "/pt/dashboard", icon: <PTDashboardIcon size="sm" variant="sage" /> },
+  { label: "Clients", href: "/pt/clients", icon: <ClientsIcon size="sm" variant="sage" /> },
 ];
 
 export const PTSidebarNav = React.forwardRef<HTMLElement, PTSidebarNavProps>(
@@ -50,7 +51,6 @@ export const PTSidebarNav = React.forwardRef<HTMLElement, PTSidebarNavProps>(
         <div className="flex flex-col gap-1">
           {DEFAULT_NAV_ITEMS.map((item) => {
             const isActive = activeHref === item.href;
-            const Icon = item.icon;
             const isClientsItem = item.label === "Clients";
 
             return (
@@ -65,7 +65,7 @@ export const PTSidebarNav = React.forwardRef<HTMLElement, PTSidebarNavProps>(
                   )}
                   aria-current={isActive ? "page" : undefined}
                 >
-                  {Icon && <Icon className="h-4 w-4" aria-hidden="true" />}
+                  {item.icon && <span aria-hidden="true">{item.icon}</span>}
                   <span className="flex-1">{item.label}</span>
                   {isClientsItem && patients.length > 0 && (
                     <button

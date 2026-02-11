@@ -2,11 +2,9 @@
 
 import { useMemo, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { StatsCard } from "@/components/ui/stats-card";
 import { PatientList } from "@/components/pt/patient-list";
-import { GuideIcon, UsersIcon, AlertIcon } from "@/components/ui/icons";
-import { SanctuaryBackground } from "@/components/ui/sanctuary-background";
 import { getTimeOfDayGreeting } from "@/lib/date-utils";
+import { UsersIcon, ChartIcon, GuideIcon, AlertIcon } from "@/components/ui/icons";
 import type { MockPatient, Alert } from "@/lib/mock-data/pt-data";
 
 /** Map DB alert types to MockPatient alert types */
@@ -96,32 +94,30 @@ export default function PTDashboardPage() {
     fetchClients();
   }, []);
 
-  // Calculate stats from patient data
   const stats = useMemo(() => {
     const totalPatients = patients.length;
     const pendingReviews = patients.filter(
       (p) => p.currentPlan?.status === "pending_review"
     ).length;
     const patientsWithAlerts = patients.filter((p) => p.alerts.length > 0).length;
+    const activePlans = patients.filter((p) => p.currentPlan != null).length;
 
     return {
       totalPatients,
       pendingReviews,
       patientsWithAlerts,
+      activePlans,
     };
   }, [patients]);
 
-  // Sort patients: alerts first, then by last session date
   const sortedPatients = useMemo(() => {
     return [...patients].sort((a, b) => {
-      // Patients with alerts first
       const aHasAlerts = a.alerts.length > 0;
       const bHasAlerts = b.alerts.length > 0;
 
       if (aHasAlerts && !bHasAlerts) return -1;
       if (!aHasAlerts && bHasAlerts) return 1;
 
-      // Then sort by last session date (most recent first)
       const aDate = a.lastSession?.getTime() ?? 0;
       const bDate = b.lastSession?.getTime() ?? 0;
 
@@ -134,70 +130,62 @@ export default function PTDashboardPage() {
   };
 
   return (
-    <SanctuaryBackground variant="default">
-      <div className="max-w-7xl space-y-8">
-        {/* Welcome Section - Full Width Card */}
-        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-sage-100 via-sage-50 to-white p-8 shadow-sm border border-sage-200/50">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-sage-200/30 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-          <div className="relative">
-            <h1 className="text-2xl font-bold text-foreground">
-              {greeting}, {ptName}!
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              Here&apos;s an overview of your patients today
-            </p>
-          </div>
-        </section>
+    <div className="max-w-7xl mx-auto space-y-8">
+      {/* Header - clean, no gradient */}
+      <div className="pt-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.15em] text-sage-500 mb-1">
+          PT Dashboard
+        </p>
+        <h1 className="text-2xl font-bold text-sage-900 tracking-tight">
+          {greeting}, {ptName}
+        </h1>
+        <p className="text-sm text-sage-500 mt-1">
+          {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+        </p>
+      </div>
 
-      {/* Quick Stats Section */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold text-foreground">Overview</h2>
+      {/* Stats Row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+        <StatTile
+          icon={<UsersIcon size="sm" variant="sage" />}
+          label="Patients"
+          value={stats.totalPatients}
+        />
+        <StatTile
+          icon={<ChartIcon size="sm" variant="sage" />}
+          label="Active Plans"
+          value={stats.activePlans}
+        />
+        <StatTile
+          icon={<GuideIcon size="sm" />}
+          label="Pending Reviews"
+          value={stats.pendingReviews}
+          badge={stats.pendingReviews > 0 ? "Action needed" : undefined}
+          badgeVariant={stats.pendingReviews > 0 ? "amber" : undefined}
+        />
+        <StatTile
+          icon={<AlertIcon size="sm" variant="coral" />}
+          label="Alerts"
+          value={stats.patientsWithAlerts}
+          badge={stats.patientsWithAlerts > 0 ? `${stats.patientsWithAlerts} patient${stats.patientsWithAlerts > 1 ? "s" : ""}` : undefined}
+          badgeVariant={stats.patientsWithAlerts > 0 ? "coral" : undefined}
+        />
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <StatsCard
-            title="Total Patients"
-            value={stats.totalPatients}
-            customIcon={<UsersIcon className="w-5 h-5" />}
-            variant="sage"
-          />
-          <StatsCard
-            title="Pending Reviews"
-            value={stats.pendingReviews}
-            customIcon={<GuideIcon className="w-5 h-5" />}
-            trend={
-              stats.pendingReviews > 0
-                ? { direction: "neutral", value: "Requires attention" }
-                : undefined
-            }
-          />
-          <StatsCard
-            title="Patients with Alerts"
-            value={stats.patientsWithAlerts}
-            customIcon={<AlertIcon className="w-5 h-5" />}
-            variant={stats.patientsWithAlerts > 0 ? "coral" : "default"}
-            trend={
-              stats.patientsWithAlerts > 0
-                ? { direction: "up", value: `${stats.patientsWithAlerts} need review` }
-                : { direction: "neutral", value: "All clear" }
-            }
-          />
-        </div>
-      </section>
-
-      {/* Patient List Section */}
-      <section className="space-y-4">
+      {/* Patient List */}
+      <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">
+            <h2 className="text-base font-semibold text-sage-900">
               Your Patients
             </h2>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs text-sage-500 mt-0.5">
               {loading
-                ? "Loading patients..."
+                ? "Loading..."
                 : stats.patientsWithAlerts > 0
                   ? `${stats.patientsWithAlerts} patient${stats.patientsWithAlerts > 1 ? "s" : ""} with alerts shown first`
                   : patients.length > 0
-                    ? "All patients are progressing well"
+                    ? "All patients progressing well"
                     : "No patients assigned yet"}
             </p>
           </div>
@@ -208,15 +196,52 @@ export default function PTDashboardPage() {
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
-                className="h-40 rounded-2xl bg-sage-100/50 animate-pulse"
+                className="h-40 rounded-2xl bg-sage-50 animate-pulse"
               />
             ))}
           </div>
         ) : (
           <PatientList patients={sortedPatients} onPatientClick={handlePatientClick} />
         )}
-      </section>
       </div>
-    </SanctuaryBackground>
+    </div>
+  );
+}
+
+/* ─── Inline stat tile (pillowy, matches patient cards) ─── */
+
+function StatTile({
+  icon,
+  label,
+  value,
+  badge,
+  badgeVariant,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  badge?: string;
+  badgeVariant?: "amber" | "coral";
+}) {
+  return (
+    <div className="surface-organic p-5 transition-transform duration-200 hover:scale-[1.02]">
+      <div className="flex items-start justify-between mb-3">
+        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+        {icon}
+      </div>
+      <div className="flex items-end justify-between">
+        <span className="text-2xl font-bold text-sage-900 tracking-tight">{value}</span>
+        {badge && (
+          <span className={`
+            text-[10px] font-medium px-2 py-0.5 rounded-full
+            ${badgeVariant === "coral" ? "bg-coral-50 text-coral-600" : ""}
+            ${badgeVariant === "amber" ? "bg-amber-50 text-amber-600" : ""}
+            ${!badgeVariant ? "bg-sage-50 text-sage-600" : ""}
+          `}>
+            {badge}
+          </span>
+        )}
+      </div>
+    </div>
   );
 }

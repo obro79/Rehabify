@@ -28,4 +28,7 @@ export { DumbbellIcon } from "./dumbbell-icon";
 export { ActivityIcon } from "./activity-icon";
 export { ProgressIcon } from "./progress-icon";
 export { ProfileIcon } from "./profile-icon";
+export { PlanIcon } from "./plan-icon";
 export { NASMIcon, CESIcon, PIPEDAIcon, HITLIcon } from "./certification-icons";
+export { PTDashboardIcon } from "./pt-dashboard-icon";
+export { ClientsIcon } from "./clients-icon";
