@@ -19,6 +19,7 @@ import { DAYS_OF_WEEK, getCategoryBadgeVariant } from "./plan-utils";
 
 import exerciseData from "@/lib/exercises/data.json";
 import type { Exercise } from "@/lib/exercises/types";
+import { PlanChat } from "@/components/pt/plan-chat";
 
 // Extract unique categories from exercise data
 const categories = Array.from(
@@ -359,6 +360,32 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
     clearDraftPlan();
     router.push(`/pt/clients/${clientId}`);
   };
+
+  // Handle adding exercise from chat suggestion (by slug)
+  const handleAddExerciseBySlug = (slug: string) => {
+    const exercise = (exerciseData.exercises as Exercise[]).find(
+      (ex) => ex.slug === slug
+    );
+    if (exercise) {
+      handleAddExercise(exercise);
+    }
+  };
+
+  // Build plan context for the chat panel
+  const chatPlanContext = useMemo(() => {
+    if (!draftPlanStructure) return undefined;
+    return {
+      weekCount: draftPlanStructure.weeks.length,
+      currentWeek: selectedWeek,
+      exercises: currentWeek?.exercises.map((ex) => ({
+        name: ex.name,
+        sets: ex.sets,
+        reps: ex.reps,
+        days: ex.days,
+      })),
+      weekFocus: currentWeek?.focus,
+    };
+  }, [draftPlanStructure, selectedWeek, currentWeek]);
 
   // Format category for display
   const formatCategory = (category: string) => {
@@ -805,6 +832,13 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
           </Card>
         </div>
       </main>
+
+      {/* AI Chat Panel */}
+      <PlanChat
+        planContext={chatPlanContext}
+        patientName={patient.name}
+        onAddExercise={handleAddExerciseBySlug}
+      />
     </div>
   );
 }
