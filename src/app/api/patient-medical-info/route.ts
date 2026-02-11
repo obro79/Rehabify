@@ -9,12 +9,13 @@
  */
 
 import { NextRequest } from 'next/server';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { getCurrentUser } from '@/lib/api/auth';
-import { success, error } from '@/lib/api/response';
-import { ErrorCode, handleAPIError } from '@/lib/api/errors';
+import { success } from '@/lib/api/response';
+import { handleAPIError } from '@/lib/api/errors';
+import { getTargetPatientId } from '@/lib/api/patient-access';
 import { validateBody } from '@/lib/api/validation';
-import { db, patientMedicalInfo, profiles } from '@/db';
+import { db, patientMedicalInfo } from '@/db';
 import { z } from 'zod';
 
 const updateMedicalInfoSchema = z.object({
@@ -61,24 +62,7 @@ const updateMedicalInfoSchema = z.object({
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser();
-    const { searchParams } = new URL(request.url);
-    const requestedPatientId = searchParams.get('patientId');
-
-    let targetPatientId: string;
-
-    if (user.role === 'patient') {
-      // Patients can only access their own medical info
-      targetPatientId = user.id;
-    } else if (user.role === 'pt' || user.role === 'admin') {
-      // PTs and admins can access any patient's medical info
-      if (requestedPatientId) {
-        targetPatientId = requestedPatientId;
-      } else {
-        return error(ErrorCode.BAD_REQUEST, 'patientId query parameter is required for PT/admin access');
-      }
-    } else {
-      return error(ErrorCode.FORBIDDEN, 'Unauthorized access');
-    }
+    const targetPatientId = getTargetPatientId(request, user);
 
     // Get medical info
     const [medicalInfo] = await db
@@ -102,24 +86,7 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const user = await getCurrentUser();
-    const { searchParams } = new URL(request.url);
-    const requestedPatientId = searchParams.get('patientId');
-
-    let targetPatientId: string;
-
-    if (user.role === 'patient') {
-      // Patients can only update their own medical info
-      targetPatientId = user.id;
-    } else if (user.role === 'pt' || user.role === 'admin') {
-      // PTs and admins can update any patient's medical info
-      if (requestedPatientId) {
-        targetPatientId = requestedPatientId;
-      } else {
-        return error(ErrorCode.BAD_REQUEST, 'patientId query parameter is required for PT/admin access');
-      }
-    } else {
-      return error(ErrorCode.FORBIDDEN, 'Unauthorized access');
-    }
+    const targetPatientId = getTargetPatientId(request, user);
 
     // Validate request body
     const body = await validateBody(request, updateMedicalInfoSchema);

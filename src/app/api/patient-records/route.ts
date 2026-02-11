@@ -11,8 +11,9 @@
 import { NextRequest } from 'next/server';
 import { eq, desc } from 'drizzle-orm';
 import { getCurrentUser } from '@/lib/api/auth';
-import { success, error } from '@/lib/api/response';
-import { ErrorCode, handleAPIError } from '@/lib/api/errors';
+import { success } from '@/lib/api/response';
+import { handleAPIError } from '@/lib/api/errors';
+import { getTargetPatientId } from '@/lib/api/patient-access';
 import { db, assessments, plans, sessions } from '@/db';
 
 /**
@@ -25,24 +26,7 @@ import { db, assessments, plans, sessions } from '@/db';
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser();
-    const { searchParams } = new URL(request.url);
-    const requestedPatientId = searchParams.get('patientId');
-
-    let targetPatientId: string;
-
-    if (user.role === 'patient') {
-      // Patients can only access their own records
-      targetPatientId = user.id;
-    } else if (user.role === 'pt' || user.role === 'admin') {
-      // PTs and admins can access any patient's records
-      if (requestedPatientId) {
-        targetPatientId = requestedPatientId;
-      } else {
-        return error(ErrorCode.BAD_REQUEST, 'patientId query parameter is required for PT/admin access');
-      }
-    } else {
-      return error(ErrorCode.FORBIDDEN, 'Unauthorized access');
-    }
+    const targetPatientId = getTargetPatientId(request, user);
 
     // Fetch all records in parallel
     const [patientAssessments, patientPlans, patientSessions] = await Promise.all([

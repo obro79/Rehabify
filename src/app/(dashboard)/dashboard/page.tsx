@@ -5,8 +5,9 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { getExerciseById } from "@/lib/exercises";
+import { getExerciseById, getExerciseBySlug, toCardData } from "@/lib/exercises";
 import type { PlanStructure } from "@/lib/gemini/types";
+import type { ExerciseCardData } from "@/lib/exercises/types";
 import { Badge } from "@/components/ui/badge";
 import { StreakDisplay } from "@/components/ui/streak-display";
 import { StatsCard } from "@/components/ui/stats-card";
@@ -29,12 +30,7 @@ import {
 import {
   ArrowRight,
 } from "lucide-react";
-import {
-  mockExercises,
-  mockSessions,
-  mockWeeklyActivity,
-  motivationalQuotes,
-} from "@/lib/mock-data";
+import { motivationalQuotes } from "@/lib/mock-data";
 import {
   getCategoryIcon,
   getExerciseIconOrCategory,
@@ -43,13 +39,7 @@ import {
   getExerciseImage,
 } from "@/lib/exercise-utils";
 import { FadeIn, StaggerContainer, StaggerItem } from "@/components/motion";
-
-function getTimeOfDayGreeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
-}
+import { getTimeOfDayGreeting } from "@/lib/date-utils";
 
 function getDifficultyBadgeVariant(difficulty: string): "easy" | "medium" | "hard" {
   switch (difficulty) {
@@ -64,141 +54,234 @@ function getDifficultyBadgeVariant(difficulty: string): "easy" | "medium" | "har
   }
 }
 
+interface ProfileData {
+  displayName?: string;
+  xp: number;
+  level: number;
+  currentStreak: number;
+  longestStreak: number;
+}
+
+interface SessionRecord {
+  id: string;
+  date: string;
+  exercises: Array<{
+    exerciseName: string;
+    exerciseSlug: string;
+    category: string;
+    formScore: number;
+    repsCompleted: number;
+  }> | null;
+  durationSeconds: number;
+  overallFormScore: string | null;
+  status: string;
+}
+
+function formatRelativeDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const todayStr = now.toISOString().split("T")[0];
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+  if (dateStr === todayStr) return "Today";
+  if (dateStr === yesterdayStr) return "Yesterday";
+
+  const diffDays = Math.floor((now.getTime() - date.getTime()) / 86400000);
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 14) return "1 week ago";
+  return `${Math.floor(diffDays / 7)} weeks ago`;
+}
+
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
-  const userName = "Sarah";
   const quote = motivationalQuotes[0];
   const greeting = getTimeOfDayGreeting();
+
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [planExercises, setPlanExercises] = useState<ExerciseCardData[]>([]);
+  const [recentSessions, setRecentSessions] = useState<SessionRecord[]>([]);
+  const [weeklyActivity, setWeeklyActivity] = useState<Array<{ date: string; completed: boolean }>>([]);
+  const [weeklyStats, setWeeklyStats] = useState({ sessions: 0, goal: 7, totalReps: 0, totalMinutes: 0 });
+  const [avgFormScore, setAvgFormScore] = useState(0);
   const [firstExerciseSlug, setFirstExerciseSlug] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Fetch user's plan and get first exercise, create default if none exists
   useEffect(() => {
-    async function fetchFirstExercise() {
+    async function loadDashboardData() {
       try {
-        const response = await fetch("/api/patient-records");
-        if (!response.ok) {
-          // Try to create a default plan
-          await createDefaultPlan();
-          return;
+        // Fetch profile and patient records in parallel
+        const [profileRes, recordsRes] = await Promise.all([
+          fetch("/api/profile"),
+          fetch("/api/patient-records"),
+        ]);
+
+        // Process profile
+        if (profileRes.ok) {
+          const profileResult = await profileRes.json();
+          const p = profileResult.data || profileResult;
+          setProfile({
+            displayName: p.displayName || p.name,
+            xp: p.xp ?? 0,
+            level: p.level ?? 1,
+            currentStreak: p.currentStreak ?? 0,
+            longestStreak: p.longestStreak ?? 0,
+          });
         }
 
-        const result = await response.json();
+        // Process records
+        if (recordsRes.ok) {
+          const recordsResult = await recordsRes.json();
+          const data = recordsResult.data || recordsResult;
 
-        // API returns { data: { plans: [...], assessments: [...], sessions: [...] } }
-        const data = result.data || result;
+          // Process plans -> exercises for "Today's Recommended Exercises"
+          const plans = data?.plans || [];
+          if (plans.length > 0) {
+            const activePlan = plans.find(
+              (p: { status: string }) => p.status === "approved"
+            ) || plans[0];
 
-        if (!data) {
-          await createDefaultPlan();
-          return;
-        }
+            if (activePlan?.structure) {
+              let structure: PlanStructure;
+              if (typeof activePlan.structure === "string") {
+                structure = JSON.parse(activePlan.structure);
+              } else {
+                structure = activePlan.structure as PlanStructure;
+              }
 
-        const plans = data.plans || [];
+              if (structure?.weeks?.[0]?.exercises) {
+                const week = structure.weeks[0];
+                const sorted = [...week.exercises].sort((a, b) => a.order - b.order);
 
-        if (plans.length === 0) {
-          // No plans exist, create a default one
-          await createDefaultPlan();
-          return;
-        }
+                // Convert plan exercises to card data
+                const cards: ExerciseCardData[] = [];
+                for (const planEx of sorted) {
+                  const ex = planEx.exerciseSlug
+                    ? getExerciseBySlug(planEx.exerciseSlug)
+                    : planEx.exerciseId
+                    ? getExerciseById(planEx.exerciseId)
+                    : undefined;
 
-        // Get the most recent approved plan, or first plan if none approved
-        const activePlan = plans.find(
-          (plan: { status: string }) => plan.status === "approved"
-        ) || plans[0];
+                  if (ex) {
+                    cards.push(toCardData(ex));
+                  }
+                }
 
-        if (!activePlan?.structure) {
-          await createDefaultPlan();
-          return;
-        }
-
-        // Parse structure if it's a string (JSONB from database might be stringified)
-        let structure: PlanStructure;
-        if (typeof activePlan.structure === 'string') {
-          try {
-            structure = JSON.parse(activePlan.structure);
-          } catch (e) {
-            console.error("[Dashboard] Failed to parse plan structure:", e);
-            await createDefaultPlan();
-            return;
+                if (cards.length > 0) {
+                  setPlanExercises(cards);
+                  setFirstExerciseSlug(cards[0].slug);
+                } else {
+                  setFirstExerciseSlug("bodyweight-squat");
+                }
+              }
+            }
           }
-        } else {
-          structure = activePlan.structure as PlanStructure;
-        }
 
-        // Validate structure has weeks
-        if (!structure?.weeks || !Array.isArray(structure.weeks) || structure.weeks.length === 0) {
-          await createDefaultPlan();
-          return;
-        }
-
-        // Get first week
-        const firstWeek = structure.weeks[0];
-
-        if (!firstWeek?.exercises || !Array.isArray(firstWeek.exercises) || firstWeek.exercises.length === 0) {
-          await createDefaultPlan();
-          return;
-        }
-
-        // Get first exercise (sorted by order)
-        const sortedExercises = [...firstWeek.exercises].sort(
-          (a, b) => (a.order || 0) - (b.order || 0)
-        );
-        const firstExercise = sortedExercises[0];
-
-        if (!firstExercise) {
-          await createDefaultPlan();
-          return;
-        }
-
-        // Use exerciseSlug if available, otherwise look up by exerciseId
-        let slug = firstExercise.exerciseSlug;
-        if (!slug && firstExercise.exerciseId) {
-          const exercise = getExerciseById(firstExercise.exerciseId);
-          if (exercise?.slug) {
-            slug = exercise.slug;
+          if (planExercises.length === 0 && firstExerciseSlug === null) {
+            // Fallback: try to create default plan
+            try {
+              await fetch("/api/plans/create-default", { method: "POST" });
+              setFirstExerciseSlug("bodyweight-squat");
+            } catch {
+              setFirstExerciseSlug("bodyweight-squat");
+            }
           }
-        }
 
-        if (slug) {
-          setFirstExerciseSlug(slug);
-        } else {
-          // Fallback to cat-camel if slug not found
-          setFirstExerciseSlug('cat-camel');
+          // Process sessions
+          const sessions: SessionRecord[] = data?.sessions || [];
+          setRecentSessions(sessions.slice(0, 5));
+
+          // Calculate weekly stats
+          const now = new Date();
+          const oneWeekAgo = new Date(now.getTime() - 7 * 86400000);
+          const thisWeekSessions = sessions.filter(
+            (s: SessionRecord) => new Date(s.date) >= oneWeekAgo
+          );
+
+          let totalReps = 0;
+          let totalSeconds = 0;
+          let formScoreSum = 0;
+          let formScoreCount = 0;
+
+          for (const s of thisWeekSessions) {
+            totalSeconds += s.durationSeconds || 0;
+            if (s.overallFormScore) {
+              formScoreSum += parseFloat(s.overallFormScore);
+              formScoreCount++;
+            }
+            if (Array.isArray(s.exercises)) {
+              for (const ex of s.exercises) {
+                totalReps += ex.repsCompleted || 0;
+              }
+            }
+          }
+
+          setWeeklyStats({
+            sessions: thisWeekSessions.length,
+            goal: 7,
+            totalReps,
+            totalMinutes: Math.round(totalSeconds / 60),
+          });
+
+          setAvgFormScore(formScoreCount > 0 ? Math.round(formScoreSum / formScoreCount) : 0);
+
+          // Build weekly activity calendar
+          const activityDays: Array<{ date: string; completed: boolean }> = [];
+          for (let i = 6; i >= 0; i--) {
+            const d = new Date(now.getTime() - i * 86400000);
+            const dateStr = d.toISOString().split("T")[0];
+            const hasSession = sessions.some(
+              (s: SessionRecord) => s.date === dateStr
+            );
+            activityDays.push({ date: dateStr, completed: hasSession });
+          }
+          setWeeklyActivity(activityDays);
         }
-      } catch (error) {
-        console.error("[Dashboard] Failed to fetch plan:", error);
-        // Try to create default plan as fallback
-        await createDefaultPlan();
+      } catch (err) {
+        console.error("[Dashboard] Failed to load data:", err);
+        setFirstExerciseSlug("bodyweight-squat");
+      } finally {
+        setLoading(false);
       }
     }
 
-    async function createDefaultPlan() {
-      try {
-        const response = await fetch("/api/plans/create-default", {
-          method: "POST",
-        });
-
-        if (response.ok) {
-          // Default plan created, set slug to cat-camel
-          setFirstExerciseSlug('cat-camel');
-        } else {
-          // If creation fails, still set to cat-camel as fallback
-          setFirstExerciseSlug('cat-camel');
-        }
-      } catch (error) {
-        console.error("[Dashboard] Failed to create default plan:", error);
-        // Still set to cat-camel as fallback
-        setFirstExerciseSlug('cat-camel');
-      }
-    }
-
-    fetchFirstExercise();
+    loadDashboardData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleStartRoutine = () => {
-    // Use first exercise slug if available, otherwise default to cat-camel
-    const slug = firstExerciseSlug || 'cat-camel';
+    const slug = firstExerciseSlug || "bodyweight-squat";
     router.push(`/workout/${slug}`);
   };
+
+  const userName = profile?.displayName || "there";
+  const daysCompleted = weeklyActivity.filter((d) => d.completed).length;
+  const daysRemaining = 7 - daysCompleted;
+
+  if (loading) {
+    return (
+      <div className="max-w-5xl mx-auto space-y-8">
+        <div className="h-32 rounded-3xl bg-sage-50 animate-pulse" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-48 rounded-3xl bg-sage-50 animate-pulse" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-32 rounded-3xl bg-sage-50 animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 relative">
@@ -220,7 +303,10 @@ export default function DashboardPage() {
               </p>
             </div>
             <div className="bg-white/80 backdrop-blur rounded-3xl p-4 shadow-sm">
-              <StreakDisplay currentStreak={5} bestStreak={12} />
+              <StreakDisplay
+                currentStreak={profile?.currentStreak ?? 0}
+                bestStreak={profile?.longestStreak ?? 0}
+              />
             </div>
           </div>
         </section>
@@ -238,15 +324,21 @@ export default function DashboardPage() {
                 Based on your progress and recovery goals
               </p>
             </div>
-            <Button variant="primary" onClick={handleStartRoutine}>
-              Start Full Routine
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-3">
+              <Link href="/plan" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                View Full Plan
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Button variant="primary" onClick={handleStartRoutine}>
+                Start Full Routine
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </FadeIn>
 
         <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {mockExercises.map((exercise) => (
+          {planExercises.map((exercise) => (
             <StaggerItem key={exercise.name}>
               <Card
                 variant="organic"
@@ -312,18 +404,16 @@ export default function DashboardPage() {
           <StaggerItem>
             <StatsCard
               title="Sessions Completed"
-              value="4/7"
+              value={`${weeklyStats.sessions}/${weeklyStats.goal}`}
               customIcon={<CalendarIcon size="sm" variant="sage" />}
-              trend={{ direction: "up", value: "+1 from last week" }}
               className="h-full"
             />
           </StaggerItem>
           <StaggerItem>
             <StatsCard
               title="Total Reps"
-              value={120}
+              value={weeklyStats.totalReps}
               customIcon={<RepsIcon size="sm" variant="sage" />}
-              trend={{ direction: "up", value: "+15%" }}
               variant="sage"
               className="h-full"
             />
@@ -331,7 +421,7 @@ export default function DashboardPage() {
           <StaggerItem>
             <StatsCard
               title="Time Exercising"
-              value="45 min"
+              value={`${weeklyStats.totalMinutes} min`}
               customIcon={<TimerIcon size="sm" variant="coral" />}
               variant="coral"
               className="h-full"
@@ -346,17 +436,14 @@ export default function DashboardPage() {
                 <span className="text-sm text-muted-foreground">Last 7 days</span>
               </div>
               <div className="flex items-center gap-6">
-                <ProgressRing value={82} size="lg" />
+                <ProgressRing value={avgFormScore} size="lg" />
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">
-                    Your form has improved!
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="success" size="sm">+5%</Badge>
-                    <span className="text-sm text-muted-foreground">vs last week</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Focus area: Hip alignment
+                    {avgFormScore > 0
+                      ? avgFormScore >= 80
+                        ? "Your form is looking great!"
+                        : "Keep working on your form"
+                      : "Complete a session to see your score"}
                   </p>
                 </div>
               </div>
@@ -367,11 +454,13 @@ export default function DashboardPage() {
             <Card variant="organic" className="p-6 h-full">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold">Weekly Activity</h3>
-                <span className="text-sm text-muted-foreground">4 of 7 days</span>
+                <span className="text-sm text-muted-foreground">{daysCompleted} of 7 days</span>
               </div>
-              <WeeklyCalendar activities={mockWeeklyActivity} startOfWeek="monday" />
+              <WeeklyCalendar activities={weeklyActivity} startOfWeek="monday" />
               <p className="text-sm text-muted-foreground mt-4">
-                Keep going! Just 3 more days to hit your weekly goal.
+                {daysRemaining > 0
+                  ? `Keep going! Just ${daysRemaining} more day${daysRemaining > 1 ? "s" : ""} to hit your weekly goal.`
+                  : "Amazing! You hit your weekly goal!"}
               </p>
             </Card>
           </StaggerItem>
@@ -401,26 +490,46 @@ export default function DashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mockSessions.map((session, i) => (
-                  <TableRow key={i} className="cursor-pointer hover:bg-sage-50/50 transition-colors">
-                    <TableCell className="text-muted-foreground">{session.date}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="p-1.5 bg-sage-50 rounded-lg">
-                          {getCategoryIcon(session.category, "sm")}
-                        </div>
-                        <span className="font-medium">{session.exercise}</span>
-                      </div>
+                {recentSessions.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                      No sessions yet. Start your first workout!
                     </TableCell>
-                    <TableCell className="text-center">{session.reps}</TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant={getScoreBadgeVariant(session.score)} size="sm">
-                        {session.score}%
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">{session.duration}</TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  recentSessions.map((session) => {
+                    const ex = Array.isArray(session.exercises) ? session.exercises[0] : null;
+                    const exerciseName = ex ? ex.exerciseName : "Exercise";
+                    const category = ex ? ex.category : "general";
+                    const reps = ex ? ex.repsCompleted : 0;
+                    const score = session.overallFormScore ? parseFloat(session.overallFormScore) : 0;
+
+                    return (
+                      <TableRow key={session.id} className="cursor-pointer hover:bg-sage-50/50 transition-colors">
+                        <TableCell className="text-muted-foreground">
+                          {formatRelativeDate(session.date)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div className="p-1.5 bg-sage-50 rounded-lg">
+                              {getCategoryIcon(category as "Mobility" | "Strength" | "Stability", "sm")}
+                            </div>
+                            <span className="font-medium">{exerciseName}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">{reps}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant={getScoreBadgeVariant(Math.round(score))} size="sm">
+                            {Math.round(score)}%
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {formatDuration(session.durationSeconds || 0)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
               </TableBody>
             </Table>
           </Card>

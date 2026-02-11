@@ -108,7 +108,6 @@ describe('voice-store', () => {
       content: 'Test message',
       timestamp: Date.now(),
     });
-    store.setLastSpokenFeedback('Great form!');
     store.setMuted(true);
 
     // Verify state is modified
@@ -118,7 +117,6 @@ describe('voice-store', () => {
     expect(modifiedState.speakingStatus).toBe('speaking');
     expect(modifiedState.volumeLevel).toBe(0.8);
     expect(modifiedState.transcript).toHaveLength(1);
-    expect(modifiedState.lastSpokenFeedback).toBe('Great form!');
     expect(modifiedState.isMuted).toBe(true);
 
     // Reset and verify all values return to initial state
@@ -129,7 +127,6 @@ describe('voice-store', () => {
     expect(resetState.speakingStatus).toBe('idle');
     expect(resetState.volumeLevel).toBe(0);
     expect(resetState.transcript).toHaveLength(0);
-    expect(resetState.lastSpokenFeedback).toBe(null);
     expect(resetState.isMuted).toBe(false);
   });
 });

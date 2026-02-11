@@ -7,6 +7,7 @@
  */
 
 import type { SessionState } from '@/stores/session-store';
+import { SESSION_CONFIG } from '@/config/session';
 
 export const STORAGE_KEYS = {
   session: 'rehabify_session',
@@ -14,7 +15,7 @@ export const STORAGE_KEYS = {
 } as const;
 
 /** Time window during which a session can be resumed (5 minutes) */
-export const RESUME_WINDOW_MS = 5 * 60 * 1000;
+export const RESUME_WINDOW_MS = SESSION_CONFIG.RESUME_WINDOW_MS;
 
 /**
  * Extract only the state properties (no actions) from a full store state.

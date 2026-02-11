@@ -1,28 +1,25 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { Conversation } from '@/stores/message-store';
+import { formatRelativeTime } from '@/lib/date-utils';
+
+interface Conversation {
+  otherId: string;
+  otherName: string;
+  otherAvatarUrl: string | null;
+  unreadCount: number;
+  lastMessage: {
+    content: string;
+    senderRole: 'pt' | 'patient';
+    createdAt: string;
+  } | null;
+}
 
 interface MessageInboxProps {
   conversations: Conversation[];
   activeConversationId: string | null;
   onSelectConversation: (id: string) => void;
   isLoading?: boolean;
-}
-
-function formatRelativeTime(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / (1000 * 60));
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
 function ConversationCard({

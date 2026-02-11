@@ -248,4 +248,36 @@ describe('schemas helpers', () => {
       expect(schemas.dateString.safeParse('not-a-date').success).toBe(false);
     });
   });
+
+  describe('messageContent', () => {
+    it('validates valid message content', () => {
+      const result = schemas.messageContent.safeParse({ content: 'Hello, world!' });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.content).toBe('Hello, world!');
+      }
+    });
+
+    it('rejects empty content', () => {
+      const result = schemas.messageContent.safeParse({ content: '' });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects missing content', () => {
+      const result = schemas.messageContent.safeParse({});
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects content exceeding 2000 characters', () => {
+      const longContent = 'a'.repeat(2001);
+      const result = schemas.messageContent.safeParse({ content: longContent });
+      expect(result.success).toBe(false);
+    });
+
+    it('accepts content at exactly 2000 characters', () => {
+      const maxContent = 'a'.repeat(2000);
+      const result = schemas.messageContent.safeParse({ content: maxContent });
+      expect(result.success).toBe(true);
+    });
+  });
 });

@@ -18,6 +18,7 @@ import { RepsIcon, TimerIcon, TrophyIcon } from "@/components/ui/icons";
 import { CelebrationAnimation } from "@/components/ui/celebration-animation";
 import { SanctuaryBackground } from "@/components/ui/sanctuary-background";
 import { getExerciseBySlug } from "@/lib/exercises";
+import { getFormScoreColor, getFormFeedback } from "@/lib/exercise-utils";
 
 
 // Mock data - in production this would come from session state/API
@@ -41,24 +42,33 @@ const MOCK_SESSION_DATA = {
     { metric: "Movement Pace", score: 88, feedback: "Great control" },
   ],
   coachSummary:
-    "Excellent session! Your form is improving significantly. Focus on maintaining control throughout the entire range of motion next time. Overall, this was a great workout!",
-  nextExercise: {
-    name: "Cobra Extension",
-    slug: "cobra-stretch",
-    duration: "5 min",
-  },
+    "Great session! Keep focusing on maintaining control throughout the entire range of motion. Your form is looking solid!",
 };
 
-function getFormScoreMessage(score: number): string {
-  if (score >= 90) return "Perfect form!";
-  if (score >= 80) return "Great form!";
-  if (score >= 70) return "Good work!";
-  if (score >= 60) return "Keep practicing!";
-  return "Review the basics";
+interface SessionResult {
+  session: {
+    id: string;
+    durationSeconds: number;
+    overallFormScore: string;
+    xpEarned: number;
+  };
+  stats: {
+    xpEarned: number;
+    totalXP: number;
+    level: number;
+    levelProgress: number;
+    nextLevelXP: number;
+    currentStreak: number;
+    longestStreak: number;
+  };
 }
 
-function getFormScoreColor(score: number): "sage" | "coral" {
-  return score >= 70 ? "sage" : "coral";
+interface PlanContextData {
+  planName: string;
+  exercises: Array<{ name: string; exerciseSlug: string }>;
+  currentIndex: number;
+  totalExercises: number;
+  nextExercise?: { name: string; slug: string };
 }
 
 export default function SessionCompletePage() {
@@ -79,18 +89,47 @@ function SessionCompleteContent() {
   const slug = params.slug as string;
   const [isFormBreakdownOpen, setIsFormBreakdownOpen] = React.useState(false);
   const [showCelebration, setShowCelebration] = React.useState(true);
-  const [user, setUser] = React.useState<any>(null);
+  const [user, setUser] = React.useState<{ displayName?: string; name?: string } | null>(null);
+  const [sessionResult, setSessionResult] = React.useState<SessionResult | null>(null);
+  const [planCtx, setPlanCtx] = React.useState<PlanContextData | null>(null);
 
+  // Load session result and plan context from sessionStorage
+  React.useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem("lastSessionResult");
+      if (stored) {
+        setSessionResult(JSON.parse(stored));
+        sessionStorage.removeItem("lastSessionResult");
+      }
+    } catch { /* ignore */ }
+
+    try {
+      const storedPlan = sessionStorage.getItem("lastPlanContext");
+      if (storedPlan) {
+        setPlanCtx(JSON.parse(storedPlan));
+        sessionStorage.removeItem("lastPlanContext");
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  // Fetch user profile
   React.useEffect(() => {
     async function fetchUser() {
       try {
-        const response = await fetch("/api/auth/me");
+        const response = await fetch("/api/profile");
         if (response.ok) {
           const result = await response.json();
           setUser(result.data || result);
         }
-      } catch (error) {
-        console.error("Failed to fetch user in completion page:", error);
+      } catch {
+        // Try fallback
+        try {
+          const response = await fetch("/api/auth/me");
+          if (response.ok) {
+            const result = await response.json();
+            setUser(result.data || result);
+          }
+        } catch { /* ignore */ }
       }
     }
     fetchUser();
@@ -100,29 +139,47 @@ function SessionCompleteContent() {
   const exerciseName = exercise?.name || "Exercise";
   const userName = user?.displayName || user?.name || "there";
 
-  // Get score and reps from query params, fallback to mock
+  // Get score and reps from query params
   const urlScore = searchParams.get("score");
   const urlReps = searchParams.get("reps");
-  
-  const formScore = urlScore ? parseInt(urlScore) : MOCK_SESSION_DATA.formScore;
-  const repsCompleted = urlReps ? parseInt(urlReps) : MOCK_SESSION_DATA.repsCompleted;
 
-  const {
-    targetReps,
-    duration,
-    xpEarned,
-    currentLevel,
-    levelProgress,
-    currentXP,
-    nextLevelXP,
-    currentStreak,
-    bestStreak,
-    formBreakdown,
-    coachSummary,
-    nextExercise,
-  } = MOCK_SESSION_DATA;
+  const formScore = urlScore ? parseInt(urlScore) : 85;
+  const repsCompleted = urlReps ? parseInt(urlReps) : 10;
+  const targetReps = exercise?.default_reps || 10;
 
-  const formScoreMessage = getFormScoreMessage(formScore);
+  // Use real data from session result, with sensible fallbacks
+  const stats = sessionResult?.stats;
+  const xpEarned = stats?.xpEarned ?? repsCompleted * 10;
+  const currentLevel = stats?.level ?? 1;
+  const levelProgress = stats?.levelProgress ?? 0;
+  const currentXP = stats?.totalXP ?? 0;
+  const nextLevelXP = stats?.nextLevelXP ?? 500;
+  const currentStreak = stats?.currentStreak ?? 1;
+  const bestStreak = stats?.longestStreak ?? 1;
+
+  // Format duration from session
+  const durationSeconds = sessionResult?.session?.durationSeconds ?? 0;
+  const duration = durationSeconds > 0
+    ? `${Math.floor(durationSeconds / 60)}:${String(durationSeconds % 60).padStart(2, "0")}`
+    : "0:00";
+
+  // Next exercise from plan context
+  const nextExercise = React.useMemo(() => {
+    if (planCtx?.nextExercise) {
+      return {
+        name: planCtx.nextExercise.name,
+        slug: planCtx.nextExercise.slug,
+      };
+    }
+    // Fallback: go to dashboard
+    return {
+      name: "Dashboard",
+      slug: "/dashboard",
+    };
+  }, [planCtx]);
+
+  const { formBreakdown, coachSummary } = FALLBACK_DATA;
+  const formScoreMessage = getFormFeedback(formScore);
   const formScoreColor = getFormScoreColor(formScore);
 
   return (
@@ -363,12 +420,14 @@ function SessionCompleteContent() {
               className="h-auto flex-col gap-2 py-4 rounded-3xl"
               asChild
             >
-              <Link href={`/workout/${nextExercise.slug}`}>
+              <Link href={nextExercise.slug.startsWith('/') ? nextExercise.slug : `/workout/${nextExercise.slug}`}>
                 <ArrowRight size={24} />
                 <span className="font-medium">Next Exercise</span>
-                <span className="text-xs opacity-90">
-                  {nextExercise.name}
-                </span>
+                {nextExercise.name !== "Dashboard" && (
+                  <span className="text-xs opacity-90">
+                    {nextExercise.name}
+                  </span>
+                )}
               </Link>
             </Button>
 

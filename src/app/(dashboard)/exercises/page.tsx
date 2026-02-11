@@ -28,30 +28,12 @@ import {
 } from "@/lib/exercise-utils";
 import { FadeIn, StaggerContainer, StaggerItem } from "@/components/motion";
 import { AnimatePresence } from "framer-motion";
-
-// Constants
-const CATEGORIES = [
-  { value: "all", label: "All" },
-  { value: "mobility", label: "Mobility" },
-  { value: "strengthening", label: "Strength" },
-  { value: "core_stability", label: "Stability" },
-  { value: "stretch", label: "Stretch" },
-] as const;
-
-const BODY_PARTS = [
-  { value: "all", label: "All Body Parts" },
-  { value: "lower_back", label: "Back" },
-  { value: "knee", label: "Knee" },
-] as const;
-
-const DIFFICULTIES = [
-  { value: "all", label: "All Difficulties" },
-  { value: "beginner", label: "Beginner" },
-  { value: "intermediate", label: "Intermediate" },
-  { value: "advanced", label: "Advanced" },
-] as const;
-
-const ITEMS_PER_PAGE = 24;
+import {
+  CATEGORIES,
+  BODY_PARTS,
+  DIFFICULTIES,
+  ITEMS_PER_PAGE,
+} from "./_components/constants";
 
 function getDifficultyLevel(difficulty: string): number {
   return DIFFICULTY_LEVELS[difficulty as keyof typeof DIFFICULTY_LEVELS] ?? 2;

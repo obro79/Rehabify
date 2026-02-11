@@ -81,7 +81,6 @@ export function ExerciseCamera({
   const incrementRep = useExerciseStore((state) => state.incrementRep);
   const clearAllErrors = useExerciseStore((state) => state.clearAllErrors);
   const addError = useExerciseStore((state) => state.addError);
-  const updateLastFrame = useExerciseStore((state) => state.updateLastFrame);
 
   React.useEffect(() => {
     engineRef.current = createFormEngine(exercise);
@@ -221,7 +220,6 @@ export function ExerciseCamera({
               setConfidence(analysis.confidence);
               clearAllErrors();
               analysis.errors.forEach((error) => addError(error));
-              updateLastFrame();
 
               // Update debug values if available
               if (analysis.debug) {
@@ -258,7 +256,6 @@ export function ExerciseCamera({
     status,
     addError,
     clearAllErrors,
-    updateLastFrame,
   ]);
 
   const activeFeedback = feedback || formFeedback;

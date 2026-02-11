@@ -91,8 +91,7 @@ export default {
   			}
   		},
   		borderRadius: {
-  			pill: '9999px',
-  			lg: 'var(--radius)',
+    			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)'
   		},

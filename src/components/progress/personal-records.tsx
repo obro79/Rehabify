@@ -31,7 +31,7 @@ const PersonalRecordsSection = React.forwardRef<HTMLDivElement, PersonalRecordsS
         <StatsCard
           title="Best Form Score"
           value={data.bestScore.score}
-          icon={Trophy}
+          customIcon={<Trophy className="w-5 h-5" />}
           variant="sage"
           trend={{
             direction: "neutral",
@@ -42,21 +42,21 @@ const PersonalRecordsSection = React.forwardRef<HTMLDivElement, PersonalRecordsS
         <StatsCard
           title="Longest Streak"
           value={`${data.longestStreak} days`}
-          icon={Flame}
+          customIcon={<Flame className="w-5 h-5" />}
           variant="coral"
         />
 
         <StatsCard
           title="Total Sessions"
           value={data.totalSessions}
-          icon={Activity}
+          customIcon={<Activity className="w-5 h-5" />}
           variant="default"
         />
 
         <StatsCard
           title="Total Time"
           value={formattedTotalTime}
-          icon={Clock}
+          customIcon={<Clock className="w-5 h-5" />}
           variant="default"
         />
       </div>

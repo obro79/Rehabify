@@ -144,7 +144,6 @@ describe('Exercise Store', () => {
       });
       store.setInPosition(true);
       store.setConfidence(0.95);
-      store.updateLastFrame();
 
       // Verify state was modified
       let state = useExerciseStore.getState();
@@ -154,7 +153,6 @@ describe('Exercise Store', () => {
       expect(state.activeErrors).toHaveLength(1);
       expect(state.isInPosition).toBe(true);
       expect(state.confidence).toBe(0.95);
-      expect(state.lastFrameAt).not.toBeNull();
 
       // Reset
       store.reset();
@@ -168,7 +166,6 @@ describe('Exercise Store', () => {
       expect(state.activeErrors).toHaveLength(0);
       expect(state.isInPosition).toBe(false);
       expect(state.confidence).toBe(0);
-      expect(state.lastFrameAt).toBeNull();
     });
   });
 });

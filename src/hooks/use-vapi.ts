@@ -26,8 +26,8 @@ export interface UseVapiOptions {
 }
 
 export interface UseVapiReturn {
-  /** Start a voice call with the assistant */
-  start: (overrideAssistantId?: string, metadata?: Record<string, unknown>) => Promise<void>;
+  /** Start a voice call with an assistant ID or inline config */
+  start: (assistantIdOrConfig?: string | Record<string, unknown>, metadata?: Record<string, unknown>) => Promise<void>;
   /** Stop the current call */
   stop: () => void;
   /** Speak text immediately (bypasses LLM) */
@@ -103,7 +103,6 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
   // Initialize Vapi SDK
   useEffect(() => {
     if (!isVoiceEnabled) {
-      console.log('[useVapi] Voice disabled by config');
       return;
     }
 
@@ -123,14 +122,12 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
 
       // Connection events
       vapi.on('call-start', () => {
-        console.log('[useVapi] Call started');
         setConnectionState('connected');
         setSpeakingStatus('listening');
         onConnectionChangeRef.current?.(true);
       });
 
       vapi.on('call-end', () => {
-        console.log('[useVapi] Call ended');
         setConnectionState('disconnected');
         setSpeakingStatus('idle');
         onConnectionChangeRef.current?.(false);
@@ -138,12 +135,10 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
 
       // Speech events
       vapi.on('speech-start', () => {
-        console.log('[useVapi] 🎤 Assistant started speaking');
         setSpeakingStatus('speaking');
       });
 
       vapi.on('speech-end', () => {
-        console.log('[useVapi] 🎤 Assistant stopped speaking');
         setSpeakingStatus('listening');
       });
 
@@ -153,12 +148,9 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
       });
 
       // Message/transcript events
-      vapi.on('message', (message: VapiMessage) => {
-        console.log('[useVapi] 📨 Message received:', message.type, message);
-
+      vapi.on('message', (message: VapiWebhookMessage) => {
         if (message.type === 'transcript') {
           const role = message.role === 'assistant' ? 'assistant' : 'user';
-          console.log(`[useVapi] 💬 Transcript (${role}):`, message.transcript);
           addTranscript({
             role,
             content: message.transcript || '',
@@ -170,7 +162,6 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
             const text = message.transcript.toLowerCase();
             const isReady = READY_PHRASES.some(phrase => text.includes(phrase));
             if (isReady) {
-              console.log('[useVapi] ✅ User confirmed ready:', message.transcript);
               onUserReadyRef.current?.();
             }
           }
@@ -178,11 +169,9 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
 
         // Handle function calls from the LLM
         if (message.type === 'function-call') {
-          console.log('[useVapi] 🔧 Function call:', message);
           const functionName = message.functionCall?.name;
           const functionArgs = message.functionCall?.parameters || {};
           if (functionName) {
-            console.log(`[useVapi] 📝 Calling ${functionName} with:`, functionArgs);
             onFunctionCallRef.current?.(functionName, functionArgs as Record<string, unknown>);
           }
         }
@@ -190,12 +179,7 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
 
       // Error handling
       vapi.on('error', (error: Error | unknown) => {
-        // Log full error details for debugging
-        console.error('[useVapi] Error:', JSON.stringify(error, null, 2));
-        console.error('[useVapi] Error type:', typeof error);
-        if (error && typeof error === 'object') {
-          console.error('[useVapi] Error keys:', Object.keys(error));
-        }
+        console.error('[useVapi] Error:', error);
         const errorMessage = error instanceof Error
           ? error.message
           : typeof error === 'object' && error !== null
@@ -205,8 +189,6 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
         setError(errorMessage);
         onErrorRef.current?.(error instanceof Error ? error : new Error(errorMessage));
       });
-
-      console.log('[useVapi] Initialized successfully');
     } catch (err) {
       console.error('[useVapi] Failed to initialize:', err);
       setError(err instanceof Error ? err.message : 'Failed to initialize Vapi');
@@ -215,7 +197,6 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
     // Cleanup function - ensures call is always disconnected
     const cleanup = () => {
       if (vapiRef.current) {
-        console.log('[useVapi] Cleanup: stopping call');
         vapiRef.current.stop();
         vapiRef.current = null;
         isInitializedRef.current = false;
@@ -245,40 +226,58 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
     reset,
   ]);
 
-  // Start a call
+  // Start a call - accepts either an assistant ID string or an inline config object
   const start = useCallback(
-    async (overrideAssistantId?: string, metadata?: Record<string, unknown>) => {
+    async (assistantIdOrConfig?: string | Record<string, unknown>, metadata?: Record<string, unknown>) => {
       if (!vapiRef.current) {
         console.error('[useVapi] Vapi not initialized');
         setError('Vapi not initialized');
         return;
       }
 
-      const targetAssistantId =
-        overrideAssistantId ||
-        assistantId ||
-        process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID;
+      // Determine if we received an inline config object or an assistant ID string
+      const isInlineConfig = typeof assistantIdOrConfig === 'object' && assistantIdOrConfig !== null;
 
-      if (!targetAssistantId) {
-        console.error('[useVapi] No assistant ID provided');
-        setError('No assistant ID configured');
-        return;
-      }
+      if (!isInlineConfig) {
+        const targetAssistantId =
+          (assistantIdOrConfig as string) ||
+          assistantId ||
+          process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID;
 
-      try {
-        setConnectionState('connecting');
-        console.log('[useVapi] Starting call with assistant:', targetAssistantId);
+        if (!targetAssistantId) {
+          console.error('[useVapi] No assistant ID provided');
+          setError('No assistant ID configured');
+          return;
+        }
 
-        await vapiRef.current.start(targetAssistantId, {
-          metadata,
-        });
-      } catch (err) {
-        console.error('[useVapi] Failed to start call:', err);
-        setConnectionState('error');
-        setError(err instanceof Error ? err.message : 'Failed to start call');
+        try {
+          setConnectionState('connecting');
+          await vapiRef.current.start(targetAssistantId, { metadata });
+          // start() resolved = call-start-success fired = call is live
+          setConnectionState('connected');
+          setSpeakingStatus('listening');
+          onConnectionChangeRef.current?.(true);
+        } catch (err) {
+          console.error('[useVapi] Failed to start call:', err);
+          setConnectionState('error');
+          setError(err instanceof Error ? err.message : 'Failed to start call');
+        }
+      } else {
+        try {
+          setConnectionState('connecting');
+          await vapiRef.current.start(assistantIdOrConfig);
+          // start() resolved = call-start-success fired = call is live
+          setConnectionState('connected');
+          setSpeakingStatus('listening');
+          onConnectionChangeRef.current?.(true);
+        } catch (err) {
+          console.error('[useVapi] Failed to start call:', err);
+          setConnectionState('error');
+          setError(err instanceof Error ? err.message : 'Failed to start call');
+        }
       }
     },
-    [assistantId, setConnectionState, setError]
+    [assistantId, setConnectionState, setSpeakingStatus, setError]
   );
 
   // Stop the current call
@@ -287,7 +286,6 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
 
     try {
       vapiRef.current.stop();
-      console.log('[useVapi] Call stopped');
     } catch (err) {
       console.error('[useVapi] Failed to stop call:', err);
     }
@@ -296,7 +294,6 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
   // Speak text immediately (bypasses LLM)
   const say = useCallback((text: string) => {
     if (!vapiRef.current) {
-      console.warn('[useVapi] Cannot say - not connected');
       return;
     }
 
@@ -310,12 +307,10 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
   // Inject context message for LLM
   const injectContext = useCallback((context: string) => {
     if (!vapiRef.current) {
-      console.warn('[useVapi] ⚠️ Cannot inject context - not connected');
       return;
     }
 
     try {
-      console.log('[useVapi] 📤 Sending context to LLM (triggerResponseEnabled=true)...');
       vapiRef.current.send({
         type: 'add-message',
         message: {
@@ -324,9 +319,8 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
         },
         triggerResponseEnabled: true,
       });
-      console.log('[useVapi] ✅ Context sent:', context.substring(0, 80) + '...');
     } catch (err) {
-      console.error('[useVapi] ❌ Failed to inject context:', err);
+      console.error('[useVapi] Failed to inject context:', err);
     }
   }, []);
 
@@ -338,7 +332,6 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
       try {
         vapiRef.current.setMuted(muted);
         setStoreMuted(muted);
-        console.log('[useVapi] Muted:', muted);
       } catch (err) {
         console.error('[useVapi] Failed to set muted:', err);
       }
@@ -376,8 +369,8 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
   );
 }
 
-// Type for Vapi message events
-interface VapiMessage {
+// Type for Vapi webhook message events
+interface VapiWebhookMessage {
   type: 'transcript' | 'function-call' | 'hang' | string;
   role?: 'user' | 'assistant' | 'system';
   transcript?: string;

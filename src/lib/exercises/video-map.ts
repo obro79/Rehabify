@@ -10,6 +10,7 @@
 const VIDEO_MAPPINGS: Record<string, string[]> = {
   // Squat video
   '/videos/squat.mp4': [
+    'squat',
     'bodyweight-squat',
     'mini-squats',
     'goblet-squat',
@@ -24,7 +25,7 @@ const VIDEO_MAPPINGS: Record<string, string[]> = {
     'cobra-stretch',
     'prone-press-up',
     'sphinx-pose',
-    'standing-back-extension',
+    'standing-lumbar-extension',
     'prone-extension-shoulder',
     'superman',
     'prone-swimming',
@@ -32,6 +33,7 @@ const VIDEO_MAPPINGS: Record<string, string[]> = {
 
   // Lunge video
   '/videos/lunge.mp4': [
+    'lunge',
     'split-squat',
     'reverse-lunge',
     'walking-lunges-ankle',

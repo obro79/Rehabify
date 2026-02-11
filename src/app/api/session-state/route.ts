@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { SESSION_CONFIG } from '@/config/session';
 
 // Session state schema
 const sessionStateSchema = z.object({
@@ -30,13 +31,12 @@ export type SessionState = z.infer<typeof sessionStateSchema> & {
 
 // In-memory store with TTL
 const sessionStore = new Map<string, SessionState>();
-const SESSION_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 // Cleanup expired sessions periodically
 function cleanupExpiredSessions() {
   const now = Date.now();
   for (const [sessionId, state] of sessionStore.entries()) {
-    if (now - state.updatedAt > SESSION_TTL_MS) {
+    if (now - state.updatedAt > SESSION_CONFIG.TTL_MS) {
       sessionStore.delete(sessionId);
       console.log(`[session-state] Cleaned up expired session: ${sessionId}`);
     }

@@ -5,7 +5,18 @@ import { motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { MessageThread, MessageComposer } from '@/components/messaging';
-import type { Message } from '@/stores/message-store';
+
+interface Message {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderRole: 'pt' | 'patient';
+  recipientId: string;
+  content: string;
+  imageUrl: string | null;
+  readAt: string | null;
+  createdAt: string;
+}
 
 // Mock PT info - in production, fetch from user's profile
 const MOCK_PT = {

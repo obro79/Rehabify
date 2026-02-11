@@ -1,124 +1,237 @@
+<div align="center">
+
 # Rehabify
 
-**AI-powered physical therapy coaching with real-time form correction**
+### AI-Powered Physical Therapy Coach with Real-Time Form Correction
+
+![Rehabify Landing Page](public/demopics/landing-hero.png)
+
+[![Built at nwHacks 2026](https://img.shields.io/badge/Built%20at-nwHacks%202026-blueviolet?style=for-the-badge)](https://nwhacks.io)
+[![Next.js 15](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript)](https://typescriptlang.org)
+[![MediaPipe](https://img.shields.io/badge/MediaPipe-Pose-green?style=for-the-badge)](https://mediapipe.dev)
+
+**Like having a physiotherapist in your living room**
+
+[Demo](#demo) · [Features](#features) · [How It Works](#how-it-works) · [Tech Stack](#tech-stack) · [Quick Start](#quick-start)
+
+</div>
+
+---
 
 ## The Problem
 
-Physical therapy is expensive ($100-200/session), hard to access (weeks-long wait times), and patients are left unsupervised at home wondering if they're doing exercises correctly. 60% of PT patients don't complete their rehab program.
+After spending **$8K on physio bills**, waiting **3 weeks for my first appointment**, and only getting seen **once every 2 weeks** for a herniated disc, I realized the broken part of physical therapy isn't the clinic—it's what happens at home.
+
+<div align="center">
+
+| The Reality of Physical Therapy |
+|:---:|
+| **Only 35%** of patients complete their prescribed exercises |
+| Patients are unsure if they're doing exercises correctly |
+| Zero supervision between clinic visits |
+| PTs have no visibility into home exercise quality |
+
+</div>
 
 ## The Solution
 
-Rehabify combines computer vision + voice AI to create an AI coach that watches your form and corrects you in real-time - like having a physio in your living room.
+Rehabify uses **computer vision + voice AI** to provide real-time form correction using just a webcam. Perform your exercises at home and get instant feedback like *"Keep your back straight"* or *"Lower those hips"*—transforming PT from opaque guesswork into data-driven care.
+
+---
+
+## Demo
+
+<div align="center">
+
+### Real-Time Form Correction in Action
+
+| Poor Form Detection | Mid-Rep Coaching | Good Form Achieved |
+|:---:|:---:|:---:|
+| ![Form correction - needs adjustment](public/demopics/demopic4.webp) | ![Form correction - squat deeper](public/demopics/demopic3.jpg) | ![Good form achieved](public/demopics/demopic5.webp) |
+| **15%** - "Sit back more, keep knees behind toes" | **83%** - "Squat a bit deeper" | **92%** - "Good depth, hold it!" |
+
+### Lunge Form Analysis
+
+![Good lunge form](public/demopics/good%20lunge.gif)
+
+</div>
+
+---
+
+## Features
+
+### For Patients
+
+- **Real-Time Form Correction** — AI watches your movement and provides instant voice feedback
+- **Personalized Exercise Plans** — Guided assessment generates a tailored 12-week program using Gemini AI
+- **Progress Tracking** — See your completion rates, form scores, and improvement over time
+- **Privacy-First** — Video never leaves your device; all computer vision runs locally in your browser
+
+### For Physical Therapists
+
+- **Remote Monitoring Dashboard** — View patient completion rates, form quality scores, and problem areas
+- **Data-Driven Insights** — Transform subjective patient reports into objective movement data
+- **Safety Guardrails** — System detects serious symptoms and redirects patients to in-person care
+
+### Safety & Compliance
+
+- **Medical Safety Stops** — Serious symptoms (numbness, bowel issues, severe pain) trigger immediate redirection to professional care
+- **HIPAA-Ready Architecture** — Built with healthcare data privacy in mind
+- **Canadian Healthcare Compliant** — Designed for integration with Canadian healthcare systems
+
+---
+
+## How It Works
 
 ```
-Webcam (30fps) --> MediaPipe Pose --> Form Detection --> Voice AI --> "Lift those hips up!"
-                        |                   |
-                  33 body landmarks    Rule-based analysis
-                  (runs locally)       (< 1 second feedback)
+┌─────────────┐     ┌──────────────┐     ┌─────────────────┐     ┌─────────────┐
+│   Webcam    │────▶│  MediaPipe   │────▶│ Form Detection  │────▶│  Voice AI   │
+│   (30fps)   │     │    Pose      │     │    Engine       │     │   Coach     │
+└─────────────┘     └──────────────┘     └─────────────────┘     └─────────────┘
+                           │                      │                      │
+                    33 body landmarks      Joint angle          "Lift those
+                    (runs locally in       analysis &           hips up!"
+                     WebAssembly)          rule-based           (< 1 sec
+                                          validation            latency)
 ```
 
-## Key Features
+### The Pipeline
 
-- **Real-time pose detection** - MediaPipe tracks 33 body landmarks at 30fps
-- **Instant voice correction** - AI coach provides feedback in < 1 second
-- **Privacy-first** - Video never leaves your device (all CV runs client-side)
-- **PT-in-the-loop** - Your physio can monitor your progress remotely
+1. **Capture** — Webcam streams video at 30fps
+2. **Detect** — MediaPipe Pose extracts 33 body landmarks in real-time (runs entirely in browser via WebAssembly)
+3. **Analyze** — Custom algorithms evaluate joint angles, body alignment, and movement patterns
+4. **Feedback** — Voice AI delivers natural coaching feedback in under 1 second
+
+---
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| Frontend | Next.js 15, React 19, Tailwind, shadcn/ui |
-| Vision | MediaPipe Pose (WebAssembly, Web Worker) |
-| Voice | Vapi (Deepgram STT + GPT-4o + ElevenLabs TTS) |
-| Database | Neon (PostgreSQL + Neon Auth) |
-| Hosting | Vercel |
+| Layer | Technology | Purpose |
+|-------|------------|---------|
+| **Frontend** | Next.js 15, React 19, Tailwind CSS | "Wellness sanctuary" design system |
+| **Computer Vision** | MediaPipe Pose (WASM + Web Workers) | Real-time skeleton tracking |
+| **Voice AI** | Vapi (Deepgram STT + Gemini + ElevenLabs TTS) | Natural coaching feedback |
+| **Database** | Neon PostgreSQL + Drizzle ORM | User data & exercise tracking |
+| **AI/ML** | Google Gemini API | Personalized plan generation |
+| **Deployment** | Vercel | Edge-optimized hosting |
+
+---
 
 ## Quick Start
 
+### Prerequisites
+
+- Node.js 18+
+- pnpm
+- PostgreSQL database (we use [Neon](https://neon.tech))
+
+### Installation
+
 ```bash
+# Clone the repository
+git clone https://github.com/yourusername/rehabify.git
+cd rehabify
+
+# Install dependencies
 pnpm install
-cp .env.example .env.local  # Add your API keys
-npx drizzle-kit push        # Setup database
-pnpm dev                    # http://localhost:3000
+
+# Set up environment variables
+cp .env.example .env.local
+# Add your API keys (Neon, Vapi, Gemini)
+
+# Initialize database
+npx drizzle-kit push
+
+# Start development server
+pnpm dev
 ```
 
-## Testing
+Visit `http://localhost:3000` to see the app.
 
-### Test Commands
+### Testing
 
 ```bash
 pnpm test           # Run all tests
-pnpm test:watch     # Run tests in watch mode
-pnpm test:smoke     # Fast smoke tests (stores, env, type-guards)
-pnpm test:coverage  # Generate coverage report
-pnpm test:e2e       # Run Playwright E2E tests
-pnpm test:e2e:ui    # Run E2E tests with UI
+pnpm test:watch     # Watch mode
+pnpm test:e2e       # Playwright E2E tests
+pnpm test:coverage  # Coverage report
 ```
 
-### Test Tiers
-
-| Tier | Trigger | Tests Included | Target Time |
-|------|---------|----------------|-------------|
-| Smoke | Every push | Lint, type check, unit tests | < 2 min |
-| Full | PRs to main/master | Build, all tests, coverage | < 5 min |
-| E2E | Manual/nightly | Full user flows | < 15 min |
-
-### CI/CD Workflows
-
-- **ci.yml** - Smoke tests on every push
-- **ci-full.yml** - Full test suite on PRs to main/master (required to pass for merge)
-- **e2e.yml** - E2E tests (manual trigger or nightly)
-
-### Branch Protection
-
-The `master` and `main` branches are protected with the following requirements:
-
-1. **Required status checks**: The `ci-full` workflow must pass before merging
-2. **Coverage reports**: Generated on every PR and optionally uploaded to Codecov
-3. **Build verification**: Production build must succeed before tests run
-
-To configure branch protection in GitHub:
-1. Go to **Settings > Branches > Branch protection rules**
-2. Add rule for `master` (or `main`)
-3. Enable **Require status checks to pass before merging**
-4. Select **Build, Lint & Full Tests** as a required check
-5. Optionally enable **Require branches to be up to date before merging**
-
-## Project Structure
-
-```
-plan/                  # Detailed specs and architecture docs
-├── 00-architecture/   # System design, data flow
-├── 01-backend/        # Database, API routes
-├── 02-frontend/       # Components, wireframes
-├── 03-vision/         # MediaPipe, form detection per exercise
-├── 04-voice-ai/       # Vapi integration, prompts
-├── 05-contingencies/  # Scope reduction, troubleshooting
-└── 06-sprint-timeline/# Hour-by-hour hackathon plan
-
-src/                   # Application code
-├── app/               # Next.js App Router
-├── components/        # React components
-├── lib/               # Vision, voice, database utilities
-└── stores/            # Zustand state management
-```
+---
 
 ## Exercise Support
 
 | Tier | Exercises | Capabilities |
-|------|-----------|--------------|
-| **Tier 1** | Cat-Camel, Cobra, Dead Bug | Full AI form detection |
-| **Tier 2** | 49 additional exercises | Voice-guided only |
+|:----:|-----------|--------------|
+| **Tier 1** | Cat-Camel, Cobra, Dead Bug, Glute Bridge, Bodyweight Squat | Full AI form detection with real-time feedback |
+| **Tier 2** | 47+ additional exercises | Voice-guided with reference videos |
 
-## Hackathon Context
+All exercises sourced from licensed PT resources and validated for safety.
 
-Built for **nwHacks 2026** (UBC Vancouver). Target: Healthcare track.
+---
 
-**Personal motivation**: Herniated disc, $8K in physio bills, 3-week wait for first appointment, could only get seen once every 2 weeks. Built this so others don't have to go through the same thing.
+## Project Structure
 
-## Documentation
+```
+rehabify/
+├── plan/                    # Detailed specs and architecture docs
+│   ├── 00-architecture/     # System design, data flow
+│   ├── 01-backend/          # Database, API routes
+│   ├── 02-frontend/         # Components, wireframes
+│   ├── 03-vision/           # MediaPipe, form detection rules
+│   ├── 04-voice-ai/         # Vapi integration, prompts
+│   └── 05-contingencies/    # Scope reduction plans
+│
+├── src/
+│   ├── app/                 # Next.js App Router pages
+│   ├── components/          # React components
+│   ├── lib/                 # Vision, voice, database utilities
+│   │   ├── mediapipe/       # Pose detection & form analysis
+│   │   ├── vapi/            # Voice AI integration
+│   │   └── gemini/          # Plan generation
+│   └── stores/              # Zustand state management
+│
+└── public/
+    ├── videos/              # Exercise demo videos
+    └── exercise-images/     # Exercise reference images
+```
 
-- `CLAUDE.md` - AI assistant instructions for this codebase
-- `plan/README.md` - Full technical documentation
-- `plan/PLAN_SUMMARY.md` - Consolidated hackathon plan
+---
+
+## What We Learned
+
+- **MediaPipe Pose** is incredibly powerful but requires careful tuning for different body types
+- **Voice AI** has come far—Gemini can give nuanced coaching feedback that feels human
+- **Privacy-first architecture** is possible AND performant with modern browser APIs
+- **Next.js 15** App Router + React Server Components are perfect for healthcare apps with mixed public/private data
+
+---
+
+## What's Next
+
+- [ ] Expand from 5 to 52 exercises (full PT library)
+- [ ] Mobile app (React Native) for better camera angles
+- [ ] PT onboarding flow for custom exercise plans
+- [ ] Machine learning for personalized form validation
+- [ ] Progress prediction: *"73% likely to recover in 4 weeks"*
+- [ ] Insurance integration (CPT code 98975)
+- [ ] Clinical trials with UBC PT department
+
+---
+
+## The Vision
+
+Physical therapy shouldn't require proximity to an expensive clinic. It should be something you can do confidently at home, with real-time guidance and professional oversight.
+
+**Rehabify is the infrastructure to make that happen.**
+
+---
+
+<div align="center">
+
+### Built with care at nwHacks 2026
+
+*Because everyone deserves access to quality physical therapy*
+
+</div>

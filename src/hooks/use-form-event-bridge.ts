@@ -24,6 +24,14 @@ export interface UseFormEventBridgeOptions {
   exerciseName?: string;
   /** Target reps for current exercise */
   targetReps?: number;
+  /** Next exercise in the plan (if any) */
+  nextExercise?: { name: string; slug: string } | null;
+  /** Plan name for context */
+  planName?: string;
+  /** Common mistakes for the current exercise (from exercise data) */
+  commonMistakes?: string[];
+  /** Exercise instructions for coaching context */
+  exerciseInstructions?: string[];
   /** Enable debug logging */
   debug?: boolean;
 }
@@ -40,6 +48,10 @@ export function useFormEventBridge(options: UseFormEventBridgeOptions): void {
     isAnalyzing,
     exerciseName = 'exercise',
     targetReps = 10,
+    nextExercise = null,
+    planName,
+    commonMistakes = [],
+    exerciseInstructions = [],
     debug = true,
   } = options;
 
@@ -54,7 +66,6 @@ export function useFormEventBridge(options: UseFormEventBridgeOptions): void {
   // Send pending context when assistant stops speaking
   useEffect(() => {
     if (!isSpeaking && pendingContextRef.current && isConnected) {
-      console.log(`[useFormEventBridge] 🎤 Assistant stopped speaking, sending queued context`);
       injectContext(pendingContextRef.current);
       lastFeedbackTimeRef.current = Date.now();
       pendingContextRef.current = null;
@@ -74,10 +85,6 @@ export function useFormEventBridge(options: UseFormEventBridgeOptions): void {
       newErrors.forEach((errorType) => {
         repErrorsRef.current.add(errorType);
       });
-
-      if (debug && newErrors.length > 0) {
-        console.log(`[useFormEventBridge] Errors queued: ${Array.from(repErrorsRef.current).join(', ')}`);
-      }
 
       prevErrors = currentErrorTypes;
 
@@ -103,18 +110,18 @@ export function useFormEventBridge(options: UseFormEventBridgeOptions): void {
         const errors = Array.from(repErrorsRef.current);
         const phase = state.phase;
 
-        console.log(`[useFormEventBridge] Rep ${state.repCount}/${targetReps} | Score: ${formScore}% | Errors: ${errors.join(', ') || 'none'}`);
-
         // Build context for LLM
         let context = '';
 
         if (isComplete) {
-          // Session complete
+          // Session complete - include plan context if available
+          const nextExLine = nextExercise
+            ? `\nNEXT IN PLAN: ${nextExercise.name}\nTell them great job, and mention the next exercise in their plan.`
+            : `\nThe user has completed all reps. Provide a warm closing.`;
           context = `[SESSION END]
-Exercise: ${exerciseName}
+Exercise: ${exerciseName}${planName ? ` (from "${planName}" plan)` : ''}
 Reps completed: ${state.repCount}/${targetReps}
-Final form score: ${formScore}%
-The user has completed all reps. Provide a warm closing.`;
+Final form score: ${formScore}%${nextExLine}`;
         } else if (isHalfway) {
           // Halfway milestone
           context = `[REP COMPLETED]
@@ -125,14 +132,13 @@ ${errors.length > 0 ? `Form issues this rep: ${errors.join(', ')}` : 'Form was g
 Acknowledge the halfway milestone briefly.`;
         } else if (errors.length > 0) {
           // Form feedback needed - include specific cue suggestions for variety
-          const errorCues: Record<string, string[]> = {
-            // Squat cues
+          // Specific cues for exercises with AI form detection (squat, lunge, etc.)
+          const detectionErrorCues: Record<string, string[]> = {
             forward_lean: ['chest up', 'tall spine', 'proud chest', 'shoulders back', 'look forward'],
             insufficient_depth: ['sink deeper', 'drop lower', 'hips below knees', 'deeper squat', 'all the way down'],
             knee_forward: ['knees out', 'push knees wide', 'track over toes', 'spread the floor', 'knees follow toes'],
             knee_valgus: ['knees out', 'push knees apart', 'knees over pinky toes', 'spread the floor'],
             heel_rise: ['heels down', 'weight in heels', 'press through heels', 'ground your heels'],
-            // Lunge cues
             trunk_lean: ['stand tall', 'upright torso', 'chest proud', 'shoulders over hips', 'torso vertical'],
             depth: ['drop lower', 'thigh parallel', 'sink deeper', '90 degree knees', 'lower hips'],
             hands_on_legs: ['hands free', 'arms at sides', 'no leaning on legs', 'use your legs'],
@@ -140,17 +146,23 @@ Acknowledge the halfway milestone briefly.`;
 
           // Pick a random cue for the primary error
           const primaryError = errors[0];
-          const cues = errorCues[primaryError] || ['good form'];
-          const suggestedCue = cues[Math.floor(Math.random() * cues.length)];
+          const detectionCues = detectionErrorCues[primaryError];
+          const suggestedCue = detectionCues
+            ? detectionCues[Math.floor(Math.random() * detectionCues.length)]
+            : null;
+
+          // Include exercise-specific coaching context from the exercise data
+          const mistakesContext = commonMistakes.length > 0
+            ? `\nCommon mistakes for this exercise: ${commonMistakes.slice(0, 3).join('; ')}`
+            : '';
 
           context = `[FORM FEEDBACK NEEDED]
 Exercise: ${exerciseName}
 Rep: ${state.repCount}/${targetReps}
 Form score: ${formScore}%
 Form issues detected: ${errors.join(', ')}
-Current phase: ${phase}
-Give ONE brief correction (5-15 words max). Use varied phrasing each time.
-Suggested cue: "${suggestedCue}" - rephrase this naturally, don't repeat exactly.`;
+Current phase: ${phase}${mistakesContext}
+Give ONE brief correction (5-15 words max). Use varied phrasing each time.${suggestedCue ? `\nSuggested cue: "${suggestedCue}" - rephrase this naturally, don't repeat exactly.` : '\nUse your knowledge of the exercise to give a relevant form correction.'}`;
         } else {
           // Good form - give brief encouragement on every rep
           context = `[REP COMPLETED]
@@ -162,22 +174,14 @@ Form was good. Brief encouragement (3-5 words max). Examples: "Nice!", "Good rep
 
         // Send context to LLM if we have any
         if (context) {
-          console.log(`[useFormEventBridge] 📤 Preparing context for Vapi:\n${context}`);
-          console.log(`[useFormEventBridge] ⏱️ Time since last feedback: ${timeSinceLastFeedback}ms`);
-          console.log(`[useFormEventBridge] 🎤 Assistant speaking: ${isSpeaking}`);
-
           if (isSpeaking) {
             // Queue context to send when assistant stops speaking
-            console.log(`[useFormEventBridge] ⏸️ Assistant is speaking, queuing context...`);
             pendingContextRef.current = context;
           } else {
             // Send immediately
             injectContext(context);
             lastFeedbackTimeRef.current = now;
-            console.log(`[useFormEventBridge] ✅ Context injection complete`);
           }
-        } else {
-          console.log(`[useFormEventBridge] ⏭️ No context to inject (score=${formScore}%, errors=${errors.length}, rep=${state.repCount})`);
         }
 
         // Reset errors for next rep
@@ -196,7 +200,6 @@ Form was good. Brief encouragement (3-5 words max). Examples: "Nice!", "Good rep
     prevRepCountRef.current = 0;
     repErrorsRef.current.clear();
     lastFeedbackTimeRef.current = 0;
-    console.log(`[useFormEventBridge] Reset for exercise: ${exerciseName}`);
   }, [exerciseName]);
 }
 

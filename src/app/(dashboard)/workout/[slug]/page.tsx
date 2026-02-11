@@ -18,10 +18,8 @@ import {
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import exercisesData from "@/lib/exercises/data.json";
-import {
-  ExerciseCamera,
-  WorkoutStatsPanel,
-} from "@/components/workout";
+import { ExerciseCamera } from "@/components/workout";
+import { getExerciseVideoUrl } from "@/lib/exercises/video-map";
 import { useExerciseStore } from "@/stores/exercise-store";
 import {
   selectFormScore,
@@ -30,25 +28,24 @@ import {
   selectActiveErrors,
 } from "@/stores/exercise-store-selectors";
 import type { Exercise } from "@/lib/exercises/types";
+import { getFormScoreColor, getFormFeedback } from "@/lib/exercise-utils";
 import { useVapi } from "@/hooks/use-vapi";
 import { useFormEventBridge } from "@/hooks/use-form-event-bridge";
 import { useVoiceStore } from "@/stores/voice-store";
+import type { PlanStructure, PlanExercise } from "@/lib/gemini/types";
 
 type SessionState = "active" | "paused" | "complete";
 type VoiceState = "idle" | "connecting" | "listening" | "thinking" | "speaking";
 type VoicePhase = "explaining" | "analyzing" | "finished";
 
-// Helper functions for form score
-function getFormScoreColor(score: number): "sage" | "coral" {
-  return score >= 70 ? "sage" : "coral";
-}
-
-function getFormFeedback(score: number): string {
-  if (score >= 90) return "Perfect form!";
-  if (score >= 80) return "Great form!";
-  if (score >= 70) return "Good work!";
-  if (score >= 60) return "Keep practicing!";
-  return "Review the basics";
+interface PlanContext {
+  planName: string;
+  currentWeekFocus: string;
+  currentWeekNotes: string;
+  exercises: PlanExercise[];
+  currentIndex: number;
+  totalExercises: number;
+  nextExercise?: { name: string; slug: string };
 }
 
 export default function WorkoutSessionPage() {
@@ -60,6 +57,63 @@ export default function WorkoutSessionPage() {
   const exercise = React.useMemo(() => {
     const exercises = exercisesData.exercises as Exercise[];
     return exercises.find((ex) => ex.slug === slug);
+  }, [slug]);
+
+  // Plan context for voice coach and session saving
+  const [planContext, setPlanContext] = React.useState<PlanContext | null>(null);
+  const [planId, setPlanId] = React.useState<string | null>(null);
+
+  // Fetch plan context on mount
+  React.useEffect(() => {
+    async function fetchPlanContext() {
+      try {
+        const response = await fetch("/api/patient-records");
+        if (!response.ok) return;
+        const result = await response.json();
+        const data = result.data || result;
+        const plans = data?.plans || [];
+        if (plans.length === 0) return;
+
+        const activePlan = plans.find(
+          (p: { status: string }) => p.status === "approved"
+        ) || plans[0];
+
+        if (!activePlan?.structure) return;
+        setPlanId(activePlan.id);
+
+        let structure: PlanStructure;
+        if (typeof activePlan.structure === "string") {
+          structure = JSON.parse(activePlan.structure);
+        } else {
+          structure = activePlan.structure as PlanStructure;
+        }
+
+        if (!structure?.weeks?.[0]?.exercises) return;
+
+        const week = structure.weeks[0];
+        const sorted = [...week.exercises].sort((a, b) => a.order - b.order);
+        const currentIdx = sorted.findIndex((e) => e.exerciseSlug === slug);
+
+        const nextEx = currentIdx >= 0 && currentIdx < sorted.length - 1
+          ? sorted[currentIdx + 1]
+          : undefined;
+
+        setPlanContext({
+          planName: activePlan.name || "Rehabilitation Plan",
+          currentWeekFocus: week.focus,
+          currentWeekNotes: week.notes,
+          exercises: sorted,
+          currentIndex: currentIdx >= 0 ? currentIdx : 0,
+          totalExercises: sorted.length,
+          nextExercise: nextEx
+            ? { name: nextEx.name, slug: nextEx.exerciseSlug }
+            : undefined,
+        });
+      } catch (err) {
+        console.error("[WorkoutPage] Failed to fetch plan context:", err);
+      }
+    }
+    fetchPlanContext();
   }, [slug]);
 
   // Session state
@@ -81,6 +135,9 @@ export default function WorkoutSessionPage() {
   const setExercisePhase = useExerciseStore((state) => state.setPhase);
   const incrementRep = useExerciseStore((state) => state.incrementRep);
   const targetReps = exercise?.default_reps || 10;
+
+  // Check if exercise has a demo video
+  const demoVideoUrl = exercise ? getExerciseVideoUrl(exercise.slug) : null;
 
   // Voice coaching phase
   const [voicePhase, setVoicePhase] = React.useState<VoicePhase>("explaining");
@@ -120,6 +177,10 @@ export default function WorkoutSessionPage() {
     isAnalyzing: voicePhase === "analyzing",
     exerciseName: exercise?.name,
     targetReps,
+    nextExercise: planContext?.nextExercise || null,
+    planName: planContext?.planName,
+    commonMistakes: exercise?.common_mistakes,
+    exerciseInstructions: exercise?.instructions,
   });
 
   // Voice state for UI
@@ -140,18 +201,58 @@ export default function WorkoutSessionPage() {
     return transcriptEntries.slice(-2).map((t) => t.content).join(" ");
   }, [transcriptEntries, isConnected]);
 
-  // Exercise intro context
+  // Exercise intro context (plan-aware, full exercise coaching data)
   const exerciseIntroContext = React.useMemo(() => {
     if (!exercise) return null;
+
+    const planInfo = planContext
+      ? `\nPlan: "${planContext.planName}" - Exercise ${planContext.currentIndex + 1} of ${planContext.totalExercises}
+Today's exercises: ${planContext.exercises.map((e, i) => `${i + 1}. ${e.name}${e.exerciseSlug === slug ? " (current)" : ""}`).join(", ")}
+Week focus: ${planContext.currentWeekNotes}
+Sets: ${planContext.exercises[planContext.currentIndex]?.sets || 2}, Reps: ${planContext.exercises[planContext.currentIndex]?.reps || targetReps}${planContext.exercises[planContext.currentIndex]?.holdSeconds ? `, Hold: ${planContext.exercises[planContext.currentIndex].holdSeconds}s` : ""}`
+      : "";
+
+    // Build rep type instructions
+    const repInfo = exercise.rep_type === "hold" || exercise.rep_type === "timed_hold"
+      ? `Rep type: Hold for ${exercise.default_hold_seconds} seconds each rep`
+      : exercise.rep_type === "alternating"
+        ? `Rep type: Alternating sides`
+        : exercise.rep_type === "per_side"
+          ? `Rep type: Do each side separately`
+          : `Rep type: Standard reps`;
+
     return `[EXERCISE INTRO]
 Exercise: ${exercise.name}
-Target area: ${exercise.target_area || exercise.category.replace(/_/g, " ")}
-Key cue: ${exercise.instructions[0]}
+Category: ${exercise.category.replace(/_/g, " ")}
+Target area: ${exercise.target_area?.replace(/_/g, " ") || exercise.category.replace(/_/g, " ")}
+Difficulty: ${exercise.difficulty}
+${repInfo}
+Default: ${exercise.default_sets} sets x ${exercise.default_reps} reps${exercise.default_hold_seconds > 0 ? `, ${exercise.default_hold_seconds}s hold` : ""}
+Equipment: ${exercise.equipment === "none" ? "No equipment needed" : exercise.equipment.replace(/_/g, " ")}
+${planInfo}
 
-Greet the user briefly. Tell them what exercise we're doing and give them ONE key thing to focus on.
-Then ask: "Ready to start?"
-Wait for their confirmation before we begin analyzing their form.`;
-  }, [exercise]);
+DESCRIPTION: ${exercise.description}
+
+STEP-BY-STEP INSTRUCTIONS (use these to guide the user):
+${exercise.instructions.map((inst, i) => `${i + 1}. ${inst}`).join("\n")}
+
+COMMON MISTAKES TO WATCH FOR:
+${exercise.common_mistakes.map((m) => `- ${m}`).join("\n")}
+
+MODIFICATIONS:
+- Easier: ${exercise.modifications.easier}
+- Harder: ${exercise.modifications.harder}
+
+${exercise.contraindications.length > 0 ? `CONTRAINDICATIONS (stop if relevant): ${exercise.contraindications.join(", ")}` : ""}
+
+YOUR COACHING APPROACH:
+1. Greet the user${planContext ? ` and tell them this is exercise ${planContext.currentIndex + 1} of ${planContext.totalExercises} in their plan` : ""}.
+2. Briefly describe what the exercise is and what it targets (1-2 sentences).
+3. Walk them through the starting position (use the instructions above).
+4. Give them ONE key cue to focus on.
+5. Ask: "Ready to start?" and wait for confirmation.
+Keep it conversational and encouraging. Don't read the full list - summarize naturally.`;
+  }, [exercise, planContext, slug, targetReps]);
 
   // Inject context when connected
   const hasInjectedContext = React.useRef(false);
@@ -170,17 +271,28 @@ Wait for their confirmation before we begin analyzing their form.`;
     }
   }, [isConnected, exerciseIntroContext, injectContext]);
 
-  // Inject analyze context
+  // Inject analyze context with exercise-specific coaching reminders
   React.useEffect(() => {
-    if (voicePhase === "analyzing" && isConnected) {
+    if (voicePhase === "analyzing" && isConnected && exercise) {
+      const repTypeReminder = exercise.rep_type === "hold" || exercise.rep_type === "timed_hold"
+        ? `This is a hold exercise - count to ${exercise.default_hold_seconds} for each rep.`
+        : exercise.rep_type === "alternating"
+          ? `This is an alternating exercise - coach both sides.`
+          : "";
+      const mistakesReminder = exercise.common_mistakes.length > 0
+        ? `\nWatch for: ${exercise.common_mistakes.slice(0, 2).join("; ")}`
+        : "";
+
       const context = `[EXERCISE STARTING]
-The user is ready to begin. Say "Great, let's go - I'm watching your form."
+The user is ready to begin ${exercise.name}. Say "Great, let's go - I'm watching your form."
+${repTypeReminder}${mistakesReminder}
 From now on, give brief form corrections when I send you [FORM FEEDBACK NEEDED] messages.
-Keep corrections to 5-15 words max. Focus on what TO do, not what's wrong.`;
+Keep corrections to 5-15 words max. Focus on what TO do, not what's wrong.
+Use your knowledge of ${exercise.name} to give relevant cues.`;
       console.log("[WorkoutPage] Transitioning to analyze phase");
       injectContext(context);
     }
-  }, [voicePhase, isConnected, injectContext]);
+  }, [voicePhase, isConnected, injectContext, exercise]);
 
   // Sync state for webhook
   React.useEffect(() => {
@@ -225,14 +337,53 @@ Keep corrections to 5-15 words max. Focus on what TO do, not what's wrong.`;
     return () => resetExercise();
   }, [exercise, resetExercise, setExercise]);
 
+  // Save session to API
+  const saveSessionRef = React.useRef(false);
+  const saveSession = React.useCallback(async (finalReps: number, finalScore: number) => {
+    if (saveSessionRef.current) return; // Prevent double-save
+    saveSessionRef.current = true;
+
+    const durationSeconds = Math.floor((Date.now() - startTime.getTime()) / 1000);
+    try {
+      const response = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          exerciseSlug: slug,
+          exerciseName: exercise?.name || slug,
+          category: exercise?.category?.replace(/_/g, " ") || "general",
+          formScore: finalScore,
+          repsCompleted: finalReps,
+          targetReps,
+          durationSeconds,
+          planId: planId || undefined,
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        // Store session result for the complete page
+        sessionStorage.setItem("lastSessionResult", JSON.stringify(result.data));
+        // Store plan context for the complete page
+        if (planContext) {
+          sessionStorage.setItem("lastPlanContext", JSON.stringify(planContext));
+        }
+      }
+    } catch (err) {
+      console.error("[WorkoutPage] Failed to save session:", err);
+    }
+  }, [slug, exercise, targetReps, startTime, planId, planContext]);
+
   // Auto-complete when target reps reached
   React.useEffect(() => {
     if (sessionState !== "active") return;
     if (repCount >= targetReps) {
       setSessionState("complete");
-      router.push(`/workout/${slug}/complete?score=${formScore}&reps=${repCount}`);
+      saveSession(repCount, formScore).then(() => {
+        router.push(`/workout/${slug}/complete?score=${formScore}&reps=${repCount}`);
+      });
     }
-  }, [repCount, router, sessionState, slug, targetReps, formScore]);
+  }, [repCount, router, sessionState, slug, targetReps, formScore, saveSession]);
 
   // Demo mode for non-vision exercises
   React.useEffect(() => {
@@ -262,14 +413,9 @@ Keep corrections to 5-15 words max. Focus on what TO do, not what's wrong.`;
 
   const handlePauseToggle = () => setIsPaused(!isPaused);
   const handleEndSession = () => setShowEndDialog(true);
-  const handleConfirmEnd = () => router.push(`/workout/${slug}/complete?score=${formScore}&reps=${repCount}`);
-
-  const handleStartVoice = () => {
-    startVapi(undefined, {
-      sessionId,
-      exerciseId: exercise?.id,
-      exerciseName: exercise?.name,
-      targetReps,
+  const handleConfirmEnd = () => {
+    saveSession(repCount, formScore).then(() => {
+      router.push(`/workout/${slug}/complete?score=${formScore}&reps=${repCount}`);
     });
   };
 
@@ -309,10 +455,42 @@ Keep corrections to 5-15 words max. Focus on what TO do, not what's wrong.`;
         </div>
       </header>
 
-      {/* Main Content - Two Column Layout (Controls Left, Vertical Camera Right) */}
+      {/* Main Content - Layout adapts based on whether demo video exists */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-6">
-          {/* Left Column: Coach, Metrics & Info */}
+        <div className={cn(
+          "grid grid-cols-1 gap-6",
+          demoVideoUrl
+            ? "lg:grid-cols-[280px_1fr_400px]"  // 3-column: Demo Video | Controls | Camera
+            : "lg:grid-cols-[1fr_400px]"         // 2-column: Controls | Camera
+        )}>
+          {/* Demo Video Panel (only shown when video exists) */}
+          {demoVideoUrl && (
+            <div className="hidden lg:block">
+              <Card className="overflow-hidden shadow-lg sticky top-20">
+                <div className="aspect-[3/4] bg-black relative">
+                  <video
+                    src={demoVideoUrl}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute top-3 left-3">
+                    <span className="px-2 py-1 bg-white/90 backdrop-blur-sm rounded-full text-xs font-semibold text-sage-700">
+                      Demo
+                    </span>
+                  </div>
+                </div>
+                <div className="p-3 bg-white">
+                  <p className="text-sm font-medium text-sage-800">{exercise?.name}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Follow along with the video</p>
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {/* Middle Column: Coach, Metrics & Info */}
           <div className="space-y-6">
             {/* Voice Coach Card */}
             <Card className="p-6 flex flex-col bg-white/50 backdrop-blur-sm">
@@ -521,14 +699,14 @@ Keep corrections to 5-15 words max. Focus on what TO do, not what's wrong.`;
                 </ExerciseCamera>
               </Card>
 
-              {/* Guide Image Overlay */}
+              {/* Guide Image/Video Overlay */}
               {showGuideImage && (
                 <div className="absolute inset-0 bg-black/60 backdrop-blur-sm rounded-xl flex items-center justify-center z-20">
                   <Card className="max-w-xs mx-4 p-4 relative">
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="absolute right-2 top-2 h-6 w-6"
+                      className="absolute right-2 top-2 h-6 w-6 z-10"
                       onClick={() => setShowGuideImage(false)}
                     >
                       <X className="h-4 w-4" />
@@ -536,10 +714,21 @@ Keep corrections to 5-15 words max. Focus on what TO do, not what's wrong.`;
 
                     <div className="space-y-3 pt-2">
                       <h3 className="font-bold text-base">Reference Guide</h3>
-                      <div className="aspect-[3/4] bg-gradient-to-br from-sage-100 to-sage-200 rounded-lg flex items-center justify-center">
-                        <p className="text-sage-600 text-xs text-center px-4">
-                          Exercise illustration
-                        </p>
+                      <div className="aspect-[3/4] bg-gradient-to-br from-sage-100 to-sage-200 rounded-lg flex items-center justify-center overflow-hidden">
+                        {getExerciseVideoUrl(exercise.slug) ? (
+                          <video
+                            src={getExerciseVideoUrl(exercise.slug)!}
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <p className="text-sage-600 text-xs text-center px-4">
+                            Exercise illustration
+                          </p>
+                        )}
                       </div>
                       <ul className="space-y-1 text-xs text-muted-foreground">
                         {exercise.instructions.slice(0, 3).map((instruction, i) => (
@@ -555,21 +744,6 @@ Keep corrections to 5-15 words max. Focus on what TO do, not what's wrong.`;
               )}
             </div>
           </div>
-
-          {/* Right Panel - Stats */}
-          <WorkoutStatsPanel
-            voiceState={voiceState}
-            transcript={transcript}
-            isConnected={isConnected}
-            isMuted={isMuted}
-            onStartVoice={handleStartVoice}
-            onStopVoice={stopVapi}
-            onToggleMute={() => setMuted(!isMuted)}
-            repCount={repCount}
-            targetReps={targetReps}
-            formScore={formScore}
-            phase={phase}
-          />
         </div>
       </main>
 

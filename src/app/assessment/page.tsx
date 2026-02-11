@@ -14,6 +14,7 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/component
 import { cn } from "@/lib/utils";
 import exercisesData from "@/lib/exercises/data.json";
 import type { Exercise } from "@/lib/exercises/types";
+import { getFormScoreColor } from "@/lib/exercise-utils";
 import { ExerciseCamera } from "@/components/workout";
 import { useExerciseStore } from "@/stores/exercise-store";
 import {
@@ -150,10 +151,6 @@ export default function AssessmentPage() {
             assessmentResults.length
         )
       : 0;
-
-  const getFormScoreColor = (score: number): "sage" | "coral" => {
-    return score >= 70 ? "sage" : "coral";
-  };
 
   const getFormFeedback = (score: number): string => {
     if (score >= 90) return "Excellent alignment";

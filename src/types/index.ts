@@ -6,5 +6,4 @@ export * from './exercise';
 export * from './vision';
 export * from './session';
 export * from './voice';
-export * from './character';
 export * from './guards';

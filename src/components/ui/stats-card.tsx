@@ -2,12 +2,11 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { LucideIcon, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
 export interface StatsCardProps extends React.HTMLAttributes<HTMLDivElement> {
   title: string;
   value: string | number;
-  icon?: LucideIcon;
   customIcon?: React.ReactNode;
   trend?: {
     direction: "up" | "down" | "neutral";
@@ -23,7 +22,7 @@ const TREND_CONFIG = {
 } as const;
 
 const StatsCard = React.forwardRef<HTMLDivElement, StatsCardProps>(
-  ({ className, title, value, icon: Icon, customIcon, trend, variant = "default", ...props }, ref) => {
+  ({ className, title, value, customIcon, trend, variant = "default", ...props }, ref) => {
     const TrendIcon = trend ? TREND_CONFIG[trend.direction].icon : null;
 
     return (
@@ -71,7 +70,7 @@ const StatsCard = React.forwardRef<HTMLDivElement, StatsCardProps>(
                 : "bg-white/20 text-white"
             )}
           >
-            {customIcon ? customIcon : Icon && <Icon size={20} />}
+            {customIcon}
           </div>
         </div>
       </div>

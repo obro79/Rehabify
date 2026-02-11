@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Mic, MicOff, Volume2, Loader2, X } from "lucide-react";
+import { ArrowLeft, Mic, MicOff, Volume2, Loader2, X, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +28,7 @@ import {
 import { useAssessmentVapi } from "@/hooks/use-assessment-vapi";
 import exercisesData from "@/lib/exercises/data.json";
 import type { Exercise } from "@/lib/exercises/types";
+import { getFormScoreColor } from "@/lib/exercise-utils";
 
 type VoiceState = "idle" | "connecting" | "listening" | "thinking" | "speaking";
 
@@ -251,10 +252,6 @@ function AssessmentStatsPanel({
   formScore,
   exercisePhase,
 }: AssessmentStatsPanelProps) {
-  const getFormScoreColor = (score: number): "sage" | "coral" => {
-    return score >= 70 ? "sage" : "coral";
-  };
-
   return (
     <div className="flex flex-col h-full gap-4">
       {/* Voice Coach Card */}
@@ -431,6 +428,20 @@ export default function LowerBackAssessmentPage() {
   const [saveError, setSaveError] = React.useState<string | null>(null);
   const [currentMovementIndex, setCurrentMovementIndex] = React.useState(0);
   const [isMovementPhase, setIsMovementPhase] = React.useState(false);
+  const [showDescribeModal, setShowDescribeModal] = React.useState(false);
+  const [describeText, setDescribeText] = React.useState(
+    `Body region: Lower back
+
+Pain level (0-10):
+
+Symptoms:
+
+Activities affected:
+
+Goals: `
+  );
+  const [describeError, setDescribeError] = React.useState<string | null>(null);
+  const [isSubmittingText, setIsSubmittingText] = React.useState(false);
 
   // Movement exercises for camera tracking
   const movementExercises = React.useMemo(() => {
@@ -492,7 +503,6 @@ export default function LowerBackAssessmentPage() {
       }
 
       const result = await response.json();
-      console.log("[AssessmentPage] Assessment saved:", result);
 
       // Navigate to dashboard or results
       router.push("/dashboard");
@@ -515,12 +525,11 @@ export default function LowerBackAssessmentPage() {
     currentPhase,
   } = useAssessmentVapi({
     onComplete: () => {
-      console.log("[AssessmentPage] Assessment complete");
       // Auto-save when complete
       saveAssessment();
     },
     onRedFlag: () => {
-      console.log("[AssessmentPage] Red flag detected");
+      // Red flag detected - UI overlay will show
     },
   });
 
@@ -536,7 +545,6 @@ export default function LowerBackAssessmentPage() {
             lowerContent.includes(kw.toLowerCase())
           );
           if (hasMovementKeyword) {
-            console.log("[AssessmentPage] Movement phase detected from transcript");
             setIsMovementPhase(true);
             break;
           }
@@ -548,7 +556,6 @@ export default function LowerBackAssessmentPage() {
   // Set exercise when entering movement phase
   React.useEffect(() => {
     if (isMovementPhase && currentMovementExercise) {
-      console.log("[AssessmentPage] Setting movement exercise:", currentMovementExercise.name);
       setExercise(currentMovementExercise);
     } else if (!isMovementPhase) {
       resetExercise();
@@ -561,8 +568,6 @@ export default function LowerBackAssessmentPage() {
   // Handle rep completion - signal voice to ask about pain
   React.useEffect(() => {
     if (isMovementPhase && repCount > prevRepCountRef.current && currentMovementExercise) {
-      console.log("[AssessmentPage] Rep completed:", repCount);
-
       // Save movement result
       addMovementResult({
         exerciseSlug: currentMovementExercise.slug,
@@ -601,6 +606,13 @@ export default function LowerBackAssessmentPage() {
     return lastAssistant?.content || "Listening...";
   }, [transcriptEntries, isConnected]);
 
+  // Auto-start Vapi when component mounts
+  React.useEffect(() => {
+    if (!isConnected) {
+      startVapi();
+    }
+  }, [isConnected, startVapi]);
+
   // Handle start/stop
   const handleStartStop = async () => {
     if (isConnected) {
@@ -630,9 +642,7 @@ export default function LowerBackAssessmentPage() {
   // Handle skip - skip to next phase or complete
   const handleSkip = () => {
     if (!isMovementPhase && currentPhase === "interview") {
-      // Skip interview → trigger movement phase WITHOUT voice
-      console.log("[AssessmentPage] Skipping to movement phase (no voice)");
-
+      // Skip interview - trigger movement phase WITHOUT voice
       // Stop voice if connected
       if (isConnected) {
         stopVapi();
@@ -647,20 +657,54 @@ export default function LowerBackAssessmentPage() {
       // Trigger movement phase
       setIsMovementPhase(true);
     } else if (isMovementPhase) {
-      // Skip movement → go to dashboard (complete)
-      console.log("[AssessmentPage] Skipping movement, completing assessment");
+      // Skip movement - go to dashboard (complete)
       updateMovementScreen(DEFAULT_ASSESSMENT_DATA.movementScreen);
       if (isConnected) {
         stopVapi();
       }
       router.push("/dashboard");
     } else {
-      // Summary or other → complete
-      console.log("[AssessmentPage] Completing assessment");
+      // Summary or other - complete
       if (isConnected) {
         stopVapi();
       }
       router.push("/dashboard");
+    }
+  };
+
+  // Handle text-to-plan submission
+  const handleSubmitDescription = async () => {
+    if (!describeText.trim() || describeText.trim().length < 10) {
+      setDescribeError("Please describe your symptoms in at least a few words.");
+      return;
+    }
+    setIsSubmittingText(true);
+    setDescribeError(null);
+
+    // Stop voice if connected
+    if (isConnected) {
+      stopVapi();
+    }
+
+    try {
+      const response = await fetch("/api/assessments/from-text", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: describeText }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error?.message || "Failed to generate plan");
+      }
+
+      const result = await response.json();
+      router.push("/dashboard");
+    } catch (err) {
+      console.error("[DescribeModal] Submit error:", err);
+      setDescribeError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setIsSubmittingText(false);
     }
   };
 
@@ -684,24 +728,36 @@ export default function LowerBackAssessmentPage() {
               Lower Back Assessment
             </h1>
 
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleSkip}
-              disabled={isSaving}
-              className="text-muted-foreground"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Creating plan...
-                </>
-              ) : !isMovementPhase && currentPhase === "interview" ? (
-                "Skip to Movement"
-              ) : (
-                "Skip to Dashboard"
-              )}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowDescribeModal(true)}
+                disabled={isSaving || isSubmittingText}
+                className="text-sage-600 gap-1.5"
+              >
+                <FileText className="w-4 h-4" />
+                Skip &amp; Describe
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSkip}
+                disabled={isSaving}
+                className="text-muted-foreground"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Creating plan...
+                  </>
+                ) : !isMovementPhase && currentPhase === "interview" ? (
+                  "Skip to Movement"
+                ) : (
+                  "Skip to Dashboard"
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -824,6 +880,72 @@ export default function LowerBackAssessmentPage() {
           </div>
         </div>
       </main>
+
+      {/* Skip & Describe Modal */}
+      {showDescribeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <Card className="w-full max-w-lg mx-4 p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-foreground">
+                Describe Your Symptoms
+              </h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setShowDescribeModal(false)}
+                disabled={isSubmittingText}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <p className="text-sm text-muted-foreground mb-4">
+              Skip the voice assessment and describe your condition below.
+              We'll generate a personalized rehab plan from your description.
+            </p>
+
+            <textarea
+              value={describeText}
+              onChange={(e) => setDescribeText(e.target.value)}
+              disabled={isSubmittingText}
+              className="w-full h-48 px-3 py-2 text-sm border border-sage-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sage-400 focus:border-transparent resize-none disabled:opacity-50"
+              placeholder="Describe your symptoms, pain level, and goals..."
+            />
+
+            {describeError && (
+              <p className="text-sm text-destructive mt-2">{describeError}</p>
+            )}
+
+            <div className="flex items-center justify-end gap-3 mt-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowDescribeModal(false)}
+                disabled={isSubmittingText}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleSubmitDescription}
+                disabled={isSubmittingText}
+                className="gap-1.5"
+              >
+                {isSubmittingText ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Generating Plan...
+                  </>
+                ) : (
+                  "Generate My Plan"
+                )}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

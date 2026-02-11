@@ -14,42 +14,25 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePTStore } from "@/stores/pt-store";
 import type { PlanExercise } from "@/lib/mock-data/pt-data";
-import type { PlanWeek } from "@/lib/gemini/types";
+import type { PlanWeek, PlanStructure } from "@/lib/gemini/types";
+import { DAYS_OF_WEEK, getCategoryBadgeVariant } from "./plan-utils";
 
 import exerciseData from "@/lib/exercises/data.json";
-
-interface Exercise {
-  id: string;
-  name: string;
-  slug: string;
-  tier: number;
-  body_region: string;
-  category: string;
-  difficulty: string;
-  default_reps: number;
-  default_sets: number;
-  default_hold_seconds?: number;
-  description?: string;
-}
+import type { Exercise } from "@/lib/exercises/types";
+import { PlanChat } from "@/components/pt/plan-chat";
 
 // Extract unique categories from exercise data
 const categories = Array.from(
-  new Set(exerciseData.exercises.map((ex: Exercise) => ex.category))
+  new Set(exerciseData.exercises.map((ex) => ex.category))
 ).sort();
-
-// Day labels for weekly plan tabs
-const DAYS_OF_WEEK = [
-  { value: 1, label: "Mon", fullLabel: "Monday" },
-  { value: 2, label: "Tue", fullLabel: "Tuesday" },
-  { value: 3, label: "Wed", fullLabel: "Wednesday" },
-  { value: 4, label: "Thu", fullLabel: "Thursday" },
-  { value: 5, label: "Fri", fullLabel: "Friday" },
-  { value: 6, label: "Sat", fullLabel: "Saturday" },
-  { value: 0, label: "Sun", fullLabel: "Sunday" },
-];
 
 interface PlanBuilderPageProps {
   params: Promise<{ id: string }>;
+}
+
+interface PatientInfo {
+  name: string;
+  currentPlanId: string | null;
 }
 
 export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
@@ -58,10 +41,8 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
   const router = useRouter();
 
   const {
-    getPatientById,
     draftPlan,
     draftPlanStructure,
-    loadDraftPlan,
     addExerciseToPlan,
     removeExerciseFromPlan,
     updateExerciseConfig,
@@ -75,7 +56,9 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
     updateWeekNotes,
   } = usePTStore();
 
-  const patient = getPatientById(clientId);
+  // Patient info fetched from API
+  const [patient, setPatient] = useState<PatientInfo | null>(null);
+  const [patientLoading, setPatientLoading] = useState(true);
 
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -87,22 +70,58 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [availableAssessment, setAvailableAssessment] = useState<{ id: string; completed: boolean } | null>(null);
 
-  // Load existing plan on mount
+  // Load patient info and existing plan from API
   useEffect(() => {
-    if (patient?.currentPlan) {
-      loadDraftPlan(clientId);
-      setPlanName(patient.currentPlan.name);
-    } else {
-      clearDraftPlan();
-      setPlanName("New Treatment Plan");
+    async function fetchPatientAndPlan() {
+      try {
+        const response = await fetch(`/api/pt/clients/${clientId}`, {
+          headers: { "x-demo-role": "pt" },
+        });
+        if (!response.ok) {
+          setPatientLoading(false);
+          return;
+        }
+        const { data } = await response.json();
+        setPatient({
+          name: data.name,
+          currentPlanId: data.currentPlan?.id ?? null,
+        });
+
+        // If there's an existing plan, load its structure
+        if (data.currentPlan?.id) {
+          const planResponse = await fetch(`/api/plans/${data.currentPlan.id}`, {
+            headers: { "x-demo-role": "pt" },
+          });
+          if (planResponse.ok) {
+            const { data: planData } = await planResponse.json();
+            setPlanName(planData.name || "Treatment Plan");
+
+            // If the plan has a 12-week structure, load it into the draft
+            if (planData.structure?.weeks) {
+              clearDraftPlan();
+              setPlanStructure(planData.structure as PlanStructure);
+            }
+          }
+        } else {
+          clearDraftPlan();
+          setPlanName("New Treatment Plan");
+        }
+      } catch (err) {
+        console.error("Error fetching patient:", err);
+      } finally {
+        setPatientLoading(false);
+      }
     }
-  }, [clientId, patient, loadDraftPlan, clearDraftPlan]);
+    fetchPatientAndPlan();
+  }, [clientId, clearDraftPlan, setPlanStructure]);
 
   // Fetch available assessments for this patient
   useEffect(() => {
     async function fetchAssessments() {
       try {
-        const response = await fetch(`/api/assessments/${clientId}`);
+        const response = await fetch(`/api/assessments/${clientId}`, {
+          headers: { "x-demo-role": "pt" },
+        });
         if (!response.ok) {
           // If 404 or other error, just continue without assessment
           return;
@@ -226,7 +245,7 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
       // Call the real API
       const response = await fetch('/api/plans/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-demo-role': 'pt' },
         body: JSON.stringify({
           assessmentId: availableAssessment.id,
           patientId: clientId,
@@ -352,7 +371,7 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
       try {
         const response = await fetch('/api/plans', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'x-demo-role': 'pt' },
           body: JSON.stringify({
             patientId: clientId,
             name: planName || 'Rehabilitation Plan',
@@ -383,6 +402,32 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
     router.push(`/pt/clients/${clientId}`);
   };
 
+  // Handle adding exercise from chat suggestion (by slug)
+  const handleAddExerciseBySlug = (slug: string) => {
+    const exercise = (exerciseData.exercises as Exercise[]).find(
+      (ex) => ex.slug === slug
+    );
+    if (exercise) {
+      handleAddExercise(exercise);
+    }
+  };
+
+  // Build plan context for the chat panel
+  const chatPlanContext = useMemo(() => {
+    if (!draftPlanStructure) return undefined;
+    return {
+      weekCount: draftPlanStructure.weeks.length,
+      currentWeek: selectedWeek,
+      exercises: currentWeek?.exercises.map((ex) => ({
+        name: ex.name,
+        sets: ex.sets,
+        reps: ex.reps,
+        days: ex.days,
+      })),
+      weekFocus: currentWeek?.focus,
+    };
+  }, [draftPlanStructure, selectedWeek, currentWeek]);
+
   // Format category for display
   const formatCategory = (category: string) => {
     return category
@@ -391,18 +436,19 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
       .join(" ");
   };
 
-  // Get badge variant for category
-  const getCategoryBadgeVariant = (category: string) => {
-    const variants: Record<string, "default" | "success" | "info" | "warning" | "coral" | "muted"> = {
-      mobility: "info",
-      extension: "success",
-      stretch: "warning",
-      strengthening: "coral",
-      core_stability: "success",
-      neural_mobilization: "muted",
-    };
-    return variants[category] || "default";
-  };
+  if (patientLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-sage-50 to-white p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="h-16 rounded-xl bg-sage-100/50 animate-pulse mb-6" />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="h-96 rounded-xl bg-sage-100/50 animate-pulse" />
+            <div className="h-96 rounded-xl bg-sage-100/50 animate-pulse" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!patient) {
     return (
@@ -544,11 +590,11 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
                     No exercises found
                   </p>
                 ) : (
-                  filteredExercises.map((exercise) => {
+                  filteredExercises.map((exercise, idx) => {
                     const alreadyAdded = isInPlan(exercise.id);
                     return (
                       <button
-                        key={exercise.id}
+                        key={`${exercise.slug}-${idx}`}
                         onClick={() => handleAddExercise(exercise)}
                         disabled={alreadyAdded}
                         className={`
@@ -841,6 +887,13 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
           </Card>
         </div>
       </main>
+
+      {/* AI Chat Panel */}
+      <PlanChat
+        planContext={chatPlanContext}
+        patientName={patient.name}
+        onAddExercise={handleAddExerciseBySlug}
+      />
     </div>
   );
 }
