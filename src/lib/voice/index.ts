@@ -14,6 +14,6 @@ export { FormEventDebouncer, formEventDebouncer } from './form-event-debouncer';
 export {
   FormEventBridge,
   createFormEventBridge,
-  type VapiMethods,
+  type VoiceMethods,
   type FormEventBridgeOptions,
 } from './form-event-bridge';

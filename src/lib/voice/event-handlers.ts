@@ -10,7 +10,7 @@ import type {
   FormErrorType,
   FormErrorDetails,
   EventPriority,
-  VapiMethods,
+  VoiceMethods,
 } from './types.js';
 import {
   EventPriority as Priority,
@@ -20,7 +20,7 @@ import {
 import type { FormEventDebouncer } from './form-event-debouncer.js';
 
 export interface HandlerContext {
-  vapi: VapiMethods;
+  vapi: VoiceMethods;
   debouncer: FormEventDebouncer;
   log: (message: string, data?: unknown) => void;
 }

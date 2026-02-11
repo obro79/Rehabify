@@ -23,7 +23,7 @@ import {
 } from './types';
 import { FormEventDebouncer } from './form-event-debouncer';
 
-export interface VapiMethods {
+export interface VoiceMethods {
   /** Speak text immediately (bypasses LLM) */
   say: (text: string) => void;
   /** Inject context message for LLM */
@@ -40,12 +40,12 @@ export interface FormEventBridgeOptions {
 }
 
 export class FormEventBridge {
-  private vapi: VapiMethods;
+  private vapi: VoiceMethods;
   private debouncer: FormEventDebouncer;
   private debug: boolean;
   private isActive: boolean = false;
 
-  constructor(vapi: VapiMethods, options: FormEventBridgeOptions = {}) {
+  constructor(vapi: VoiceMethods, options: FormEventBridgeOptions = {}) {
     this.vapi = vapi;
     this.debouncer = options.debouncer ?? new FormEventDebouncer();
     this.debug = options.debug ?? false;
@@ -322,7 +322,7 @@ export class FormEventBridge {
  * Create a FormEventBridge instance
  */
 export function createFormEventBridge(
-  vapi: VapiMethods,
+  vapi: VoiceMethods,
   options?: FormEventBridgeOptions
 ): FormEventBridge {
   return new FormEventBridge(vapi, options);

@@ -137,7 +137,7 @@ export interface VapiContextMessage {
 /**
  * Interface for Vapi methods used by event handlers
  */
-export interface VapiMethods {
+export interface VoiceMethods {
   say: (text: string) => void;
   injectContext: (context: string) => void;
 }

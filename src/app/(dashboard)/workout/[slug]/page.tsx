@@ -29,7 +29,7 @@ import {
 } from "@/stores/exercise-store-selectors";
 import type { Exercise } from "@/lib/exercises/types";
 import { getFormScoreColor, getFormFeedback } from "@/lib/exercise-utils";
-import { useVapi } from "@/hooks/use-vapi";
+import { useGeminiVoice } from "@/hooks/use-gemini-voice";
 import { useFormEventBridge } from "@/hooks/use-form-event-bridge";
 import { useVoiceStore } from "@/stores/voice-store";
 import type { PlanStructure, PlanExercise } from "@/lib/gemini/types";
@@ -159,7 +159,7 @@ export default function WorkoutSessionPage() {
     isSpeaking,
     setMuted,
     injectContext,
-  } = useVapi({
+  } = useGeminiVoice({
     onUserReady: handleUserReady,
   });
   const {

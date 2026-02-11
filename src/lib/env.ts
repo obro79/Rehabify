@@ -32,9 +32,9 @@ const serverEnvSchema = z.object({
   // Optional during build, required at runtime
   NEON_AUTH_BASE_URL: z.string().url('NEON_AUTH_BASE_URL must be a valid URL').optional(),
 
-  // Voice AI (Vapi)
-  VAPI_PRIVATE_KEY: z.string().min(1, 'VAPI_PRIVATE_KEY is required'),
-  VAPI_WEBHOOK_SECRET: z.string().min(1, 'VAPI_WEBHOOK_SECRET is required'),
+  // Voice AI (Vapi - legacy, optional during migration)
+  VAPI_PRIVATE_KEY: z.string().optional(),
+  VAPI_WEBHOOK_SECRET: z.string().optional(),
 
   // AI Plan Generation (Gemini)
   GEMINI_API_KEY: z.string().min(1, 'GEMINI_API_KEY is required'),
@@ -52,9 +52,7 @@ const serverEnvSchema = z.object({
 
 // Client-safe environment variables (NEXT_PUBLIC_* prefix)
 const clientEnvSchema = z.object({
-  NEXT_PUBLIC_VAPI_PUBLIC_KEY: z
-    .string()
-    .min(1, 'NEXT_PUBLIC_VAPI_PUBLIC_KEY is required'),
+  NEXT_PUBLIC_VAPI_PUBLIC_KEY: z.string().optional(),
   NEXT_PUBLIC_APP_URL: z
     .string()
     .url('NEXT_PUBLIC_APP_URL must be a valid URL'),

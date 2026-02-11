@@ -6,6 +6,9 @@ import { ArrowLeft, Mic, MicOff, Volume2, Loader2, X, FileText } from "lucide-re
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
+import { Textarea } from "@/components/ui/textarea";
 import { ProgressRing } from "@/components/ui/progress-ring";
 import { RepCounter } from "@/components/ui/rep-counter";
 import { VoiceIndicator } from "@/components/ui/voice-indicator";
@@ -25,7 +28,7 @@ import {
   selectPhase,
   selectRepCount,
 } from "@/stores/exercise-store-selectors";
-import { useAssessmentVapi } from "@/hooks/use-assessment-vapi";
+import { useAssessmentVoice } from "@/hooks/use-assessment-voice";
 import exercisesData from "@/lib/exercises/data.json";
 import type { Exercise } from "@/lib/exercises/types";
 import { getFormScoreColor } from "@/lib/exercise-utils";
@@ -429,19 +432,14 @@ export default function LowerBackAssessmentPage() {
   const [currentMovementIndex, setCurrentMovementIndex] = React.useState(0);
   const [isMovementPhase, setIsMovementPhase] = React.useState(false);
   const [showDescribeModal, setShowDescribeModal] = React.useState(false);
-  const [describeText, setDescribeText] = React.useState(
-    `Body region: Lower back
-
-Pain level (0-10):
-
-Symptoms:
-
-Activities affected:
-
-Goals: `
-  );
+  const [formData, setFormData] = React.useState({
+    bodyRegion: "Lower back",
+    painLevel: 5,
+    symptoms: "",
+    activitiesAffected: "",
+    goals: "",
+  });
   const [describeError, setDescribeError] = React.useState<string | null>(null);
-  const [isSubmittingText, setIsSubmittingText] = React.useState(false);
 
   // Movement exercises for camera tracking
   const movementExercises = React.useMemo(() => {
@@ -523,7 +521,7 @@ Goals: `
     setMuted,
     injectContext,
     currentPhase,
-  } = useAssessmentVapi({
+  } = useAssessmentVoice({
     onComplete: () => {
       // Auto-save when complete
       saveAssessment();
@@ -667,40 +665,31 @@ Goals: `
     }
   };
 
-  // Handle text-to-plan submission
-  const handleSubmitDescription = async () => {
-    if (!describeText.trim() || describeText.trim().length < 10) {
-      setDescribeError("Please describe your symptoms in at least a few words.");
+  // Handle text-to-plan submission — redirect immediately, generate in background
+  const handleSubmitDescription = () => {
+    if (!formData.symptoms.trim()) {
+      setDescribeError("Please describe your symptoms.");
       return;
     }
-    setIsSubmittingText(true);
-    setDescribeError(null);
 
     // Stop voice if connected
     if (isConnected) {
       stopVapi();
     }
 
-    try {
-      const response = await fetch("/api/assessments/from-text", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: describeText }),
-      });
+    const text = `Body region: ${formData.bodyRegion}\nPain level: ${formData.painLevel}/10\nSymptoms: ${formData.symptoms}\nActivities affected: ${formData.activitiesAffected}\nGoals: ${formData.goals}`;
 
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error?.message || "Failed to generate plan");
-      }
+    // Fire-and-forget: send the request, don't wait for it
+    fetch("/api/assessments/from-text", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    }).catch((err) => {
+      console.error("[DescribeModal] Background submit error:", err);
+    });
 
-      const result = await response.json();
-      router.push("/dashboard");
-    } catch (err) {
-      console.error("[DescribeModal] Submit error:", err);
-      setDescribeError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setIsSubmittingText(false);
-    }
+    // Redirect to dashboard immediately
+    router.push("/dashboard");
   };
 
   return (
@@ -728,7 +717,7 @@ Goals: `
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowDescribeModal(true)}
-                disabled={isSaving || isSubmittingText}
+                disabled={isSaving}
                 className="text-sage-600 gap-1.5"
               >
                 <FileText className="w-4 h-4" />
@@ -878,8 +867,8 @@ Goals: `
 
       {/* Skip & Describe Modal */}
       {showDescribeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <Card className="w-full max-w-lg mx-4 p-6 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-6">
+          <Card className="w-full max-w-lg p-6 shadow-xl max-h-[calc(100vh-3rem)] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-foreground">
                 Describe Your Symptoms
@@ -889,7 +878,7 @@ Goals: `
                 size="icon"
                 className="h-8 w-8"
                 onClick={() => setShowDescribeModal(false)}
-                disabled={isSubmittingText}
+
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -900,13 +889,72 @@ Goals: `
               We'll generate a personalized rehab plan from your description.
             </p>
 
-            <textarea
-              value={describeText}
-              onChange={(e) => setDescribeText(e.target.value)}
-              disabled={isSubmittingText}
-              className="w-full h-48 px-3 py-2 text-sm border border-sage-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sage-400 focus:border-transparent resize-none disabled:opacity-50"
-              placeholder="Describe your symptoms, pain level, and goals..."
-            />
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-foreground mb-1.5 block">
+                  Body Region
+                </label>
+                <Input
+                  value={formData.bodyRegion}
+                  readOnly
+                  className="bg-muted/50"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-foreground mb-1.5 block">
+                  Pain Level: <span className="text-sage-600">{formData.painLevel}/10</span>
+                </label>
+                <Slider
+                  value={formData.painLevel}
+                  min={0}
+                  max={10}
+                  step={1}
+                  onValueChange={(v) => setFormData((prev) => ({ ...prev, painLevel: v }))}
+                  showValue
+  
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-foreground mb-1.5 block">
+                  Symptoms <span className="text-destructive">*</span>
+                </label>
+                <Textarea
+                  value={formData.symptoms}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, symptoms: e.target.value }))}
+  
+                  rows={2}
+                  placeholder="e.g. dull ache, stiffness in the morning, sharp pain when bending..."
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-foreground mb-1.5 block">
+                  Activities Affected
+                </label>
+                <Textarea
+                  value={formData.activitiesAffected}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, activitiesAffected: e.target.value }))}
+  
+                  rows={2}
+                  placeholder="e.g. sitting at desk, lifting, exercising..."
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-foreground mb-1.5 block">
+                  Goals
+                </label>
+                <Textarea
+                  value={formData.goals}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, goals: e.target.value }))}
+  
+                  rows={2}
+                  placeholder="e.g. reduce pain, improve mobility, return to running..."
+                />
+              </div>
+            </div>
 
             {describeError && (
               <p className="text-sm text-destructive mt-2">{describeError}</p>
@@ -917,7 +965,7 @@ Goals: `
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowDescribeModal(false)}
-                disabled={isSubmittingText}
+
               >
                 Cancel
               </Button>
@@ -925,17 +973,10 @@ Goals: `
                 variant="secondary"
                 size="sm"
                 onClick={handleSubmitDescription}
-                disabled={isSubmittingText}
+
                 className="gap-1.5"
               >
-                {isSubmittingText ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Generating Plan...
-                  </>
-                ) : (
-                  "Generate My Plan"
-                )}
+                Generate My Plan
               </Button>
             </div>
           </Card>
