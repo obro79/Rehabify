@@ -324,10 +324,16 @@ export default function DashboardPage() {
                 Based on your progress and recovery goals
               </p>
             </div>
-            <Button variant="primary" onClick={handleStartRoutine}>
-              Start Full Routine
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-3">
+              <Link href="/plan" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                View Full Plan
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Button variant="primary" onClick={handleStartRoutine}>
+                Start Full Routine
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </FadeIn>
 
