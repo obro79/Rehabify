@@ -20,8 +20,21 @@ import { SanctuaryBackground } from "@/components/ui/sanctuary-background";
 import { getExerciseBySlug } from "@/lib/exercises";
 import { getFormScoreColor, getFormFeedback } from "@/lib/exercise-utils";
 
-// Fallback data when no session result is available
-const FALLBACK_DATA = {
+
+// Mock data - in production this would come from session state/API
+const MOCK_SESSION_DATA = {
+  userName: "Sarah",
+  formScore: 85,
+  repsCompleted: 10,
+  targetReps: 10,
+  duration: "5:23",
+  xpEarned: 125,
+  currentLevel: 3,
+  levelProgress: 67,
+  currentXP: 325,
+  nextLevelXP: 500,
+  currentStreak: 6,
+  bestStreak: 12,
   formBreakdown: [
     { metric: "Range of Motion", score: 95, feedback: "Excellent!" },
     { metric: "Head Position", score: 82, feedback: "Good" },
