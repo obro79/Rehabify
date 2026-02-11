@@ -26,8 +26,8 @@ export interface UseVapiOptions {
 }
 
 export interface UseVapiReturn {
-  /** Start a voice call with the assistant */
-  start: (overrideAssistantId?: string, metadata?: Record<string, unknown>) => Promise<void>;
+  /** Start a voice call with an assistant ID or inline config */
+  start: (assistantIdOrConfig?: string | Record<string, unknown>, metadata?: Record<string, unknown>) => Promise<void>;
   /** Stop the current call */
   stop: () => void;
   /** Speak text immediately (bypasses LLM) */
@@ -226,39 +226,58 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
     reset,
   ]);
 
-  // Start a call
+  // Start a call - accepts either an assistant ID string or an inline config object
   const start = useCallback(
-    async (overrideAssistantId?: string, metadata?: Record<string, unknown>) => {
+    async (assistantIdOrConfig?: string | Record<string, unknown>, metadata?: Record<string, unknown>) => {
       if (!vapiRef.current) {
         console.error('[useVapi] Vapi not initialized');
         setError('Vapi not initialized');
         return;
       }
 
-      const targetAssistantId =
-        overrideAssistantId ||
-        assistantId ||
-        process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID;
+      // Determine if we received an inline config object or an assistant ID string
+      const isInlineConfig = typeof assistantIdOrConfig === 'object' && assistantIdOrConfig !== null;
 
-      if (!targetAssistantId) {
-        console.error('[useVapi] No assistant ID provided');
-        setError('No assistant ID configured');
-        return;
-      }
+      if (!isInlineConfig) {
+        const targetAssistantId =
+          (assistantIdOrConfig as string) ||
+          assistantId ||
+          process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID;
 
-      try {
-        setConnectionState('connecting');
+        if (!targetAssistantId) {
+          console.error('[useVapi] No assistant ID provided');
+          setError('No assistant ID configured');
+          return;
+        }
 
-        await vapiRef.current.start(targetAssistantId, {
-          metadata,
-        });
-      } catch (err) {
-        console.error('[useVapi] Failed to start call:', err);
-        setConnectionState('error');
-        setError(err instanceof Error ? err.message : 'Failed to start call');
+        try {
+          setConnectionState('connecting');
+          await vapiRef.current.start(targetAssistantId, { metadata });
+          // start() resolved = call-start-success fired = call is live
+          setConnectionState('connected');
+          setSpeakingStatus('listening');
+          onConnectionChangeRef.current?.(true);
+        } catch (err) {
+          console.error('[useVapi] Failed to start call:', err);
+          setConnectionState('error');
+          setError(err instanceof Error ? err.message : 'Failed to start call');
+        }
+      } else {
+        try {
+          setConnectionState('connecting');
+          await vapiRef.current.start(assistantIdOrConfig);
+          // start() resolved = call-start-success fired = call is live
+          setConnectionState('connected');
+          setSpeakingStatus('listening');
+          onConnectionChangeRef.current?.(true);
+        } catch (err) {
+          console.error('[useVapi] Failed to start call:', err);
+          setConnectionState('error');
+          setError(err instanceof Error ? err.message : 'Failed to start call');
+        }
       }
     },
-    [assistantId, setConnectionState, setError]
+    [assistantId, setConnectionState, setSpeakingStatus, setError]
   );
 
   // Stop the current call

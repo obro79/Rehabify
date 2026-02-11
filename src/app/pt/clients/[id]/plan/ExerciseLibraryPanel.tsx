@@ -69,9 +69,9 @@ export function ExerciseLibraryPanel({
               No exercises found
             </p>
           ) : (
-            exercises.map((exercise) => (
+            exercises.map((exercise, idx) => (
               <ExerciseLibraryItem
-                key={exercise.id}
+                key={`${exercise.slug}-${idx}`}
                 exercise={exercise}
                 isInPlan={isInPlan(exercise.id)}
                 onAdd={() => onAddExercise(exercise)}

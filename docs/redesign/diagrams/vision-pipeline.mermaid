@@ -1,0 +1,49 @@
+%% Vision Pipeline: Skeleton Streaming Architecture
+%% See: docs/redesign/04-vision-architecture.md
+
+graph TD
+    subgraph Client ["Client (Browser) — Video Never Leaves Device"]
+        CAM[Camera Feed]
+        MP[MediaPipe Pose<br/>Landmarker WASM]
+        FILT[1-Euro Filter<br/>Smoothing]
+        FE[form-engine.ts<br/>Client Analysis]
+        UI[Real-time<br/>Form Feedback]
+        TEL[Telemetry<br/>Stream Client]
+    end
+
+    subgraph Server ["Server (Cloud Run)"]
+        WS[WebSocket<br/>Ingestion]
+        DTW[DTW Scorer<br/>vs Reference Motions]
+        PHY[Physics<br/>Validator]
+        REP[Server Rep<br/>Counter]
+        STORE[Telemetry<br/>Storage]
+    end
+
+    subgraph Storage ["Data Layer"]
+        DB[(PostgreSQL<br/>telemetry_sessions)]
+        BLOB[(Cloud Storage<br/>Raw Landmarks)]
+        REF[(reference_motions<br/>Gold Standard)]
+    end
+
+    CAM -->|Video frames| MP
+    MP -->|"33 landmarks<br/>@ 30fps"| FILT
+    FILT --> FE
+    FILT --> TEL
+    FE -->|"< 16ms latency"| UI
+    TEL -->|"JSON ~5KB/s<br/>via WebSocket"| WS
+    WS --> DTW
+    WS --> PHY
+    WS --> REP
+    REF -.->|Reference data| DTW
+    DTW --> STORE
+    PHY --> STORE
+    REP --> STORE
+    STORE --> DB
+    STORE --> BLOB
+
+    style CAM fill:#ffebee,stroke:#b71c1c
+    style MP fill:#e1f5fe,stroke:#01579b
+    style FE fill:#e8f5e9,stroke:#1b5e20
+    style UI fill:#e8f5e9,stroke:#1b5e20
+    style DTW fill:#fff3e0,stroke:#e65100
+    style REF fill:#f3e5f5,stroke:#4a148c

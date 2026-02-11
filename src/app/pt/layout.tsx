@@ -1,12 +1,13 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Menu } from "lucide-react";
 import { PTSidebarNav } from "@/components/pt/pt-sidebar-nav";
 import { Logo } from "@/components/ui/logo";
 import { Button } from "@/components/ui/button";
 import { MobileNav } from "@/components/layout/mobile-nav";
-import { usePTStore } from "@/stores/pt-store";
 import { useRouter } from "next/navigation";
+import type { MockPatient } from "@/lib/mock-data/pt-data";
 
 export default function PTLayout({
   children,
@@ -14,7 +15,42 @@ export default function PTLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const patients = usePTStore((state) => state.patients);
+  const [patients, setPatients] = useState<MockPatient[]>([]);
+
+  useEffect(() => {
+    async function fetchClients() {
+      try {
+        const response = await fetch("/api/pt/clients", {
+          headers: { "x-demo-role": "pt" },
+        });
+        if (!response.ok) return;
+        const { data } = await response.json();
+        const mapped = (data as Array<Record<string, unknown>>).map(
+          (client): MockPatient => ({
+            id: client.id as string,
+            name: client.name as string,
+            email: client.email as string,
+            status: (client.status as MockPatient["status"]) ?? "active",
+            memberSince: new Date(),
+            alerts: ((client.alerts as Array<Record<string, unknown>>) ?? []).map((a) => ({
+              id: a.id as string,
+              type: "pain_report" as const,
+              severity: (a.severity as "low" | "medium" | "high") ?? "low",
+              message: a.message as string,
+              createdAt: new Date(a.createdAt as string),
+            })),
+            lastSession: null,
+            currentPlan: null,
+            sessionHistory: [],
+          })
+        );
+        setPatients(mapped);
+      } catch {
+        // Silently fail - sidebar will just be empty
+      }
+    }
+    fetchClients();
+  }, []);
 
   const handlePatientClick = (patientId: string) => {
     router.push(`/pt/clients/${patientId}`);
