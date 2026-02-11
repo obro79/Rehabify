@@ -25,13 +25,14 @@
     ]
   },
   "dependencies": {
+    "1eurofilter": "^1.2.2",
+    "@google/genai": "^1.40.0",
     "@google/generative-ai": "^0.21.0",
     "@mediapipe/tasks-vision": "^0.10.14",
     "@neondatabase/auth": "0.1.0-beta.21",
     "@neondatabase/serverless": "^0.10.0",
     "@radix-ui/react-slot": "^1.2.4",
     "@vapi-ai/web": "^2.0.0",
-    "1eurofilter": "^1.2.2",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.38.0",
