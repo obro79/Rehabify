@@ -28,7 +28,19 @@ export async function GET() {
       .where(eq(profiles.id, user.id));
 
     if (!profile) {
-      return success({
+      // Auto-create profile for new users (including demo mode)
+      const [created] = await db
+        .insert(profiles)
+        .values({
+          id: user.id,
+          email: user.email,
+          displayName: user.name || null,
+          role: (user as { role?: string }).role === 'pt' ? 'pt' : 'patient',
+        })
+        .onConflictDoNothing()
+        .returning();
+
+      const newProfile = created ?? {
         id: user.id,
         email: user.email,
         displayName: user.name || null,
@@ -38,6 +50,18 @@ export async function GET() {
         longestStreak: 0,
         lastWorkoutDate: null,
         preferences: {},
+      };
+
+      return success({
+        id: newProfile.id,
+        email: newProfile.email,
+        displayName: newProfile.displayName,
+        xp: newProfile.xp ?? 0,
+        level: newProfile.level ?? 1,
+        currentStreak: newProfile.currentStreak ?? 0,
+        longestStreak: newProfile.longestStreak ?? 0,
+        lastWorkoutDate: newProfile.lastWorkoutDate ?? null,
+        preferences: newProfile.preferences ?? {},
       });
     }
 

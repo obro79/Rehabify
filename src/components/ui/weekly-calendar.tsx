@@ -80,7 +80,7 @@ const WeeklyCalendar = React.forwardRef<HTMLDivElement, WeeklyCalendarProps>(
                 key={index}
                 className={cn(
                   "relative flex items-center justify-center",
-                  "w-9 h-9 rounded-lg transition-all",
+                  "aspect-square rounded-lg transition-all",
                   isCompleted
                     ? "bg-gradient-to-b from-sage-light to-sage-500 text-white shadow-sm"
                     : isPast

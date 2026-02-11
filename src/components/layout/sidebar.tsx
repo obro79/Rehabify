@@ -9,10 +9,11 @@ import {
     DumbbellIcon,
     ProgressIcon,
     ProfileIcon,
+    PlanIcon,
 } from "@/components/ui/icons";
 import { Logo } from "@/components/ui/logo";
 import { Button } from "@/components/ui/button";
-import { LogOut, ClipboardList } from "lucide-react";
+import { LogOut } from "lucide-react";
 
 export interface NavItem {
     label: string;
@@ -29,7 +30,7 @@ const navItems: NavItem[] = [
     {
         label: "My Plan",
         href: "/plan",
-        icon: <ClipboardList className="h-5 w-5 text-sage-600" />,
+        icon: <PlanIcon size="md" variant="sage" />,
     },
     {
         label: "Exercises",

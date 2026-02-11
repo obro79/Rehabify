@@ -231,6 +231,28 @@ export default function ProfilePage() {
     });
   };
 
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Settings</h1>
+          <p className="text-muted-foreground mt-1">
+            Manage your account preferences and accessibility options
+          </p>
+        </div>
+        {[1, 2, 3, 4, 5].map((i) => (
+          <Card key={i} className="rounded-3xl">
+            <CardContent className="p-6 space-y-4">
+              <div className="h-5 w-48 bg-muted animate-pulse rounded" />
+              <div className="h-4 w-72 bg-muted/60 animate-pulse rounded" />
+              <div className="h-10 w-full bg-muted/40 animate-pulse rounded" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 relative">
       {/* Subtle organic background decoration */}
