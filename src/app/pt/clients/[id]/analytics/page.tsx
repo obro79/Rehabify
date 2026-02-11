@@ -1,8 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { usePTStore } from "@/stores/pt-store";
 import { StatsCard } from "@/components/ui/stats-card";
 import { ProgressRing } from "@/components/ui/progress-ring";
 import { Badge } from "@/components/ui/badge";
@@ -20,10 +19,27 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
+  Loader2,
 } from "lucide-react";
 import { GoalIcon, CalendarIcon, ChartIcon } from "@/components/ui/icons";
 
 type TrendDirection = "improving" | "declining" | "stable";
+
+interface SessionFromAPI {
+  id: string;
+  date: string;
+  formScore: number;
+  duration: string;
+  painLevel?: number;
+  status: string;
+  exercises: unknown;
+}
+
+interface ClientFromAPI {
+  id: string;
+  name: string;
+  sessionHistory: SessionFromAPI[];
+}
 
 interface AnalyticsData {
   avgFormScore: number;
@@ -39,7 +55,7 @@ interface AnalyticsData {
 }
 
 function calculateAnalytics(
-  sessionHistory: Array<{ formScore: number; painLevel?: number; date: Date }>
+  sessionHistory: Array<{ formScore: number; painLevel?: number; date: string }>
 ): AnalyticsData {
   if (sessionHistory.length === 0) {
     return {
@@ -56,20 +72,22 @@ function calculateAnalytics(
     };
   }
 
+  // Sort sessions by date ascending for trend calculations
+  const sorted = [...sessionHistory].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+
   // Calculate average form score
   const avgFormScore = Math.round(
-    sessionHistory.reduce((sum, s) => sum + s.formScore, 0) /
-      sessionHistory.length
+    sorted.reduce((sum, s) => sum + s.formScore, 0) / sorted.length
   );
 
   // Get recent scores for display (last 5)
-  const recentScores = sessionHistory
-    .slice(-5)
-    .map((s) => s.formScore);
+  const recentScores = sorted.slice(-5).map((s) => s.formScore);
 
   // Calculate form score trend: compare first 5 vs last 5 sessions
-  const first5 = sessionHistory.slice(0, Math.min(5, sessionHistory.length));
-  const last5 = sessionHistory.slice(-Math.min(5, sessionHistory.length));
+  const first5 = sorted.slice(0, Math.min(5, sorted.length));
+  const last5 = sorted.slice(-Math.min(5, sorted.length));
 
   const first5Avg =
     first5.reduce((sum, s) => sum + s.formScore, 0) / first5.length;
@@ -84,28 +102,25 @@ function calculateAnalytics(
     formScoreTrend = "declining";
   }
 
-  // Calculate session completion rate (sessions in last 4 weeks / expected 3-4 per week)
-  // Use most recent session date as reference point to avoid hydration mismatch
-  const sortedByDate = [...sessionHistory].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
-  const mostRecentDate = sortedByDate.length > 0 ? new Date(sortedByDate[0].date) : new Date(0);
+  // Calculate session completion rate (sessions in last 4 weeks / expected)
+  const mostRecentDate =
+    sorted.length > 0 ? new Date(sorted[sorted.length - 1].date) : new Date(0);
   const fourWeeksBeforeRecent = new Date(mostRecentDate);
   fourWeeksBeforeRecent.setDate(fourWeeksBeforeRecent.getDate() - 28);
 
-  const sessionsInLast4Weeks = sessionHistory.filter(
+  const sessionsInLast4Weeks = sorted.filter(
     (s) => new Date(s.date) >= fourWeeksBeforeRecent
   ).length;
 
-  const expectedSessions = 14; // Assuming 3.5 sessions per week for 4 weeks
+  const expectedSessions = 14; // ~3.5 sessions per week for 4 weeks
   const sessionCompletionRate = Math.min(
     100,
     Math.round((sessionsInLast4Weeks / expectedSessions) * 100)
   );
 
   // Calculate pain levels
-  const sessionsWithPain = sessionHistory.filter(
-    (s) => s.painLevel !== undefined
+  const sessionsWithPain = sorted.filter(
+    (s) => s.painLevel !== undefined && s.painLevel !== null
   );
   const initialPainLevel =
     sessionsWithPain.length > 0 ? sessionsWithPain[0].painLevel ?? 0 : 0;
@@ -166,18 +181,41 @@ export default function PatientAnalyticsPage() {
   const router = useRouter();
   const params = useParams();
   const patientId = params.id as string;
-  const getPatientById = usePTStore((state) => state.getPatientById);
-  const patient = getPatientById(patientId);
+
+  const [client, setClient] = useState<ClientFromAPI | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    async function fetchClient() {
+      try {
+        const response = await fetch(`/api/pt/clients/${patientId}`, {
+          headers: { "x-demo-role": "pt" },
+        });
+        if (!response.ok) {
+          setError(true);
+          setLoading(false);
+          return;
+        }
+        const { data } = await response.json();
+        setClient(data);
+      } catch {
+        setError(true);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchClient();
+  }, [patientId]);
 
   const analytics = useMemo(() => {
-    if (!patient) return null;
-    return calculateAnalytics(patient.sessionHistory);
-  }, [patient]);
+    if (!client?.sessionHistory?.length) return null;
+    return calculateAnalytics(client.sessionHistory);
+  }, [client]);
 
   const benchmarkComparisons = useMemo(() => {
     if (!analytics) return null;
 
-    // Calculate form score improvement percentage
     const formScoreImprovement = calculateFormScoreImprovement(
       analytics.recentScores[0] ?? analytics.avgFormScore,
       analytics.recentScores[analytics.recentScores.length - 1] ?? analytics.avgFormScore
@@ -199,7 +237,33 @@ export default function PatientAnalyticsPage() {
     };
   }, [analytics]);
 
-  if (!patient || !analytics) {
+  // Loading state
+  if (loading) {
+    return (
+      <div className="max-w-4xl space-y-6">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.back()}
+            className="gap-2"
+          >
+            <ArrowLeft size={16} />
+            Back
+          </Button>
+        </div>
+        <Card>
+          <CardContent className="py-12 flex items-center justify-center gap-3">
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            <p className="text-muted-foreground">Loading analytics...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Error or not found state
+  if (error || !client) {
     return (
       <div className="max-w-4xl space-y-6">
         <Button
@@ -214,6 +278,41 @@ export default function PatientAnalyticsPage() {
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-muted-foreground">Patient not found</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Empty sessions state
+  if (!analytics) {
+    return (
+      <div className="max-w-4xl space-y-6">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.back()}
+            className="gap-2"
+          >
+            <ArrowLeft size={16} />
+            Back
+          </Button>
+          <div>
+            <h1 className="text-xl font-bold text-foreground">
+              {client.name} - Analytics
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Progress tracking and benchmark comparison
+            </p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="py-12 text-center">
+            <p className="text-muted-foreground">
+              No session data yet. Analytics will appear once the patient
+              completes their first workout session.
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -237,7 +336,7 @@ export default function PatientAnalyticsPage() {
         </Button>
         <div>
           <h1 className="text-xl font-bold text-foreground">
-            {patient.name} - Analytics
+            {client.name} - Analytics
           </h1>
           <p className="text-sm text-muted-foreground">
             Progress tracking and benchmark comparison
