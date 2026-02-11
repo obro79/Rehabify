@@ -6,15 +6,13 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { FadeIn, StaggerContainer, StaggerItem } from "@/components/motion";
-import { ArrowRight, ClipboardList, Play, Clock, Dumbbell } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, ClipboardList, Play, Clock, Dumbbell } from "lucide-react";
 import {
   getExerciseById,
   getExerciseBySlug,
   toCardData,
 } from "@/lib/exercises";
-import type { ExerciseCardData } from "@/lib/exercises/types";
 import {
   getExerciseImage,
   getExerciseIconOrCategory,
@@ -38,7 +36,7 @@ interface PlanData {
 }
 
 /** Convert a PlanExercise to ExerciseCardData for display */
-function toCard(planEx: PlanExercise): ExerciseCardData | null {
+function toCard(planEx: PlanExercise): ReturnType<typeof toCardData> | null {
   const ex = planEx.exerciseSlug
     ? getExerciseBySlug(planEx.exerciseSlug)
     : planEx.exerciseId
@@ -49,7 +47,7 @@ function toCard(planEx: PlanExercise): ExerciseCardData | null {
 
 export default function PlanPage() {
   const [plan, setPlan] = useState<PlanData | null>(null);
-  const [selectedWeek, setSelectedWeek] = useState("1");
+  const [selectedWeekNum, setSelectedWeekNum] = useState(1);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -94,8 +92,9 @@ export default function PlanPage() {
     loadPlan();
   }, []);
 
+  const totalWeeks = plan?.structure.weeks.length ?? 0;
   const currentWeek: PlanWeek | undefined = plan?.structure.weeks.find(
-    (w) => String(w.weekNumber) === selectedWeek
+    (w) => w.weekNumber === selectedWeekNum
   );
 
   // Sorted unique days that have exercises in the current week
@@ -170,211 +169,205 @@ export default function PlanPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      {/* Plan Header */}
+      {/* Week Header with Arrows */}
       <FadeIn>
-        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-sage-100 via-sage-50 to-white p-6 shadow-sm">
-          <div
-            className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-sage-200/30 to-terracotta-100/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"
-            aria-hidden="true"
-          />
-          <div className="relative space-y-2">
-            <h1 className="text-2xl font-bold text-foreground">{plan.name}</h1>
-            {plan.summary && (
-              <p className="text-muted-foreground max-w-2xl text-sm">
-                {plan.summary}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSelectedWeekNum((w) => Math.max(1, w - 1))}
+              disabled={selectedWeekNum <= 1}
+              className="p-2 rounded-full hover:bg-sage-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              aria-label="Previous week"
+            >
+              <ChevronLeft className="h-5 w-5 text-foreground" />
+            </button>
+            <div className="text-center min-w-[140px]">
+              <h1 className="text-2xl font-bold text-foreground">
+                Week {selectedWeekNum}
+              </h1>
+              <p className="text-xs text-muted-foreground">
+                of {totalWeeks}
               </p>
-            )}
-            {plan.recommendations.length > 0 && (
-              <div className="flex flex-wrap gap-2 pt-2">
-                {plan.recommendations.map((rec, i) => (
-                  <Badge
-                    key={i}
-                    variant={
-                      rec.type === "warning" || rec.type === "contraindication"
-                        ? "warning"
-                        : rec.type === "encouragement"
-                        ? "success"
-                        : "info"
-                    }
-                    size="sm"
-                  >
-                    {rec.message}
-                  </Badge>
-                ))}
-              </div>
-            )}
+            </div>
+            <button
+              onClick={() => setSelectedWeekNum((w) => Math.min(totalWeeks, w + 1))}
+              disabled={selectedWeekNum >= totalWeeks}
+              className="p-2 rounded-full hover:bg-sage-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              aria-label="Next week"
+            >
+              <ChevronRight className="h-5 w-5 text-foreground" />
+            </button>
           </div>
-        </section>
+          {/* Week progress dots */}
+          <div className="hidden sm:flex items-center gap-1.5">
+            {plan.structure.weeks.map((week) => (
+              <button
+                key={week.weekNumber}
+                onClick={() => setSelectedWeekNum(week.weekNumber)}
+                className={`w-2 h-2 rounded-full transition-all ${
+                  week.weekNumber === selectedWeekNum
+                    ? "bg-sage-900 scale-125"
+                    : "bg-sage-200 hover:bg-sage-400"
+                }`}
+                aria-label={`Go to week ${week.weekNumber}`}
+              />
+            ))}
+          </div>
+        </div>
       </FadeIn>
 
-      {/* Week Selector */}
-      <FadeIn delay={0.1}>
-        <Tabs value={selectedWeek} onValueChange={setSelectedWeek}>
-          <TabsList className="w-full flex flex-wrap gap-1">
-            {plan.structure.weeks.map((week) => (
-              <TabsTrigger
-                key={week.weekNumber}
-                value={String(week.weekNumber)}
-                className="min-w-[3rem]"
+      {/* Week Focus */}
+      {currentWeek && (currentWeek.focus || currentWeek.notes) && (
+        <FadeIn delay={0.05}>
+          <div className="space-y-1">
+            {currentWeek.focus && (
+              <p className="text-sm font-medium text-foreground">{currentWeek.focus}</p>
+            )}
+            {currentWeek.notes && (
+              <p className="text-sm text-muted-foreground">{currentWeek.notes}</p>
+            )}
+          </div>
+        </FadeIn>
+      )}
+
+      {/* Day Tabs */}
+      {activeDays.length > 0 && (
+        <FadeIn delay={0.1}>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {activeDays.map((day) => (
+              <button
+                key={day}
+                onClick={() => setSelectedDay(day)}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors shrink-0 ${
+                  selectedDay === day
+                    ? "bg-sage-900 text-white"
+                    : "bg-sage-100 text-sage-600 hover:bg-sage-200"
+                }`}
               >
-                W{week.weekNumber}
-              </TabsTrigger>
+                {DAY_NAMES[day]}
+              </button>
             ))}
-          </TabsList>
+          </div>
+        </FadeIn>
+      )}
 
-          {plan.structure.weeks.map((week) => (
-            <TabsContent
-              key={week.weekNumber}
-              value={String(week.weekNumber)}
-            >
-              {/* Week Info */}
-              <div className="mb-4 space-y-1">
-                <h2 className="text-lg font-semibold text-foreground">
-                  Week {week.weekNumber}: {week.focus}
-                </h2>
-                <p className="text-sm text-muted-foreground">{week.notes}</p>
-              </div>
-
-              <div className="space-y-4">
-                {/* Day Tabs — only show if days info exists */}
-                {activeDays.length > 0 && (
-                  <div className="flex gap-2">
-                    {activeDays.map((day) => (
-                      <button
-                        key={day}
-                        onClick={() => setSelectedDay(day)}
-                        className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                          selectedDay === day
-                            ? "bg-sage-900 text-white"
-                            : "bg-sage-100 text-sage-600 hover:bg-sage-200"
-                        }`}
-                      >
-                        {DAY_NAMES[day]}
-                      </button>
-                    ))}
+      {/* Start Session Button */}
+      {dayExercises.length > 0 && (
+        <FadeIn delay={0.15}>
+          <Link
+            href={`/workout/${dayExercises[0].exerciseSlug}`}
+            className="group block"
+          >
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-sage-800 to-sage-900 p-5 shadow-lg transition-all duration-200 hover:shadow-xl hover:scale-[1.01] active:scale-[0.99]">
+              <div
+                className="absolute inset-0 bg-gradient-to-r from-sage-700/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"
+                aria-hidden="true"
+              />
+              <div className="relative flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center justify-center w-11 h-11 rounded-full bg-white/15 backdrop-blur-sm">
+                    <Play className="h-5 w-5 text-white ml-0.5" />
                   </div>
-                )}
-
-                {/* Start Session Button */}
-                {dayExercises.length > 0 && (
-                  <Link
-                    href={`/workout/${dayExercises[0].exerciseSlug}`}
-                    className="group block"
-                  >
-                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-sage-800 to-sage-900 p-5 shadow-lg transition-all duration-200 hover:shadow-xl hover:scale-[1.01] active:scale-[0.99]">
-                      <div
-                        className="absolute inset-0 bg-gradient-to-r from-sage-700/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"
-                        aria-hidden="true"
-                      />
-                      <div className="relative flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center justify-center w-11 h-11 rounded-full bg-white/15 backdrop-blur-sm">
-                            <Play className="h-5 w-5 text-white ml-0.5" />
-                          </div>
-                          <div>
-                            <p className="text-white font-semibold text-base">
-                              Start Session
-                            </p>
-                            <div className="flex items-center gap-3 mt-0.5">
-                              <span className="flex items-center gap-1 text-sage-200 text-xs">
-                                <Dumbbell className="h-3 w-3" />
-                                {dayExercises.length} exercise{dayExercises.length !== 1 && "s"}
-                              </span>
-                              <span className="flex items-center gap-1 text-sage-200 text-xs">
-                                <Clock className="h-3 w-3" />
-                                ~{estimatedMinutes} min
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        <ArrowRight className="h-5 w-5 text-white/70 group-hover:text-white group-hover:translate-x-1 transition-all" />
-                      </div>
-                    </div>
-                  </Link>
-                )}
-
-                {/* Exercise Cards Grid — matching dashboard style */}
-                {dayExercises.length > 0 ? (
-                  <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {dayExercises.map((exercise) => {
-                      const cardData = toCard(exercise);
-                      return (
-                        <StaggerItem key={exercise.exerciseId || exercise.exerciseSlug}>
-                          <Card
-                            variant="organic"
-                            className="group p-4 hover:shadow-lg transition-all cursor-pointer hover:scale-[1.02]"
-                          >
-                            {/* Image/Icon area */}
-                            <div className="flex items-center justify-center h-24 bg-sage-50 rounded-2xl mb-3 group-hover:bg-sage-100 transition-colors relative overflow-hidden">
-                              {getExerciseImage(exercise.exerciseSlug) ? (
-                                <Image
-                                  src={getExerciseImage(exercise.exerciseSlug)!}
-                                  alt={exercise.name}
-                                  fill
-                                  className="object-cover"
-                                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                                />
-                              ) : (
-                                cardData
-                                  ? getExerciseIconOrCategory(cardData.id, cardData.category, "md")
-                                  : <Dumbbell className="h-8 w-8 text-sage-300" />
-                              )}
-                            </div>
-
-                            {/* Content */}
-                            <div className="space-y-2">
-                              <div className="flex items-start justify-between gap-1">
-                                <h3 className="font-semibold text-foreground text-sm leading-snug">
-                                  {exercise.name}
-                                </h3>
-                                {cardData && (
-                                  <Badge variant={getCategoryBadgeVariant(cardData.category)} size="sm" className="shrink-0">
-                                    {cardData.category}
-                                  </Badge>
-                                )}
-                              </div>
-
-                              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                                <span>
-                                  {exercise.sets} &times; {exercise.reps} reps
-                                  {exercise.holdSeconds != null && exercise.holdSeconds > 0 && (
-                                    <> &middot; {exercise.holdSeconds}s hold</>
-                                  )}
-                                </span>
-                                {cardData && (() => {
-                                  const fullExercise = getExerciseById(cardData.id);
-                                  const difficulty = fullExercise?.difficulty || "intermediate";
-                                  return (
-                                    <Badge variant={getDifficultyBadgeVariant(difficulty)} size="sm">
-                                      {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
-                                    </Badge>
-                                  );
-                                })()}
-                              </div>
-
-                              <Button variant="ghost" size="sm" className="w-full mt-2 h-8 px-2 text-xs font-normal text-muted-foreground hover:text-foreground" asChild>
-                                <Link href={`/workout/${exercise.exerciseSlug}`}>
-                                  Start
-                                </Link>
-                              </Button>
-                            </div>
-                          </Card>
-                        </StaggerItem>
-                      );
-                    })}
-                  </StaggerContainer>
-                ) : (
-                  <Card variant="organic" className="p-8 text-center space-y-2">
-                    <Dumbbell className="h-8 w-8 text-sage-300 mx-auto" />
-                    <p className="text-sm text-muted-foreground">
-                      No exercises scheduled for this week. Your plan may focus on rest and recovery during this period.
+                  <div>
+                    <p className="text-white font-semibold text-base">
+                      Start Session
                     </p>
-                  </Card>
-                )}
+                    <div className="flex items-center gap-3 mt-0.5">
+                      <span className="flex items-center gap-1 text-sage-200 text-xs">
+                        <Dumbbell className="h-3 w-3" />
+                        {dayExercises.length} exercise{dayExercises.length !== 1 && "s"}
+                      </span>
+                      <span className="flex items-center gap-1 text-sage-200 text-xs">
+                        <Clock className="h-3 w-3" />
+                        ~{estimatedMinutes} min
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <ArrowRight className="h-5 w-5 text-white/70 group-hover:text-white group-hover:translate-x-1 transition-all" />
               </div>
-            </TabsContent>
-          ))}
-        </Tabs>
+            </div>
+          </Link>
+        </FadeIn>
+      )}
+
+      {/* Exercise Cards Grid */}
+      <FadeIn delay={0.2}>
+        {dayExercises.length > 0 ? (
+          <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {dayExercises.map((exercise) => {
+              const cardData = toCard(exercise);
+              return (
+                <StaggerItem key={exercise.exerciseId || exercise.exerciseSlug}>
+                  <Card
+                    variant="organic"
+                    className="group p-4 hover:shadow-lg transition-all cursor-pointer hover:scale-[1.02]"
+                  >
+                    <div className="flex items-center justify-center h-24 bg-sage-50 rounded-2xl mb-3 group-hover:bg-sage-100 transition-colors relative overflow-hidden">
+                      {getExerciseImage(exercise.exerciseSlug) ? (
+                        <Image
+                          src={getExerciseImage(exercise.exerciseSlug)!}
+                          alt={exercise.name}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                        />
+                      ) : (
+                        cardData
+                          ? getExerciseIconOrCategory(cardData.id, cardData.category, "md")
+                          : <Dumbbell className="h-8 w-8 text-sage-300" />
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-start justify-between gap-1">
+                        <h3 className="font-semibold text-foreground text-sm leading-snug">
+                          {exercise.name}
+                        </h3>
+                        {cardData && (
+                          <Badge variant={getCategoryBadgeVariant(cardData.category)} size="sm" className="shrink-0">
+                            {cardData.category}
+                          </Badge>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between text-sm text-muted-foreground">
+                        <span>
+                          {exercise.sets} &times; {exercise.reps} reps
+                          {exercise.holdSeconds != null && exercise.holdSeconds > 0 && (
+                            <> &middot; {exercise.holdSeconds}s hold</>
+                          )}
+                        </span>
+                        {cardData && (() => {
+                          const fullExercise = getExerciseById(cardData.id);
+                          const difficulty = fullExercise?.difficulty || "intermediate";
+                          return (
+                            <Badge variant={getDifficultyBadgeVariant(difficulty)} size="sm">
+                              {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+                            </Badge>
+                          );
+                        })()}
+                      </div>
+
+                      <Button variant="ghost" size="sm" className="w-full mt-2 h-8 px-2 text-xs font-normal text-muted-foreground hover:text-foreground" asChild>
+                        <Link href={`/workout/${exercise.exerciseSlug}`}>
+                          Start
+                        </Link>
+                      </Button>
+                    </div>
+                  </Card>
+                </StaggerItem>
+              );
+            })}
+          </StaggerContainer>
+        ) : (
+          <Card variant="organic" className="p-8 text-center space-y-2">
+            <Dumbbell className="h-8 w-8 text-sage-300 mx-auto" />
+            <p className="text-sm text-muted-foreground">
+              No exercises scheduled for this day. Your plan may focus on rest and recovery.
+            </p>
+          </Card>
+        )}
       </FadeIn>
     </div>
   );
