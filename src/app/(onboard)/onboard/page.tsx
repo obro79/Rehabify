@@ -21,7 +21,7 @@ export default function OnboardPage() {
     }
 
     // Redirect to assessment page
-    router.push("/assessment");
+    router.push("/assessment/lower-back");
   };
 
   return <OnboardingWizard onComplete={handleComplete} />;
