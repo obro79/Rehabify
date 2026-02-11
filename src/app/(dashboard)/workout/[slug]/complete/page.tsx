@@ -178,7 +178,7 @@ function SessionCompleteContent() {
     };
   }, [planCtx]);
 
-  const { formBreakdown, coachSummary } = FALLBACK_DATA;
+  const { formBreakdown, coachSummary } = MOCK_SESSION_DATA;
   const formScoreMessage = getFormFeedback(formScore);
   const formScoreColor = getFormScoreColor(formScore);
 

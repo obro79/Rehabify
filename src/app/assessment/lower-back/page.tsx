@@ -606,12 +606,7 @@ Goals: `
     return lastAssistant?.content || "Listening...";
   }, [transcriptEntries, isConnected]);
 
-  // Auto-start Vapi when component mounts
-  React.useEffect(() => {
-    if (!isConnected) {
-      startVapi();
-    }
-  }, [isConnected, startVapi]);
+  // No auto-start — user clicks "Start Assessment" button to begin
 
   // Handle start/stop
   const handleStartStop = async () => {
