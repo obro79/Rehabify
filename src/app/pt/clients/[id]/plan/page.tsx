@@ -590,11 +590,11 @@ export default function PlanBuilderPage({ params }: PlanBuilderPageProps) {
                     No exercises found
                   </p>
                 ) : (
-                  filteredExercises.map((exercise) => {
+                  filteredExercises.map((exercise, idx) => {
                     const alreadyAdded = isInPlan(exercise.id);
                     return (
                       <button
-                        key={exercise.id}
+                        key={`${exercise.slug}-${idx}`}
                         onClick={() => handleAddExercise(exercise)}
                         disabled={alreadyAdded}
                         className={`
