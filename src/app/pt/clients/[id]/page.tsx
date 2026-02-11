@@ -1,9 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { usePTStore } from "@/stores/pt-store";
 import { StatusBadge } from "@/components/pt/status-badge";
 import { AlertBadge } from "@/components/pt/alert-badge";
 import { Avatar } from "@/components/ui/avatar";
@@ -27,25 +26,80 @@ import {
   BarChart3,
 } from "lucide-react";
 import { CalendarIcon } from "@/components/ui/icons";
-import type { Session } from "@/lib/mock-data/pt-data";
+import type { Alert } from "@/lib/mock-data/pt-data";
+
+interface ClientAlert {
+  id: string;
+  type: string;
+  severity: string;
+  message: string;
+  createdAt: string;
+}
+
+interface ClientPlan {
+  id: string;
+  name: string;
+  status: "pending_review" | "approved" | "modified" | "rejected";
+  exercises: Array<Record<string, unknown>>;
+  createdAt: string;
+  reviewedAt?: string;
+  notes?: string;
+  structure?: unknown;
+}
+
+interface ClientSession {
+  id: string;
+  date: string;
+  formScore: number;
+  duration: string;
+  painLevel?: number;
+  status: string;
+  exercises: unknown;
+}
+
+interface ClientData {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl?: string;
+  status: string;
+  memberSince: string;
+  lastSession: string | null;
+  currentPlan: ClientPlan | null;
+  alerts: ClientAlert[];
+  sessionHistory: ClientSession[];
+}
+
+/** Map DB alert types to display alert types */
+function mapAlertType(dbType: string): Alert["type"] {
+  const mapping: Record<string, Alert["type"]> = {
+    high_pain: "pain_report",
+    missed_sessions: "missed_session",
+    declining_form: "declining_form",
+    patient_concern: "pain_report",
+  };
+  return mapping[dbType] ?? "pain_report";
+}
 
 /**
  * Helper to format date for display
  */
-function formatDate(date: Date): string {
+function formatDate(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
-  }).format(date);
+  }).format(d);
 }
 
 /**
  * Helper to format relative date (e.g., "2 days ago")
  */
-function formatRelativeDate(date: Date): string {
+function formatRelativeDate(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
   const now = new Date();
-  const diffTime = now.getTime() - date.getTime();
+  const diffTime = now.getTime() - d.getTime();
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
   if (diffDays === 0) return "Today";
@@ -78,38 +132,113 @@ export default function ClientDetailPage() {
   const router = useRouter();
   const patientId = params.id as string;
 
-  const getPatientById = usePTStore((state) => state.getPatientById);
-  const updatePlanStatus = usePTStore((state) => state.updatePlanStatus);
+  const [client, setClient] = useState<ClientData | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const patient = getPatientById(patientId);
+  useEffect(() => {
+    async function fetchClient() {
+      try {
+        const response = await fetch(`/api/pt/clients/${patientId}`, {
+          headers: { "x-demo-role": "pt" },
+        });
+        if (!response.ok) {
+          setLoading(false);
+          return;
+        }
+        const { data } = await response.json();
+        setClient(data);
+      } catch (err) {
+        console.error("Error fetching client:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchClient();
+  }, [patientId]);
 
-  // Get last 4-6 weeks of session history (most recent first)
+  // Get session history
   const recentSessions = useMemo(() => {
-    if (!patient) return [];
-
-    // Sort sessions by date (most recent first) and take last 28-42 days
-    const sortedSessions = [...patient.sessionHistory]
-      .sort((a, b) => b.date.getTime() - a.date.getTime())
-      .slice(0, 20); // Limit to ~20 sessions for display
-
-    return sortedSessions;
-  }, [patient]);
+    if (!client) return [];
+    return client.sessionHistory.slice(0, 20);
+  }, [client]);
 
   // Handle plan actions
-  const handleApprove = () => {
-    updatePlanStatus(patientId, "approved");
+  const handleApprove = async () => {
+    if (!client?.currentPlan) return;
+    try {
+      const response = await fetch(`/api/plans/${client.currentPlan.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-demo-role": "pt",
+        },
+        body: JSON.stringify({ status: "approved" }),
+      });
+      if (response.ok) {
+        setClient((prev) =>
+          prev && prev.currentPlan
+            ? {
+                ...prev,
+                currentPlan: { ...prev.currentPlan, status: "approved" },
+              }
+            : prev
+        );
+      }
+    } catch (err) {
+      console.error("Error approving plan:", err);
+    }
   };
 
   const handleModify = () => {
     router.push(`/pt/clients/${patientId}/plan`);
   };
 
-  const handleReject = () => {
-    updatePlanStatus(patientId, "rejected");
+  const handleReject = async () => {
+    if (!client?.currentPlan) return;
+    try {
+      const response = await fetch(`/api/plans/${client.currentPlan.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-demo-role": "pt",
+        },
+        body: JSON.stringify({ status: "modified" }),
+      });
+      if (response.ok) {
+        setClient((prev) =>
+          prev && prev.currentPlan
+            ? {
+                ...prev,
+                currentPlan: { ...prev.currentPlan, status: "modified" },
+              }
+            : prev
+        );
+      }
+    } catch (err) {
+      console.error("Error rejecting plan:", err);
+    }
   };
 
+  // Loading state
+  if (loading) {
+    return (
+      <div className="max-w-7xl space-y-8">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/pt/dashboard">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Dashboard
+            </Link>
+          </Button>
+        </div>
+        <div className="h-40 rounded-2xl bg-sage-100/50 animate-pulse" />
+        <div className="h-60 rounded-2xl bg-sage-100/50 animate-pulse" />
+      </div>
+    );
+  }
+
   // If patient not found
-  if (!patient) {
+  if (!client) {
     return (
       <div className="max-w-7xl space-y-8">
         <div className="flex items-center gap-4">
@@ -144,35 +273,37 @@ export default function ClientDetailPage() {
         <div className="absolute top-0 right-0 w-64 h-64 bg-sage-200/30 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
         <div className="relative flex flex-col md:flex-row md:items-center gap-6">
           <Avatar
-            src={patient.avatarUrl}
-            alt={patient.name}
+            src={client.avatarUrl}
+            alt={client.name}
             size="lg"
-            fallback={patient.name.slice(0, 2)}
+            fallback={client.name.slice(0, 2)}
           />
           <div className="flex-1 space-y-2">
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-2xl font-bold text-foreground">
-                {patient.name}
+                {client.name}
               </h1>
-              <StatusBadge
-                status={patient.currentPlan?.status || "pending_review"}
-              />
-              {patient.alerts.map((alert) => (
+              {client.currentPlan && (
+                <StatusBadge
+                  status={client.currentPlan.status === "rejected" ? "modified" : client.currentPlan.status}
+                />
+              )}
+              {client.alerts.map((alert) => (
                 <AlertBadge
                   key={alert.id}
-                  type={alert.type}
-                  severity={alert.severity}
+                  type={mapAlertType(alert.type)}
+                  severity={alert.severity as Alert["severity"]}
                 />
               ))}
             </div>
             <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <Mail className="h-4 w-4" />
-                {patient.email}
+                {client.email}
               </span>
               <span className="flex items-center gap-1.5">
                 <CalendarIcon className="h-4 w-4" />
-                Member since {formatDate(patient.memberSince)}
+                Member since {formatDate(client.memberSince)}
               </span>
             </div>
           </div>
@@ -196,22 +327,24 @@ export default function ClientDetailPage() {
       </section>
 
       {/* Current Plan Status Card */}
-      {patient.currentPlan && (
+      {client.currentPlan && (
         <Card>
           <CardHeader>
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="space-y-1">
-                <CardTitle>{patient.currentPlan.name}</CardTitle>
+                <CardTitle>{client.currentPlan.name}</CardTitle>
                 <div className="flex items-center gap-2">
-                  <StatusBadge status={patient.currentPlan.status} />
+                  <StatusBadge
+                    status={client.currentPlan.status === "rejected" ? "modified" : client.currentPlan.status}
+                  />
                   <span className="text-sm text-muted-foreground">
-                    Created {formatRelativeDate(patient.currentPlan.createdAt)}
+                    Created {formatRelativeDate(client.currentPlan.createdAt)}
                   </span>
                 </div>
               </div>
 
               {/* Action Buttons for pending plans */}
-              {patient.currentPlan.status === "pending_review" && (
+              {client.currentPlan.status === "pending_review" && (
                 <div className="flex flex-wrap gap-2">
                   <Button variant="secondary" size="sm" onClick={handleApprove}>
                     <Check className="h-4 w-4 mr-2" />
@@ -234,24 +367,11 @@ export default function ClientDetailPage() {
             </div>
           </CardHeader>
           <CardContent>
-            {/* Plan Exercises */}
+            {/* Plan Notes */}
             <div className="space-y-2">
-              <p className="text-sm font-medium text-sage-600">
-                Exercises ({patient.currentPlan.exercises.length})
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {patient.currentPlan.exercises.map((exercise) => (
-                  <Badge key={exercise.id} variant="muted" size="sm">
-                    {exercise.name}
-                    {exercise.holdSeconds
-                      ? ` - ${exercise.sets}x${exercise.holdSeconds}s`
-                      : ` - ${exercise.sets}x${exercise.reps}`}
-                  </Badge>
-                ))}
-              </div>
-              {patient.currentPlan.notes && (
-                <p className="text-sm text-muted-foreground mt-2 italic">
-                  {patient.currentPlan.notes}
+              {client.currentPlan.notes && (
+                <p className="text-sm text-muted-foreground italic">
+                  {client.currentPlan.notes}
                 </p>
               )}
             </div>
@@ -270,37 +390,31 @@ export default function ClientDetailPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Date</TableHead>
-                <TableHead>Exercise</TableHead>
                 <TableHead>Form Score</TableHead>
                 <TableHead>Duration</TableHead>
-                <TableHead>Reps</TableHead>
                 <TableHead>Pain Level</TableHead>
+                <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {recentSessions.map((session: Session) => (
+              {recentSessions.map((session) => (
                 <TableRow key={session.id}>
                   <TableCell className="font-medium">
                     {formatDate(session.date)}
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                      {session.exerciseName}
-                      <Badge variant="muted" size="sm">
-                        {session.category}
+                    {session.formScore > 0 ? (
+                      <Badge
+                        variant={getFormScoreVariant(session.formScore)}
+                        size="sm"
+                      >
+                        {session.formScore}%
                       </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={getFormScoreVariant(session.formScore)}
-                      size="sm"
-                    >
-                      {session.formScore}%
-                    </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
                   </TableCell>
                   <TableCell>{session.duration}</TableCell>
-                  <TableCell>{session.repCount}</TableCell>
                   <TableCell>
                     {session.painLevel !== undefined ? (
                       <span
@@ -311,6 +425,11 @@ export default function ClientDetailPage() {
                     ) : (
                       <span className="text-muted-foreground">-</span>
                     )}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="muted" size="sm">
+                      {session.status}
+                    </Badge>
                   </TableCell>
                 </TableRow>
               ))}

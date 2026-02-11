@@ -1,19 +1,100 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { StatsCard } from "@/components/ui/stats-card";
 import { PatientList } from "@/components/pt/patient-list";
-import { usePTStore } from "@/stores/pt-store";
 import { GuideIcon, UsersIcon, AlertIcon } from "@/components/ui/icons";
 import { SanctuaryBackground } from "@/components/ui/sanctuary-background";
 import { getTimeOfDayGreeting } from "@/lib/date-utils";
+import type { MockPatient, Alert } from "@/lib/mock-data/pt-data";
+
+/** Map DB alert types to MockPatient alert types */
+function mapAlertType(dbType: string): Alert["type"] {
+  const mapping: Record<string, Alert["type"]> = {
+    high_pain: "pain_report",
+    missed_sessions: "missed_session",
+    declining_form: "declining_form",
+    patient_concern: "pain_report",
+  };
+  return mapping[dbType] ?? "pain_report";
+}
+
+/** Map API response to MockPatient format */
+function mapToMockPatient(client: Record<string, unknown>): MockPatient {
+  const alerts = (client.alerts as Array<Record<string, unknown>>) ?? [];
+  const plan = client.currentPlan as Record<string, unknown> | null;
+
+  return {
+    id: client.id as string,
+    name: client.name as string,
+    email: client.email as string,
+    avatarUrl: (client.avatarUrl as string) || undefined,
+    status: (client.status as MockPatient["status"]) ?? "active",
+    memberSince: client.memberSince ? new Date(client.memberSince as string) : new Date(),
+    lastSession: client.lastSession ? new Date(client.lastSession as string) : null,
+    alerts: alerts.map((a) => ({
+      id: a.id as string,
+      type: mapAlertType(a.type as string),
+      severity: (a.severity as Alert["severity"]) ?? "low",
+      message: a.message as string,
+      createdAt: new Date(a.createdAt as string),
+    })),
+    currentPlan: plan
+      ? {
+          id: plan.id as string,
+          name: plan.name as string,
+          status: (plan.status as "pending_review" | "approved" | "rejected" | "modified") ?? "approved",
+          exercises: [],
+          createdAt: new Date(plan.createdAt as string),
+          reviewedAt: plan.reviewedAt ? new Date(plan.reviewedAt as string) : undefined,
+          notes: (plan.notes as string) || undefined,
+        }
+      : null,
+    sessionHistory: [],
+  };
+}
 
 export default function PTDashboardPage() {
   const router = useRouter();
-  const patients = usePTStore((state) => state.patients);
-  const ptName = "Dr. Anderson"; // TODO: Get from auth context
+  const [patients, setPatients] = useState<MockPatient[]>([]);
+  const [ptName, setPtName] = useState("Doctor");
+  const [loading, setLoading] = useState(true);
   const greeting = getTimeOfDayGreeting();
+
+  useEffect(() => {
+    async function fetchClients() {
+      try {
+        const response = await fetch("/api/pt/clients", {
+          headers: { "x-demo-role": "pt" },
+        });
+        if (!response.ok) {
+          console.error("Failed to fetch clients:", response.status);
+          setLoading(false);
+          return;
+        }
+        const { data } = await response.json();
+        const mapped = (data as Array<Record<string, unknown>>).map(mapToMockPatient);
+        setPatients(mapped);
+
+        // Try to get PT name from profile
+        const profileResponse = await fetch("/api/profile", {
+          headers: { "x-demo-role": "pt" },
+        });
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json();
+          if (profileData?.data?.displayName) {
+            setPtName(profileData.data.displayName);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching PT clients:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchClients();
+  }, []);
 
   // Calculate stats from patient data
   const stats = useMemo(() => {
@@ -111,14 +192,29 @@ export default function PTDashboardPage() {
               Your Patients
             </h2>
             <p className="text-sm text-muted-foreground">
-              {stats.patientsWithAlerts > 0
-                ? `${stats.patientsWithAlerts} patient${stats.patientsWithAlerts > 1 ? "s" : ""} with alerts shown first`
-                : "All patients are progressing well"}
+              {loading
+                ? "Loading patients..."
+                : stats.patientsWithAlerts > 0
+                  ? `${stats.patientsWithAlerts} patient${stats.patientsWithAlerts > 1 ? "s" : ""} with alerts shown first`
+                  : patients.length > 0
+                    ? "All patients are progressing well"
+                    : "No patients assigned yet"}
             </p>
           </div>
         </div>
 
-        <PatientList patients={sortedPatients} onPatientClick={handlePatientClick} />
+        {loading ? (
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="h-40 rounded-2xl bg-sage-100/50 animate-pulse"
+              />
+            ))}
+          </div>
+        ) : (
+          <PatientList patients={sortedPatients} onPatientClick={handlePatientClick} />
+        )}
       </section>
       </div>
     </SanctuaryBackground>
