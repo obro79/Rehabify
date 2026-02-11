@@ -1,0 +1,59 @@
+%% Deployment Architecture: Full GCP Option
+%% See: docs/redesign/06-infrastructure.md
+
+graph TB
+    subgraph Internet ["Internet"]
+        BROWSER[Patient Browser<br/>MediaPipe WASM + Silero VAD]
+        PT[PT Browser<br/>Dashboard]
+    end
+
+    subgraph CDN ["CDN / Static"]
+        STATIC[Static Assets<br/>WASM models, exercise videos]
+    end
+
+    subgraph GCP ["Google Cloud Platform (HIPAA BAA)"]
+        subgraph CloudRun ["Cloud Run"]
+            NEXT[Next.js App<br/>SSR + API Routes<br/>Port 3000]
+            WSS[WebSocket Server<br/>Voice + Vision<br/>Port 8080]
+        end
+
+        subgraph Data ["Data Layer"]
+            SQL[(Cloud SQL<br/>PostgreSQL 15<br/>Encrypted at rest)]
+            GCS[(Cloud Storage<br/>Telemetry blobs<br/>Encrypted at rest)]
+        end
+
+        subgraph AI ["Google AI"]
+            GEMINI[Gemini 2.0<br/>Flash Live<br/>Audio I/O]
+        end
+
+        subgraph Ops ["Operations"]
+            LOG[Cloud Logging]
+            MON[Cloud Monitoring]
+        end
+    end
+
+    BROWSER -->|HTTPS| NEXT
+    BROWSER -->|WSS| WSS
+    PT -->|HTTPS| NEXT
+    BROWSER -->|HTTPS| STATIC
+    PT -->|HTTPS| STATIC
+
+    NEXT -->|SQL| SQL
+    NEXT -->|API| GCS
+    WSS -->|SQL| SQL
+    WSS -->|API| GCS
+    WSS <-->|"WebSocket<br/>Audio + Landmarks"| GEMINI
+
+    NEXT -->|Logs| LOG
+    WSS -->|Logs| LOG
+    SQL -->|Metrics| MON
+    WSS -->|Metrics| MON
+
+    style BROWSER fill:#e3f2fd,stroke:#1565c0
+    style PT fill:#e3f2fd,stroke:#1565c0
+    style NEXT fill:#e8f5e9,stroke:#2e7d32
+    style WSS fill:#e8f5e9,stroke:#2e7d32
+    style SQL fill:#fff3e0,stroke:#ef6c00
+    style GCS fill:#fff3e0,stroke:#ef6c00
+    style GEMINI fill:#fce4ec,stroke:#c62828
+    style GCP fill:#f5f5f5,stroke:#616161

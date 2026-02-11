@@ -1,0 +1,35 @@
+%% Voice Pipeline: Current (Vapi) → Target (Gemini 2.0 Flash Live)
+%% See: docs/redesign/03-voice-architecture.md
+
+graph LR
+    subgraph Client ["Client (Browser)"]
+        MIC[Microphone]
+        VAD[Silero VAD<br/>WASM]
+        PLAYER[Web Audio API<br/>Playback]
+    end
+
+    subgraph Server ["WebSocket Server"]
+        WS[WebSocket<br/>Handler]
+        CTX[Context<br/>Cache]
+        GUARD[Usage<br/>Guardrails]
+        LOG[Session<br/>Logger]
+    end
+
+    subgraph Google ["Google Cloud"]
+        GEMINI[Gemini 2.0<br/>Flash Live]
+    end
+
+    MIC -->|Raw audio| VAD
+    VAD -->|"Speech detected<br/>(audio chunks)"| WS
+    VAD -.->|"Silence<br/>(no data sent)"| VAD
+    WS -->|Check limits| GUARD
+    GUARD -->|OK| CTX
+    CTX -->|"Audio + context"| GEMINI
+    GEMINI -->|"Audio response<br/>(STT+LLM+TTS)"| WS
+    WS -->|Audio stream| PLAYER
+    WS -->|Metadata| LOG
+
+    style VAD fill:#e1f5fe,stroke:#01579b
+    style GEMINI fill:#e8f5e9,stroke:#1b5e20
+    style GUARD fill:#fff3e0,stroke:#e65100
+    style LOG fill:#f3e5f5,stroke:#4a148c
