@@ -1,0 +1,105 @@
+%% Data Flow: Patient / PT / Clinic Relationships
+%% See: docs/redesign/05-data-architecture.md
+
+erDiagram
+    CLINICS {
+        uuid id PK
+        text name
+        text slug UK
+        text billing_email
+        text billing_tier
+        timestamptz hipaa_baa_signed_at
+    }
+
+    CLINIC_MEMBERSHIPS {
+        uuid id PK
+        uuid clinic_id FK
+        uuid user_id FK
+        text role
+        timestamptz accepted_at
+    }
+
+    PROFILES {
+        uuid id PK
+        text name
+        text email
+        text role
+    }
+
+    PLANS {
+        uuid id PK
+        uuid patient_id FK
+        uuid clinic_id FK
+        jsonb exercises
+        text status
+    }
+
+    SESSIONS {
+        uuid id PK
+        uuid patient_id FK
+        uuid plan_id FK
+        uuid clinic_id FK
+        jsonb metrics
+    }
+
+    ASSESSMENTS {
+        uuid id PK
+        uuid patient_id FK
+        uuid clinic_id FK
+        text type
+        jsonb results
+    }
+
+    BILLING_RECORDS {
+        uuid id PK
+        uuid clinic_id FK
+        uuid patient_id FK
+        date billing_month
+        text cpt_code
+        text status
+        int device_days
+        int pt_minutes
+    }
+
+    TELEMETRY_SESSIONS {
+        uuid id PK
+        uuid session_id FK
+        uuid clinic_id FK
+        uuid patient_id FK
+        int verified_reps
+        float avg_dtw_score
+    }
+
+    AUDIT_LOG {
+        bigserial id PK
+        uuid actor_id FK
+        uuid clinic_id FK
+        text action
+        text resource_type
+        uuid resource_id
+    }
+
+    MESSAGES {
+        uuid id PK
+        uuid sender_id FK
+        uuid receiver_id FK
+        uuid clinic_id FK
+        text content
+    }
+
+    CLINICS ||--o{ CLINIC_MEMBERSHIPS : "has members"
+    PROFILES ||--o{ CLINIC_MEMBERSHIPS : "belongs to"
+    CLINICS ||--o{ PLANS : "scopes"
+    CLINICS ||--o{ SESSIONS : "scopes"
+    CLINICS ||--o{ ASSESSMENTS : "scopes"
+    CLINICS ||--o{ BILLING_RECORDS : "owns"
+    CLINICS ||--o{ TELEMETRY_SESSIONS : "scopes"
+    CLINICS ||--o{ AUDIT_LOG : "scopes"
+    CLINICS ||--o{ MESSAGES : "scopes"
+    PROFILES ||--o{ PLANS : "patient"
+    PROFILES ||--o{ SESSIONS : "patient"
+    PROFILES ||--o{ ASSESSMENTS : "patient"
+    PROFILES ||--o{ BILLING_RECORDS : "patient"
+    PROFILES ||--o{ MESSAGES : "sender"
+    PLANS ||--o{ SESSIONS : "exercises from"
+    SESSIONS ||--o{ TELEMETRY_SESSIONS : "has telemetry"
