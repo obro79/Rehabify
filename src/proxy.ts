@@ -22,7 +22,6 @@ export const config = {
     '/exercises/:path*',
     '/progress/:path*',
     '/messages/:path*',
-    '/assessment/:path*',
     '/pt/:path*',
   ],
 };
