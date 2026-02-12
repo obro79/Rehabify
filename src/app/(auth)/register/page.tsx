@@ -132,8 +132,10 @@ export default function RegisterPage(): React.JSX.Element {
         return;
       }
       router.push('/dashboard');
-    } catch {
-      setErrors({ form: 'An unexpected error occurred' });
+    } catch (err) {
+      console.error('Registration error:', err);
+      const message = err instanceof Error ? err.message : 'An unexpected error occurred';
+      setErrors({ form: message });
     } finally {
       setIsLoading(false);
     }

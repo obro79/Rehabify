@@ -82,8 +82,10 @@ export default function LoginPage(): React.JSX.Element {
         return;
       }
       router.push('/dashboard');
-    } catch {
-      setErrors({ form: 'An unexpected error occurred' });
+    } catch (err) {
+      console.error('Login error:', err);
+      const message = err instanceof Error ? err.message : 'An unexpected error occurred';
+      setErrors({ form: message });
     } finally {
       setIsLoading(false);
     }
