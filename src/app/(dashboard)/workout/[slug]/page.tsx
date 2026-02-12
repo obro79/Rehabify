@@ -201,6 +201,109 @@ export default function WorkoutSessionPage() {
     return transcriptEntries.slice(-2).map((t) => t.content).join(" ");
   }, [transcriptEntries, isConnected]);
 
+  // Inline Vapi assistant config with exercise-specific system prompt
+  const workoutAssistantConfig = React.useMemo(() => {
+    if (!exercise) return null;
+
+    const planInfo = planContext
+      ? `The user is on exercise ${planContext.currentIndex + 1} of ${planContext.totalExercises} in their "${planContext.planName}" plan.`
+      : "";
+
+    const formCorrectionPhrases = exercise.common_mistakes.map((m: string) => {
+      const key = m.toLowerCase().replace(/\s+/g, "_").slice(0, 30);
+      return `- "${key}" → "${m.startsWith("Not") || m.startsWith("Excessive") ? m.replace(/^(Not |Excessive )/, "Try more ") : `Watch your ${m.toLowerCase()}`}"`;
+    }).join("\n");
+
+    const systemPrompt = `# CURRENT EXERCISE: ${exercise.name.toUpperCase()}
+
+Name: ${exercise.name}
+Target: ${exercise.target_area?.replace(/_/g, " ") || exercise.category.replace(/_/g, " ")}
+${planInfo}
+Difficulty: ${exercise.difficulty}
+Reps: ${targetReps}
+${exercise.rep_type === "hold" ? `Hold: ${exercise.default_hold_seconds}s per rep` : ""}
+
+Key Instructions:
+${exercise.instructions.map((inst: string, i: number) => `${i + 1}. ${inst}`).join("\n")}
+
+Common Mistakes to Watch:
+${exercise.common_mistakes.map((m: string) => `- ${m}`).join("\n")}
+
+ONLY discuss this exercise. Do not mention any other exercises.
+
+## VOICE STYLE
+
+- Calm, reassuring, clinical but warm
+- Speak at a measured pace - never rush
+- Use natural pauses between instructions
+- Your tone should feel like a warm hug, not a drill sergeant
+
+## SESSION WORKFLOW
+
+1. Greet user: "Hi! Today we're working on ${exercise.name}"
+2. Give ONE key cue based on the exercise instructions above
+3. Ask: "Ready to start?"
+4. Wait for confirmation, then say: "Great, let's go - I'm watching your form"
+5. Provide brief feedback when you receive system messages
+6. At session end, give a warm closing
+
+## RESPONSE LENGTH
+
+DURING ACTIVE MOVEMENT:
+- Maximum 5-15 words per response
+- Examples: "Good... keep breathing...", "Nice and slow", "Great form, keep going"
+
+DURING REST:
+- 1-3 sentences, check how they're feeling
+
+## FORM CORRECTIONS
+
+IMPORTANT: When you receive [FORM FEEDBACK NEEDED], respond VERBALLY only.
+Do NOT call any tools - just speak the correction directly.
+
+Common corrections for ${exercise.name}:
+${formCorrectionPhrases}
+
+## SYSTEM MESSAGES
+
+Respond naturally - don't read out the message type:
+[EXERCISE INTRO] - Greet and explain briefly
+[EXERCISE STARTING] - User is ready, start coaching
+[FORM FEEDBACK NEEDED] - Give ONE brief correction (5-15 words). DO NOT use tools.
+[REP COMPLETED] - Brief acknowledgment
+[SESSION END] - Warm closing
+
+## THINGS YOU MUST NEVER DO
+
+- Never mention any exercise except ${exercise.name}
+- Never say "wrong," "bad," or "incorrect"
+- Never give more than one correction at a time
+- Never speak for more than 15 seconds during movement
+- Never call tools when receiving form feedback - just speak
+
+## PAIN HANDLING
+
+MILD: "Let's take a moment there."
+MODERATE: "Let's stop and rest. We can modify this."
+SEVERE: "Please stop completely. That's not something to push through."
+
+Remember: Every interaction should leave them feeling supported and capable.`;
+
+    return {
+      name: "Rehabify Exercise Coach",
+      firstMessage: `Hi! Today we're working on ${exercise.name}. ${exercise.description} Ready to get started?`,
+      model: {
+        provider: "openai",
+        model: "gpt-4o",
+        messages: [{ role: "system", content: systemPrompt }],
+      },
+      voice: { provider: "11labs", voiceId: "sarah" },
+      transcriber: { provider: "deepgram", model: "nova-2", language: "en-US" },
+      silenceTimeoutSeconds: 30,
+      maxDurationSeconds: 900,
+    };
+  }, [exercise, planContext, targetReps]);
+
   // Exercise intro context (plan-aware, full exercise coaching data)
   const exerciseIntroContext = React.useMemo(() => {
     if (!exercise) return null;
@@ -535,7 +638,7 @@ Use your knowledge of ${exercise.name} to give relevant cues.`;
                     <Button
                       variant="secondary"
                       size="lg"
-                      onClick={() => startVapi(undefined, {
+                      onClick={() => startVapi(workoutAssistantConfig as unknown as string, {
                         sessionId,
                         exerciseId: exercise?.id,
                         exerciseName: exercise?.name,
