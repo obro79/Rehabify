@@ -33,7 +33,63 @@ interface PlanData {
   summary: string;
   recommendations: Recommendation[];
   structure: PlanStructure;
+  isSample?: boolean;
 }
+
+const SAMPLE_PLAN: PlanData = {
+  name: "Sample Lower Back Rehab Plan",
+  summary: "A gentle 4-week plan focusing on mobility, core stability, and strengthening.",
+  recommendations: [],
+  isSample: true,
+  structure: {
+    weeks: [
+      {
+        weekNumber: 1,
+        focus: "Foundation & Mobility",
+        notes: "Focus on gentle movements and building body awareness.",
+        exercises: [
+          { exerciseId: "cat-camel", exerciseSlug: "cat-camel", name: "Cat-Camel", sets: 2, reps: 10, order: 1, days: [1, 3, 5] },
+          { exerciseId: "cobra-stretch", exerciseSlug: "cobra-stretch", name: "Cobra Stretch", sets: 2, reps: 10, holdSeconds: 5, order: 2, days: [1, 3, 5] },
+          { exerciseId: "dead-bug", exerciseSlug: "dead-bug", name: "Dead Bug", sets: 2, reps: 10, order: 3, days: [1, 3, 5] },
+          { exerciseId: "bird-dog", exerciseSlug: "bird-dog", name: "Bird Dog", sets: 2, reps: 10, holdSeconds: 3, order: 4, days: [2, 4] },
+        ],
+      },
+      {
+        weekNumber: 2,
+        focus: "Building Stability",
+        notes: "Introduce more core engagement while maintaining mobility work.",
+        exercises: [
+          { exerciseId: "cat-camel", exerciseSlug: "cat-camel", name: "Cat-Camel", sets: 2, reps: 12, order: 1, days: [1, 3, 5] },
+          { exerciseId: "dead-bug", exerciseSlug: "dead-bug", name: "Dead Bug", sets: 3, reps: 10, order: 2, days: [1, 3, 5] },
+          { exerciseId: "bird-dog", exerciseSlug: "bird-dog", name: "Bird Dog", sets: 3, reps: 10, holdSeconds: 3, order: 3, days: [1, 3, 5] },
+          { exerciseId: "bodyweight-squat", exerciseSlug: "bodyweight-squat", name: "Bodyweight Squat", sets: 2, reps: 8, order: 4, days: [2, 4] },
+        ],
+      },
+      {
+        weekNumber: 3,
+        focus: "Strength & Endurance",
+        notes: "Increase reps and add strengthening exercises.",
+        exercises: [
+          { exerciseId: "dead-bug", exerciseSlug: "dead-bug", name: "Dead Bug", sets: 3, reps: 12, order: 1, days: [1, 3, 5] },
+          { exerciseId: "bird-dog", exerciseSlug: "bird-dog", name: "Bird Dog", sets: 3, reps: 12, holdSeconds: 5, order: 2, days: [1, 3, 5] },
+          { exerciseId: "bodyweight-squat", exerciseSlug: "bodyweight-squat", name: "Bodyweight Squat", sets: 3, reps: 10, order: 3, days: [2, 4] },
+          { exerciseId: "cobra-stretch", exerciseSlug: "cobra-stretch", name: "Cobra Stretch", sets: 2, reps: 10, holdSeconds: 5, order: 4, days: [2, 4] },
+        ],
+      },
+      {
+        weekNumber: 4,
+        focus: "Progress & Maintenance",
+        notes: "Full routine with increased volume. Listen to your body.",
+        exercises: [
+          { exerciseId: "cat-camel", exerciseSlug: "cat-camel", name: "Cat-Camel", sets: 2, reps: 12, order: 1, days: [1, 3, 5] },
+          { exerciseId: "dead-bug", exerciseSlug: "dead-bug", name: "Dead Bug", sets: 3, reps: 15, order: 2, days: [1, 3, 5] },
+          { exerciseId: "bird-dog", exerciseSlug: "bird-dog", name: "Bird Dog", sets: 3, reps: 12, holdSeconds: 5, order: 3, days: [1, 3, 5] },
+          { exerciseId: "bodyweight-squat", exerciseSlug: "bodyweight-squat", name: "Bodyweight Squat", sets: 3, reps: 12, order: 4, days: [2, 4] },
+        ],
+      },
+    ],
+  },
+};
 
 /** Convert a PlanExercise to ExerciseCardData for display */
 function toCard(planEx: PlanExercise): ReturnType<typeof toCardData> | null {
@@ -80,10 +136,14 @@ export default function PlanPage() {
               recommendations: activePlan.recommendations || [],
               structure,
             });
+            return;
           }
         }
+        // No plans found — show sample
+        setPlan(SAMPLE_PLAN);
       } catch (err) {
-        console.error("[Plan] Failed to load plan:", err);
+        console.error("[Plan] Failed to load plan, showing sample:", err);
+        setPlan(SAMPLE_PLAN);
       } finally {
         setLoading(false);
       }
@@ -169,6 +229,23 @@ export default function PlanPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
+      {/* Sample Plan Banner */}
+      {plan.isSample && (
+        <FadeIn>
+          <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-amber-900">Sample Plan</p>
+              <p className="text-sm text-amber-700 mt-0.5">
+                This is an example plan. Complete an assessment to get your personalized plan.
+              </p>
+            </div>
+            <Button variant="primary" size="sm" asChild className="shrink-0">
+              <Link href="/assessment/lower-back">Take Assessment</Link>
+            </Button>
+          </div>
+        </FadeIn>
+      )}
+
       {/* Week Header with Arrows */}
       <FadeIn>
         <div className="flex items-center justify-between">
