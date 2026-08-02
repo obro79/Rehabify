@@ -78,24 +78,42 @@ legal-review blocker under ADR-011. Details in [03](./03-data-architecture.md).
 
 ---
 
-## ADR-003 — Computer vision shelved {#adr-003}
+## ADR-003 — Computer vision retained {#adr-003}
 
-**Date** 2026-08-02 · **Status** Accepted
+**Date** 2026-08-02 · **Status** Accepted — **reversed the same day**
 
 **Context.** MediaPipe pose detection, a 1,286-line form engine, DTW movement
-comparison, and skeleton streaming were central to the previous plan.
+comparison, and skeleton streaming were central to the previous plan. The initial
+call was to shelve all of it, and the cleanup plan was written to remove 2,912
+LOC and 3 dependencies across 7 file edits.
 
-**Decision.** Shelved. The product **never claims to observe or correct form**
-([01 stage G](./01-product-definition.md)).
+**Decision (revised).** **Vision is kept in full.** No vision code is deleted,
+refactored, or touched by the cleanup — explicitly including the ~1,099 LOC that
+currently has zero importers (`form-engine.ts` has one live analyzer, squat; the
+`standing`, `lumbar`, `floor`, and `assessment-movements` modules plus
+`geometry.ts` and `form-types.ts` are unreferenced today). knip confirms those
+six independently, and they stay anyway.
 
-**Consequences.** 2,912 LOC and 3 dependencies removed
-([07 §3](./07-cleanup-plan.md)); 7 files edited; 2 live pages touched. Notably,
-`form-engine.ts` had exactly **one** live analyzer (squat) — 1,099 of those lines
-were already dead. The `docs/redesign/` billing-verification premise goes with it,
-which ADR-011 would have killed anyway.
+**Consequences.** The cleanup shrinks from ~14,800 LOC to ~9,500, and phase 5
+disappears from [07 §9](./07-cleanup-plan.md). `@mediapipe/tasks-vision`,
+`1eurofilter`, and `dynamic-time-warping` stay in `package.json`. The
+vision-adjacent files in `components/workout/` are excluded from the deletion
+sweep even where knip reports them unused.
 
-Reversible: the code is in git history, and nothing in the new architecture
-forecloses adding vision later behind the same authority boundary.
+Two things this decision does **not** settle, and which should be revisited
+before vision ships to real patients:
+
+- **The authority boundary in [01 stage G](./01-product-definition.md) still
+  reads "never claims to observe or correct form."** That language and a live
+  form-correction feature are in tension. It was not renegotiated here, so it
+  stands as written — flag it when vision re-enters product scope.
+- `__tests__/form-engine-flexion.test.ts` has **two genuinely failing
+  assertions** about rep counting. Under ADR-003-as-shelved that test was going
+  to be deleted; under this decision it is a **live bug in retained code**. See
+  [07 §0f](./07-cleanup-plan.md).
+
+Note that the `docs/redesign/` billing-verification premise still dies — not on
+vision grounds but on [ADR-011](#adr-011), since CPT codes do not exist in Canada.
 
 ---
 
