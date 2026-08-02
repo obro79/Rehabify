@@ -5,20 +5,109 @@
 > `not-found.tsx`, `error.tsx`, `loading.tsx`, `template.tsx`, `default.tsx`,
 > and `src/proxy.ts` (Next 16's `middleware.ts` replacement).
 >
+> **Verified 2026-08-02** with `tsc`, `vitest`, and `knip` against installed
+> dependencies — see **§0**, which supersedes any disagreement below.
+>
 > **Headline: ~13,000 LOC (24% of `src/`) is removable with no behaviour
 > change, rising to ~14,800 (28%) once vision is parked. Plus ~6,000 lines of
 > regenerable SQL and 28 MB of assets.**
+>
+> **And the finding that reframes the rest: there is no CI, the pre-commit hook
+> is not executable, and the test suite has not run at all — 21 of 21 files fail
+> to load on a missing peer dependency. Production code typechecks clean; every
+> one of the 20 `tsc` errors is in a test file.**
 
 ---
 
-## ⚠️ Caveats on this audit
+## 0. Verification pass — run 2026-08-02
 
-`node_modules/` is absent from this worktree, so **`knip` and `ts-prune` were
-not run** — this is a hand-built resolver plus targeted greps. Consequences:
+The audit below was originally hand-built (no `node_modules`). **Dependencies
+have since been installed and `tsc`, `vitest`, and `knip` were run.** This
+section records what that changed. Where §0 and the sections below disagree, §0
+wins.
 
-- **`tsc --noEmit` and `next build` were not run.** The repo is not confirmed to
-  compile today, so a deletion could surface a *pre-existing* error. Establish a
-  green build before Phase 1.
+### 🔴 0a. The baseline was not green, and nothing has ever gated it
+
+**There is no CI.** No `.github/workflows` of any kind. The only hook is
+`.husky/pre-commit` (`bun run build`), and **it is not executable** — git prints
+`hook was ignored because it's not set as executable` on every commit. So no
+typecheck, no test run, and no build has ever been enforced on this repo.
+
+That is the root cause of everything in §0b–0c. It is also the cheapest thing
+here to fix, and it should be fixed *first* — otherwise the cleanup restores a
+green baseline that immediately rots again.
+
+### 🔴 0b. The entire test suite was non-executing
+
+All **21 test files failed to load**: `Cannot find module '@testing-library/dom'`.
+It is a peer dependency of `@testing-library/react` v16 and **was never declared
+in `package.json`**.
+
+`bun add -d @testing-library/dom` — one line — takes the suite from
+**0 tests running** to **192 of 203 passing**.
+
+The 11 remaining failures across 5 files, categorized:
+
+| File | Cause | Action |
+|---|---|---|
+| `lib/session/__tests__/react-integration.test.ts` | Imports `@/hooks/useSessionResume` and `@/hooks/useMultiTabGuard` — **neither module exists** | Delete with §2g `session-guard.ts` |
+| `stores/__tests__/onboarding-store.test.ts` | Imports 6 selectors the store no longer exports | Rewrite or delete |
+| `__tests__/form-engine-flexion.test.ts` | Vision | Deleted in §3 |
+| `app/privacy/page.test.tsx`, `app/terms/page.test.tsx` | Env validation — `NEXT_PUBLIC_VAPI_PUBLIC_KEY` / `NEXT_PUBLIC_APP_URL` unset under test | Add test env; the Vapi key disappears with §2e |
+
+**Three of five failing files test code that no longer exists.** The tests were
+never updated when the code moved, and nothing ran them to notice.
+
+### 0c. `tsc --noEmit`: 20 errors — **all of them in test files**
+
+| File | Errors |
+|---|---|
+| `lib/api/__tests__/auth.test.ts` | 8 |
+| `stores/__tests__/onboarding-store.test.ts` | 6 |
+| `lib/session/__tests__/react-integration.test.ts` | 3 |
+| `app/terms/page.test.tsx`, `app/privacy/page.test.tsx`, `__tests__/form-engine-flexion.test.ts` | 1 each |
+
+**Production code typechecks clean.** That is a genuinely good result for 53k
+LOC and worth stating plainly — the rot is confined to the test layer, which is
+exactly what "no CI" predicts.
+
+### 🟠 0d. New finding — `src/lib/date-utils.js` is a committed build artifact
+
+`src/lib/date-utils.js` (190 lines, CommonJS, `Object.defineProperty(exports,
+"__esModule", …)`) sits next to `src/lib/date-utils.ts` (183 lines). It is `tsc`
+output, committed in `826de38 Add date-utils`, exporting the same 11 functions.
+
+It is the **only** stray `.js` in `src/`, and it shadows its own source in some
+resolvers — which is why knip reports the `.ts` as unused while three live pages
+import from `@/lib/date-utils`. Delete the `.js`; add `src/**/*.js` to
+`.gitignore`.
+
+### 0e. knip found ~116 unused files — more than this document did
+
+knip's list is a **superset** of §2, and the additions are all the same
+extract-but-never-adopt pattern §2a describes, in directories §2 did not reach:
+
+| Directory | Files | Note |
+|---|---|---|
+| `components/landing/` | 8 | **Verified**: `landing-client.tsx` is the live component and imports only `./clinical-trust-section` |
+| `components/ui/` | ~18 | Overlaps §2b |
+| `app/**/_components/` (dashboard, exercises, profile, workout complete, plan, analytics) | ~35 | Overlaps §2a |
+
+**Both tools have false positives — verify per file, do not pipe either list into
+`rm`:**
+
+- knip flags `src/lib/date-utils.ts` as unused. It is live (§0d explains why).
+- knip flags `eslint-config-next` and `lint-staged` as unused devDependencies.
+  Both are used — via `eslint.config`/`next lint` and via husky respectively.
+- knip does **not** flag `react-is`, which §4 identifies as genuinely unused.
+
+Other knip output worth acting on: `postcss-load-config` is an **unlisted**
+dependency (used by `postcss.config.mjs`, not declared), and there are 269 unused
+exports / 186 unused exported types — mostly inside files already slated for
+deletion, so sweep those *after* the file deletions, not before.
+
+### Caveats that still stand
+
 - Static `import` / `export … from` / `require` / `import('literal')` were
   resolved. A component pulled in by a computed specifier or a string-keyed
   registry would read as dead. No such registry was found, but its absence was
@@ -26,10 +115,11 @@ not run** — this is a hand-built resolver plus targeted greps. Consequences:
 - **`src/app/globals.css` was not audited.** Several greps hit CSS names that
   shadow component names being deleted (`.sidebar-nav`, `.calendar-container`,
   `--popover`). Check it when removing those components.
+- `next build` was not run (it needs env vars). Confirm in Phase 0.
 
-**Method for every deletion below:** run `knip` first, confirm against this
-document, then delete in the ordered phases. Each phase is one commit with a
-green `tsc --noEmit && next build && vitest run`.
+**Method for every deletion below:** confirm against knip *and* this document,
+then delete in the ordered phases. Each phase is one commit with a green
+`tsc --noEmit && next build && vitest run`.
 
 ---
 
@@ -451,22 +541,38 @@ is lost, then let the old remote go cold.
 Each phase is one commit, ending green on
 `tsc --noEmit && next build && vitest run`.
 
-| # | Phase | LOC | Risk |
-|---|---|---|---|
-| **0** | **Establish a green build.** Run `knip` with `node_modules` present and diff against this document. Nothing is deleted in this phase. | 0 | — |
-| **1** | Fix §1a (fabricated `/progress` charts) — a patient-facing correctness bug. Ship independently of the rebuild. | ~50 changed | Low |
-| **2** | Assets: `public/` 25.9 MB, `.playwright-mcp/` (+ `.gitignore` fix), empty dirs, move public `.md` files to `docs/` | — | None |
-| **3** | Unreferenced files: §2a–2g. Largest sweep, zero behaviour change. | ~9,200 | Low |
-| **4** | Vision removal: §3, including the 7 file edits and 3 dependency drops | 2,912 | Medium — touches two live pages |
-| **5** | Vapi removal ([05 §9](./05-voice-pipeline.md)) — do this *with* the Deepgram build, not before | — | High — removes the live voice path |
-| **6** | Product deletions: messaging (§2i), duplicate `/assessment` route (§2j) + exit-target fix | 1,658 | Low, but **confirm with the user first** |
-| **7** | Mock-data untangling: §1b, §1c, §2h | ~420 deleted, 6 files rewired | Medium |
-| **8** | Database: drop the 8 unqueried tables, delete `002`/`003` SQL, collapse to one migration system | ~6,300 | Superseded by [03](./03-data-architecture.md) |
-| **9** | `react-is`, remaining `console.log`s, `pt-store` legacy shape | ~60 | None |
+One branch off `prod` (`cleanup/*`), one commit per phase, each ending green on
+`tsc --noEmit && next build && vitest run`.
 
-**Phases 1–4 are pure cleanup and can land before any rebuild work starts.** They
-are the "good starting spot." Phases 5 and 8 are the rebuild itself. Phase 6
-needs a product decision.
+| # | Phase | Scope | Risk |
+|---|---|---|---|
+| **0** | **Make the build gate real** — declare `@testing-library/dom`, `chmod +x .husky/pre-commit`, add a `.github/workflows` running typecheck + test + build, add `postcss-load-config`, set a test env for `NEXT_PUBLIC_*` | ~10 lines | **None — do this first** |
+| **1** | **Green the baseline** — delete the 3 test files covering code that no longer exists (§0b), fix the remaining tsc errors, delete `date-utils.js` + `.gitignore` `src/**/*.js` | ~500 deleted | Low |
+| **2** | Fix §1a (fabricated `/progress` charts) — a patient-facing correctness bug. **Ship this one on its own.** | ~50 changed | Low |
+| **3** | Assets: `public/` 25.9 MB, `.playwright-mcp/` (+ `.gitignore` fix), empty dirs, move public `.md` files to `docs/` | 25.9 MB | None |
+| **4** | Unreferenced files: §2a–2g **reconciled against knip's 116** (§0e). Largest sweep, zero behaviour change. | ~9,200 | Low |
+| **5** | Vision removal: §3, including the 7 file edits and 3 dependency drops | 2,912 | Medium — touches two live pages |
+| **6** | Unused exports/types sweep (knip: 269 + 186) — **after** phase 4, since most live in deleted files | — | Low |
+| **7** | `react-is`, remaining `console.log`s, `pt-store` legacy shape | ~60 | None |
+| — | *Product deletions: messaging (§2i), duplicate `/assessment` route (§2j)* | 1,658 | **Parked — open question, §10** |
+| — | *Vapi removal ([05 §9](./05-voice-pipeline.md))* | — | **Not cleanup** — lands with Deepgram ([08 stage 7](./08-migration-plan.md)) |
+| — | *Database: 8 unqueried tables, `002`/`003` SQL, one migration system* | ~6,300 | **Not cleanup** — superseded by [03](./03-data-architecture.md) |
+
+**Phases 0–7 are pure cleanup and land before any rebuild work starts.** That is
+the "good starting spot": ~12,000 LOC and 25.9 MB gone, a green suite, and a CI
+gate that keeps it green.
+
+Three changes from the original ordering, all forced by §0:
+
+1. **Phase 0 is new and comes first.** The old plan's phase 0 said "establish a
+   green build" — but the build was never green and nothing enforced it. Fixing
+   the gate before the cleanup is what stops this from recurring.
+2. **Vapi and database work are no longer phases here.** Deleting Vapi before
+   Deepgram works leaves the app with no voice path; both belong to
+   [08](./08-migration-plan.md), not to cleanup.
+3. **Test deletion moved to phase 1** rather than being spread across later
+   phases — the three dead test files are what keep the suite red, and a red
+   suite makes every subsequent phase's exit criterion meaningless.
 
 ---
 

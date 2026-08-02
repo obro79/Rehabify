@@ -53,19 +53,23 @@ lands. Everything else is a real dependency.
 
 ## 2. Stage detail
 
-### Stage 1 — Fix the live bug, establish a baseline
+### Stage 1 — Make the gate real, then green the baseline
 
-Ship `/progress` first and separately. It is a correctness bug in front of real
-users and it has nothing to do with the rebuild.
+**The verification pass has been run** — see [07 §0](./07-cleanup-plan.md). It
+found that the baseline was never green and that **nothing has ever enforced it**:
+no CI, and the one pre-commit hook is not executable. The entire test suite was
+non-executing because a peer dependency was never declared.
 
-Then, before deleting anything: run `knip`, `ts-prune`, and `tsc --noEmit` with
-`node_modules` present and **diff the output against [07](./07-cleanup-plan.md)**.
-That document's inventory was assembled by reading imports, not by running the
-tools — it should hold up, but confirm it rather than trust it. Any disagreement
-is worth understanding before 9,000 lines are deleted on its say-so.
+So stage 1 starts with the gate, not the cleanup: declare
+`@testing-library/dom`, make the hook executable, add a CI workflow running
+typecheck + test + build. Then green the baseline by deleting the three test
+files that cover code which no longer exists.
 
-**Exit:** `tsc --noEmit && next build && vitest run` green, tool output
-reconciled, `/progress` shipped.
+Ship the `/progress` fix separately on top — it is a correctness bug in front of
+real users and has nothing to do with the rebuild.
+
+**Exit:** `tsc --noEmit && next build && vitest run` green **in CI**, not just
+locally; `/progress` shipped.
 
 ### Stage 2 — Cleanup
 
