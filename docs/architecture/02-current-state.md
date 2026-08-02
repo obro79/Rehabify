@@ -266,10 +266,16 @@ No E2E. `vitest.config.ts:17` excludes an `e2e/` directory that does not exist.
 (1,286 lines). It has **only four importers**: `use-pose-detection.ts`,
 `exercise-camera.tsx`, `feedback-overlay.tsx`, and one test.
 
-Shelving it is a small cut at the import boundary but a wider *data* cut:
-`exercise-store`'s form score / rep count / phase go unpopulated, which starves
-`use-form-event-bridge` → `injectContext` (live voice form coaching goes
-silent), `POST /api/session-state`, and `sessions.overall_form_score`.
+**Vision is retained in full** ([ADR-003](./09-decision-log.md)) — this section
+is kept because it maps the blast radius of the *data* it produces, not because
+anything is being removed.
+
+That data path is the reason removal was never cheap, and it is now the reason
+vision has to be carried through the rebuild deliberately: `exercise-store`'s
+form score / rep count / phase feed `use-form-event-bridge` → `injectContext`
+(live voice form coaching), `POST /api/session-state`, and
+`sessions.overall_form_score`. Every one of those consumers is rebuilt on
+Supabase, so each needs a decision about where vision output lands.
 
 ⚠️ `src/components/motion/` is **not vision** — it is 5 files of framer-motion
 animation wrappers imported by 16 files including the entire landing page. Do

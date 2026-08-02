@@ -73,20 +73,23 @@ locally; `/progress` shipped.
 
 ### Stage 2 — Cleanup
 
-[07 §9](./07-cleanup-plan.md) phases 2–4, one commit each, green at every step:
-assets (25.9 MB, including a 5.2 MB favicon that is not even wired up), the
-unreferenced-file sweep (~9,200 LOC), and vision removal (2,912 LOC + 3 deps,
-touching two live pages).
+[07 §9](./07-cleanup-plan.md) phases 3–6, one commit each, green at every step:
+assets (25.9 MB, including a 5.1 MB favicon that is not even wired up), the
+unreferenced-file sweep (**103 files, ~9,300 LOC**, knip-confirmed), then the
+unused-export sweep and the odds and ends.
 
-Phases 5–9 of that document are *not* cleanup — they are stages 4 and 7 here, and
-they happen with the rebuild rather than before it. Deleting Vapi before Deepgram
-works would leave the app with no voice path at all.
+**Vision is retained in full ([ADR-003](./09-decision-log.md)) and is excluded
+from every phase** — including the ~1,099 LOC inside it that has no importers.
+
+Vapi and database work are *not* cleanup — they are stages 7 and 4 here, and they
+happen with the rebuild rather than before it. Deleting the live Vapi path before
+Deepgram works would leave the app with no voice at all. (The *dead* Vapi modules
+are a different thing and do go in the sweep; they are already unreferenced.)
 
 Product deletions (messaging, the duplicate `/assessment` route) stay parked;
 they are open questions in [07 §10](./07-cleanup-plan.md), not decisions.
 
-**Exit:** ~12,000 LOC and 25.9 MB gone, build green, no behaviour change outside
-vision.
+**Exit:** ~9,300 LOC and 25.9 MB gone, build green, zero behaviour change.
 
 ### Stage 3 — New remote
 

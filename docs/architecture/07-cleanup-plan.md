@@ -11,7 +11,7 @@
 > **Vision is retained in full ([ADR-003](./09-decision-log.md)) and is excluded
 > from every phase below. §3 is a do-not-touch list.**
 >
-> **Headline: ~9,500 LOC across 104 files is removable with no behaviour change
+> **Headline: ~9,300 LOC across 103 files is removable with no behaviour change
 > — knip-confirmed, vision already carved out. Plus ~6,000 lines of regenerable
 > SQL and 25.9 MB of assets.**
 >
@@ -656,7 +656,7 @@ at `lib/exercise-utils.tsx:254,259`.
 
 ### Phase 4 — the unreferenced-file sweep
 
-**104 files, ~9,450 LOC** — knip's 116 minus the 12 vision files. Full list in
+**103 files, ~9,300 LOC** — knip's 116, minus 12 vision files and one false positive. Full list in
 §11. Sub-commits, so a bisect lands somewhere useful:
 
 | Group | Files | LOC |

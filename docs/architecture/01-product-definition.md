@@ -1,7 +1,8 @@
 # 01 — Product Definition
 
 > Adapted from `feature-architecture-plan.md` in the `rehabifyy` repository,
-> with this rebuild's scope decisions applied: **computer vision is shelved**,
+> with this rebuild's scope decisions applied: **computer vision is retained**
+> ([ADR-003](./09-decision-log.md), reversed 2026-08-02),
 > and the target platform is Supabase + a composed Deepgram voice pipeline.
 
 ---
@@ -168,12 +169,19 @@ rule, and schema change runs the regression set.
 
 ## Explicitly deferred
 
-Computer vision, AI-observed form correction, autonomous diagnosis, any
+Autonomous diagnosis, AI-observed form *correction* as a clinical claim, any
 automatic treatment-state mutation, generated patient-support answers, document
 upload or summarization, a general medical chatbot, a full EHR, billing,
 scheduling, an exercise marketplace, recovery prediction, provider ranking,
 population-level recommendations, microservices, Kubernetes, a custom foundation
 model.
+
+> **Note on vision.** The vision *code* is retained in full
+> ([ADR-003](./09-decision-log.md)) — nothing is deleted or refactored. What
+> stays deferred is the **clinical claim**: stage G below still says the product
+> never claims to observe or correct form. Whether a retained vision feature is
+> allowed to make that claim is an open question ADR-003 records and does not
+> settle.
 
 ---
 
@@ -190,7 +198,7 @@ countries and different business models**, and the difference was not cosmetic.
 | Market | United States | British Columbia, Canada |
 | Regulation | HIPAA, BAAs | PIPEDA + BC PIPA / provincial health privacy |
 | Revenue | $39/mo SaaS **+ CPT 98977/98980 RTM reimbursement (~$98/patient/mo)** | SaaS only; billing explicitly deferred |
-| Vision | Central — MediaPipe + DTW, skeleton streaming for billing-grade verification | Shelved |
+| Vision | Central — MediaPipe + DTW, skeleton streaming for billing-grade verification | Retained; billing premise discarded on ADR-011 grounds |
 
 **CPT codes are US Medicare billing codes. They do not exist in the Canadian
 system.** With BC confirmed, the entire billing-engine premise — and the unit

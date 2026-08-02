@@ -45,7 +45,7 @@ want to know why something is being replaced rather than fixed.
 | Voice | **Composed** Deepgram STT → GPT-5.6 → Aura TTS. We own the turn loop |
 | LLM | **GPT-5.6** — Luna for bounded work, Sol for clinician-facing prose |
 | Observability | **Langfuse Cloud** under a no-PHI telemetry contract, CI-enforced |
-| Vision | **Shelved** |
+| Vision | **Retained in full** — excluded from cleanup ([ADR-003](./09-decision-log.md)) |
 | Shape | Modular monolith + a durable worker |
 
 Full context and consequences for each: [09](./09-decision-log.md).

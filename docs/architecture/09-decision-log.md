@@ -9,7 +9,7 @@
 |---|---|---|
 | [001](#adr-001) | Rebuild in this repo, push to a new remote | Accepted |
 | [002](#adr-002) | Supabase as the platform, `ca-central-1` | Accepted |
-| [003](#adr-003) | Computer vision shelved | Accepted |
+| [003](#adr-003) | Computer vision **retained in full** | Accepted — reversed 2026-08-02 |
 | [004](#adr-004) | Supabase Auth *(reverses an earlier call)* | Accepted |
 | [005](#adr-005) | Multi-tenancy: shared DB + `organization_id` + forced RLS | Accepted |
 | [006](#adr-006) | Drizzle two-client boundary; `drizzle-kit push` banned | Accepted |
@@ -25,9 +25,9 @@
 | Old | Was | Now |
 |---|---|---|
 | ADR-001 | Gemini 2.0 Flash Live over Vapi | **Superseded by ADR-007** |
-| ADR-002 | Skeleton streaming for billing-grade verification | **Superseded by ADR-003** — vision shelved, and CPT billing does not exist in Canada (ADR-011) |
+| ADR-002 | Skeleton streaming for billing-grade verification | **Partly superseded** — vision is retained (ADR-003), but the *billing-grade verification* premise dies with CPT, which does not exist in Canada (ADR-011) |
 | ADR-003 | GCP over AWS for HIPAA | **Superseded by ADR-002** |
-| ADR-004 | Server-side vision analysis language | **Moot** — ADR-003 |
+| ADR-004 | Server-side vision analysis language | **Open** — vision is retained (ADR-003), so where analysis runs is undecided; today it is entirely client-side |
 | ADR-005 | Deployment model | **Superseded by ADR-002** |
 | ADR-006 | Multi-tenancy via shared DB + RLS | **Carried forward as ADR-005**, with the correction that the old policies were inert |
 
