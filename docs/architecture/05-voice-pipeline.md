@@ -302,7 +302,15 @@ GPUs. **⚠️ Deepgram publishes no region list. Unconfirmed.**
 sent to Deepgram." Flux is available self-hosted. **⚠️ `nova-3-medical`
 self-hosted was "coming soon" as of the streaming announcement and I found no
 doc confirming it shipped.** If it has not, self-hosting forces the Flux
-tradeoff from §3.
+tradeoff from §3. (Also note the public AWS Marketplace Nova-3 Medical listing is
+labelled **batch** — not usable for streaming intake.)
+
+> **Decided 2026-08-02 — self-hosted is now the plan, not one of two options.**
+> [ADR-013](./09-decision-log.md#adr-013) selects self-hosting in `ca-central-1`,
+> funded by cloud credits, and re-aims the Deepgram conversation from a residency
+> *request* to an Enterprise *sales* call. Dedicated remains the fallback if the
+> GPU operational burden proves unjustified. Question 2 below is now the one that
+> decides the architecture.
 
 ### Questions for Deepgram sales — before infrastructure is provisioned
 
@@ -315,11 +323,12 @@ tradeoff from §3.
 
 > **This is a gating dependency, not a detail.** If the answer to (1) or (2) is
 > no, either the medical model or Canadian residency has to give, and that is a
-> decision for the clinical lead and counsel — not an engineering call. It also
-> interacts with the unresolved Canada-vs-US market question in
-> [01-product-definition.md](./01-product-definition.md) (ADR-011): a US market
-> makes this section largely moot, since a BAA over US-hosted Deepgram is a
-> well-trodden path.
+> decision for the clinical lead and counsel — not an engineering call.
+>
+> *Updated: the Canada-vs-US market question this note originally hedged against
+> is settled — [ADR-011](./09-decision-log.md#adr-011) accepted British Columbia,
+> so the "a US market makes this moot" escape hatch is closed. This section is
+> load-bearing.*
 
 ---
 

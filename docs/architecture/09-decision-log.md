@@ -19,6 +19,7 @@
 | [010](#adr-010) | `nova-3-medical` over Flux | **Proposed** — bake-off required |
 | [011](#adr-011) | Target market: British Columbia, Canada | Accepted |
 | [012](#adr-012) | Modular monolith + durable worker | Accepted |
+| [013](#adr-013) | Self-hosted speech in `ca-central-1`, on cloud credits | **Proposed** — gated on model availability |
 
 ### Superseded from `docs/redesign/`
 
@@ -225,6 +226,12 @@ Deepgram has **no Canadian region** — this is ADR-011's bill coming due, and i
 is the one place where the "design around it" move used for telemetry (ADR-009)
 is unavailable.
 
+**Amended 2026-08-02.** A third move exists and was missed: Deepgram ships a
+self-hosted deployment, so residency becomes a question of which region *we* run
+containers in rather than a question about Deepgram's roadmap. See
+[ADR-013](#adr-013) — which also puts `nova-3-medical` availability
+([ADR-010](#adr-010)) on the critical path.
+
 ---
 
 ## ADR-008 — GPT-5.6, tiered {#adr-008}
@@ -247,6 +254,23 @@ is an enum constrained to the clinic's approved library, resolved by exact ID �
 unstorable. **⚠️ OpenAI BAA/DPA coverage for GPT-5.6 tiers and Canadian
 residency options are unconfirmed** — same conversation as ADR-007 and ADR-009.
 
+**Amended 2026-08-02 — residency here is a fork, not a checkbox.** Azure OpenAI
+keeps inference in-region in Canada Central / Canada East, but only on Regional
+Standard or Provisioned Throughput deployments; Global Standard and Global Batch
+route out of region, and **there is no Canada data zone** to fall back on. The
+catch is model availability: **no GPT-5.x is offered on standard deployment in
+Canada.** GPT-4o is, and it retires 2026-10-01. PTU in Canada East is the only
+route to a GPT-5-class model under strict Canadian residency. GCP's
+`northamerica-northeast1` has the same shape — genuine in-region ML processing,
+trailing model availability.
+
+So gate 3 is not "does OpenAI cover us." It is **Canadian residency or the
+GPT-5.6 Luna/Sol tiering — probably not both**, with PTU commitment cost as the
+third variable (and PTU is credit-fundable, see [ADR-013](#adr-013)). This is
+undecided. It must be settled before real patient data reaches the LLM, not
+before the pilot build starts — the tiering is a routing detail behind one
+adapter, so deferring it is cheap and picking wrong now is not.
+
 ---
 
 ## ADR-009 — Langfuse Cloud, no-PHI telemetry contract {#adr-009}
@@ -265,6 +289,16 @@ attribute reaches the exporter.**
 **Consequences.** If we send no PHI, region and BAA stop being blockers and we
 avoid operating ClickHouse + a second Postgres + Redis. This reframing is the
 highest-leverage decision in the doc set.
+
+**Amended 2026-08-02 — self-hosting considered and rejected.** Cloud credits make
+a self-hosted Langfuse in a Canadian region affordable, which would *dissolve*
+this constraint rather than route around it. Rejected for now: v3 requires
+Langfuse Web + Worker + Postgres + ClickHouse + Redis/Valkey + S3 — roughly 9
+vCPU and 21 GiB at the documented minimum — and **operating five stateful
+services in order to hold PHI we have already decided not to emit is a worse
+trade than the CI-enforced allowlist.** Revisit only if the no-PHI contract
+proves too lossy to debug real incidents against; that is the failure mode to
+watch for, not cost.
 
 Caveats: Langfuse was **acquired by ClickHouse 2026-01-16** — the BAA
 counterparty changed and the published BAA predates it. The **JS masking hook
@@ -307,6 +341,24 @@ before the pilot. If cutoffs prove worse in practice, Flux at Deepgram's own
 documented medical profile (`eot_threshold=0.85`, `eot_timeout_ms=8000`, no
 eager) is the fallback.
 
+**Amended 2026-08-02 — the self-hosted caveat is now load-bearing.**
+[ADR-013](#adr-013) proposes self-hosting to solve residency, which promotes "is
+`nova-3-medical` available self-hosted, *streaming*?" from a footnote to a
+decision input. It remains unconfirmed: Deepgram does not publish its
+self-hosted model list at all (an account representative provides it during
+enterprise onboarding), the "coming soon" note has not visibly resolved, and the
+public AWS Marketplace Nova-3 Medical listing is labelled **batch** — which
+intake cannot use.
+
+So the bake-off has **three arms, not two**: cloud `nova-3-medical`, self-hosted
+Flux, and self-hosted `nova-3-medical` if it exists. **If the third does not
+exist, Canadian residency and the medical model are mutually exclusive.** That
+is not an infrastructure trade — this ADR's whole argument is that a
+mis-transcribed anatomy term is uncorrectable because nobody knows it happened.
+Choosing residency over medical accuracy is a clinical-risk decision and belongs
+with the clinical lead, alongside gate 9 in
+[08 §4](./08-migration-plan.md).
+
 ---
 
 ## ADR-011 — Target market: British Columbia, Canada {#adr-011}
@@ -329,11 +381,16 @@ Supabase platform logs are out-of-region, Edge Functions are global unless
 pinned, Realtime is undocumented; Deepgram has no Canadian endpoint at all;
 no observability vendor has one either.
 
-Two responses run through the rest of the docs. Where residency can be bought, we
-buy it (`ca-central-1`). Where it cannot, we **design around it** — the no-PHI
-telemetry contract (ADR-009) makes US-hosted observability moot by never sending
-PHI. That move is unavailable for speech, which is why ADR-007's residency
-conversation is a gating dependency.
+**Three responses** run through the rest of the docs. Where residency can be
+bought, we buy it (`ca-central-1`, ADR-002). Where it cannot be bought but the
+data need not travel, we **design around it** — the no-PHI telemetry contract
+(ADR-009) makes US-hosted observability moot by never sending PHI. Where neither
+works, because the data must travel and no vendor sells the region, we **host it
+ourselves in-region** ([ADR-013](#adr-013)).
+
+*Originally this section listed only the first two moves and concluded that
+speech had no answer. That was wrong — it treated a vendor's hosted regions as
+the full menu. The third move is what the cloud credits are for.*
 
 **Supabase publishes zero PIPEDA representation** — a legal-review blocker, not
 an engineering one. Clear it before real patient data.
@@ -356,6 +413,70 @@ no serverless flush race — `@langfuse/otel` is Node-only and not Edge-compatib
 and where `db.admin` is legitimately used. Generation is inherently async and
 clinician-reviewed, so a job queue matches the product's actual latency budget
 rather than fighting it.
+
+---
+
+## ADR-013 — Self-hosted speech in `ca-central-1`, on cloud credits {#adr-013}
+
+**Date** 2026-08-02 · **Status** ⚠️ **Proposed — gated on self-hosted model
+availability**
+
+**Context.** [ADR-011](#adr-011) accepted an expensive constraint, and speech was
+the place it bit hardest: Deepgram has no Canadian region, and unlike telemetry
+you cannot solve that by declining to send the data. Gate 2 in
+[08 §4](./08-migration-plan.md) therefore read as an open-ended wait on
+Deepgram's roadmap — the single least controllable item in the plan.
+
+The framing was too narrow. **Deepgram ships a self-hosted deployment** —
+Docker/Podman, Kubernetes, or SageMaker, on AWS, GCP, Azure, or Oracle — in which
+no audio, transcripts, or identifying markers of request content leave the
+environment you run it in. Residency stops being a question about Deepgram's
+region list and becomes a question about where we run containers. We hold GCP,
+Azure, and AWS credits, which is precisely the budget this needs.
+
+**Decision (provisional).** Pursue **self-hosted Deepgram in AWS `ca-central-1`**,
+co-located with Supabase, funded by cloud credits. Re-aim gate 2 from a residency
+*request* to a **Deepgram Enterprise sales conversation** — self-hosting requires
+an Enterprise plan, and sales moves faster than a vendor roadmap.
+
+Co-location is not incidental. The turn loop is browser → our server → STT → LLM
+→ TTS, and the concurrency ceiling in [05 §7](./05-voice-pipeline.md) is a
+latency budget. Every hop kept inside `ca-central-1` is tuning we do not have to
+do later.
+
+**Why Proposed and not Accepted.** The decision turns on a fact that is not
+published. Deepgram does not list which models are available self-hosted; an
+account representative supplies that during onboarding.
+[ADR-010](#adr-010) already flagged `nova-3-medical` self-hosted as "coming
+soon," it has not visibly shipped, and the public AWS Marketplace Nova-3 Medical
+listing is labelled **batch** — useless for streaming intake. **This is the first
+question on the sales call**, and if the answer is no, ADR-010 flips and
+residency costs us the medical model.
+
+**Consequences.**
+
+- **Gate 2 changes character**, which is the actual win: from an uncapped wait on
+  someone else's roadmap to a sales conversation plus infrastructure we control
+  and already have credits for. It moves off the critical path.
+- **`mip_opt_out=true` becomes moot on the self-hosted path** — nothing is sent
+  to opt out of. **Keep the choke point anyway.** It still governs any cloud
+  fallback, and a guarantee that holds only while one deployment mode holds is
+  not a guarantee. This is the same reasoning as ADR-006 and ADR-009.
+- **Not air-gapped.** Self-hosted deployments contact Deepgram's **License
+  Server** for validation and usage reporting. That is licensing metadata, not
+  audio — but it is an outbound dependency that belongs in the DPIA, and it is an
+  availability risk on the voice path that a hosted API does not have. Specify
+  the failure behaviour before the pilot.
+- **We now own GPU infrastructure**: instance capacity in `ca-central-1`,
+  container orchestration, model updates, and capacity planning against the
+  45-concurrent-stream ceiling. This is real operational surface the composed
+  pipeline did not previously carry, and it lands on stage 7.
+- **Credits expire; architecture does not.** This is only sound because it buys a
+  capability that is not for sale at any price — Canadian-resident Deepgram.
+  The same credits would *not* justify moving off Vercel or off Supabase, which
+  would be buying a discount on something we already have, at the cost of the
+  foundation [03](./03-data-architecture.md) and [04](./04-auth-access-control.md)
+  are built on. **Use credits for capability, never for discount.**
 
 ---
 

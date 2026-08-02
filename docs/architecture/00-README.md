@@ -23,7 +23,7 @@ the conversation.
 | 04 | [Auth & Access Control](./04-auth-access-control.md) | Identity model, Supabase Auth constraints, where authorization is actually enforced |
 | 05 | [Voice Pipeline](./05-voice-pipeline.md) | Composed Deepgram STT → LLM → TTS: topology, turn detection, failure modes, capacity |
 | 06 | [AI Pipelines & Observability](./06-ai-pipelines.md) | GPT-5.6 tiering, structured outputs, Langfuse under a no-PHI telemetry contract, evaluation |
-| 07 | [Cleanup Plan](./07-cleanup-plan.md) | The deletion inventory — ~12,000 LOC and 25.9 MB, with verdicts and risk |
+| 07 | [Cleanup Plan](./07-cleanup-plan.md) | The deletion inventory — ~9,300 LOC and 25.9 MB, with verdicts and risk |
 | 08 | [Migration Plan](./08-migration-plan.md) | Build order, what gets ported, the non-engineering gates |
 | 09 | [Decision Log](./09-decision-log.md) | Twelve ADRs, and what they supersede |
 
@@ -43,7 +43,8 @@ want to know why something is being replaced rather than fixed.
 | ORM | Drizzle behind a **two-client boundary**; `drizzle-kit push` banned |
 | Auth | **Supabase Auth** — staff at AAL2, patients episode-scoped and phone-verified |
 | Voice | **Composed** Deepgram STT → GPT-5.6 → Aura TTS. We own the turn loop |
-| LLM | **GPT-5.6** — Luna for bounded work, Sol for clinician-facing prose |
+| Speech hosting | **Self-hosted in `ca-central-1`**, on cloud credits — *proposed*, gated on model availability ([ADR-013](./09-decision-log.md#adr-013)) |
+| LLM | **GPT-5.6** — Luna for bounded work, Sol for clinician-facing prose. Residency is an open fork ([ADR-008](./09-decision-log.md#adr-008)) |
 | Observability | **Langfuse Cloud** under a no-PHI telemetry contract, CI-enforced |
 | Vision | **Retained in full** — excluded from cleanup ([ADR-003](./09-decision-log.md)) |
 | Shape | Modular monolith + a durable worker |
@@ -62,12 +63,21 @@ decision here is downstream of that — it is why the voice pipeline is composed
 rather than a managed agent, why exercise selection is an enum resolved by exact
 ID, and why nothing publishes without an approved plan version.
 
-**2. Where residency can be bought, buy it. Where it cannot, design around it.**
-Canadian residency is unsolved or unconfirmed with every vendor in this stack.
-Postgres, Storage, and Auth sit in `ca-central-1`. Observability cannot — no
-vendor has a Canadian region — so the answer is to **send no PHI at all**, and
-assert that in CI. Speech is where this move is unavailable, which is why the
-Deepgram residency conversation is a gating dependency rather than a detail.
+**2. Buy residency, or don't send the data, or host it yourself.**
+Canadian residency is unsolved or unconfirmed with every vendor in this stack, and
+there are exactly three answers. **Buy it** where it is sold — Postgres, Storage,
+and Auth sit in `ca-central-1`. **Don't send the data** where it is not sold and
+the data need not travel — no observability vendor has a Canadian region, so the
+answer is to send no PHI at all and assert that in CI. **Host it yourself** where
+the data must travel and no region exists: speech is that case, and Deepgram's
+containers can run in `ca-central-1` even though Deepgram's cloud cannot
+([ADR-013](./09-decision-log.md#adr-013)).
+
+The third move is what the cloud credits are for, and it is worth naming why it
+was almost missed: the first draft of these docs treated a vendor's hosted region
+list as the whole menu, concluded speech had no answer, and wrote gate 2 as an
+open-ended wait. **The residency question is "where does the data sit," not
+"where does the vendor operate."**
 
 **3. A guarantee that depends on everyone remembering is not a guarantee.**
 Three places in this architecture replace a policy with a narrow, enforced choke
@@ -98,6 +108,15 @@ representation, Deepgram's Canadian residency, OpenAI's DPA coverage) are
 conversations with other organizations that should start before the first line of
 rebuild code.
 
-One decision remains explicitly **Proposed** rather than Accepted:
-[ADR-010](./09-decision-log.md), `nova-3-medical` over Flux. It is settled by a
-bake-off against recorded intake audio, and that should happen before the pilot.
+Two decisions remain explicitly **Proposed** rather than Accepted, and they are
+the same question seen twice:
+
+- [ADR-010](./09-decision-log.md#adr-010) — `nova-3-medical` over Flux, settled by
+  a bake-off against recorded intake audio.
+- [ADR-013](./09-decision-log.md#adr-013) — self-hosted speech in `ca-central-1`,
+  gated on whether streaming `nova-3-medical` is available self-hosted at all.
+
+If it is not, **Canadian residency and the medical speech model are mutually
+exclusive**, and that is a clinical-risk decision rather than an architectural
+one. Both are answered by the same Deepgram Enterprise conversation, which is why
+it should start now.

@@ -183,9 +183,19 @@ pre-rendering the approved question set removes the binding constraint.
 
 **Vapi is deleted in the same PR that lands Deepgram**, not before.
 
-> ⚠️ [ADR-010](./09-decision-log.md) — run the `nova-3-medical` vs Flux bake-off
-> against recorded intake audio before the pilot. It is provisional, and it is
-> cheap to settle.
+**Deployment target is decided before this stage, not during it.**
+[ADR-013](./09-decision-log.md#adr-013) proposes self-hosting Deepgram in
+`ca-central-1` on cloud credits, which adds GPU capacity, container
+orchestration, and the License Server dependency to this stage's surface. Build
+behind the speech adapter boundary ported from `rehabifyy` (§3) so the hosted and
+self-hosted paths differ at one seam — but know which one is real before
+capacity-planning against the 45-stream ceiling.
+
+> ⚠️ [ADR-010](./09-decision-log.md#adr-010) — run the bake-off against recorded
+> intake audio before the pilot. It now has **three arms**: cloud
+> `nova-3-medical`, self-hosted Flux, and self-hosted `nova-3-medical` if it
+> exists. If it does not, residency and the medical model are mutually exclusive
+> and the choice belongs to the clinical lead, not to engineering.
 
 ### Stage 8 — Clinical surfaces
 
@@ -242,19 +252,46 @@ being started later.
 | # | Gate | Raise with | Blocks |
 |---|---|---|---|
 | 1 | **Supabase publishes zero PIPEDA representation** | Counsel | 🔴 Any real patient data |
-| 2 | **Deepgram has no Canadian region** — dedicated `ca-central-1` is plausible, unconfirmed, Enterprise-only | Deepgram | 🔴 Real patient voice |
-| 3 | OpenAI residency and DPA coverage for GPT-5.6 tiers | OpenAI | 🔴 Real patient data through the LLM |
+| 2 | **Canadian-resident speech** — self-host in `ca-central-1` ([ADR-013](./09-decision-log.md#adr-013)). First question: is streaming `nova-3-medical` available self-hosted? | Deepgram **sales** (Enterprise plan) | 🔴 Real patient voice |
+| 3 | **LLM residency is a fork** — Canada or GPT-5.6, likely not both ([ADR-008](./09-decision-log.md#adr-008)). Price PTU in Canada East | OpenAI / Microsoft | 🔴 Real patient data through the LLM |
 | 4 | **Raise the MFA verify rate limit** (15/hr/IP vs clinic NAT) | Supabase | 🟠 Pilot — this *will* fire |
 | 5 | Confirm Realtime residency; treat as out-of-region until then | Supabase | 🟠 PHI on Realtime |
 | 6 | Confirm what platform logs capture and where they live | Supabase | 🟠 The no-PHI-in-logs discipline |
-| 7 | Langfuse BAA counterparty post-ClickHouse acquisition | Langfuse | 🟡 Mooted if the no-PHI contract holds |
+| 7 | Langfuse BAA counterparty post-ClickHouse acquisition | Langfuse | 🟡 Mooted if the no-PHI contract holds; self-hosting rejected ([ADR-009](./09-decision-log.md#adr-009)) |
 | 8 | Team plan + compliance add-on pricing (unpublished) | Supabase | 🟡 Budget |
 | 9 | **Clinical lead signs the exact pathway boundary** | Partner clinic | 🔴 Any real-patient episode |
 
 Gates 1–3 are the ones to open **now**, in parallel with stage 1. They are
 conversations with other organizations, and the answers may change the
-architecture — if Deepgram cannot offer a Canadian deployment, that is a design
-input for stage 7, not a surprise during it.
+architecture — if streaming `nova-3-medical` is unavailable self-hosted, that is
+a design input for stage 7 and a clinical-risk decision for gate 9, not a
+surprise during either.
+
+**These gates, not engineering, are the critical path.** The build is on the
+order of weeks; vendor legal and sales cycles are on the order of one to three
+months, and they do not compress by adding capacity. Any plan that starts
+engineering before these conversations finishes them late.
+
+### 4a. What the cloud credits change
+
+We hold GCP, Azure, and AWS credits. They are worth spending here for exactly one
+reason, and it is not cost.
+
+**Credits buy residency, not discount.** Three gates are variations on "a vendor
+will not put PHI in Canada." Where the vendor's software can be run by us, that
+converts from *waiting* into *spending* — which is the only lever we control.
+
+| Gate | Credits help? | |
+|---|---|---|
+| 2 — Deepgram | ✅ | Self-host in `ca-central-1` ([ADR-013](./09-decision-log.md#adr-013)) — the clear win, subject to the model question |
+| 3 — LLM | 🟠 | Azure OpenAI Canada is real but has no GPT-5.x on standard deployment; PTU is credit-fundable |
+| 7 — Langfuse | ✅ | Technically feasible, deliberately **rejected** — five stateful services to hold PHI we do not emit |
+| 1, 4, 5, 6, 8 — Supabase | ❌ | Legal representation and platform configuration. **Do not replatform off Supabase for credits** — [03](./03-data-architecture.md) and [04](./04-auth-access-control.md) are Supabase-shaped, and Supabase already runs in `ca-central-1` |
+| 9 — Clinical sign-off | ❌ | |
+
+The discipline: **spend credits on capability that is not for sale at any price,
+never on a discount for something we already have.** Canadian-resident Deepgram
+passes. Cheaper hosting does not — credits expire and the architecture stays.
 
 ---
 
