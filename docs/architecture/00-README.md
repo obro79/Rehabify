@@ -25,7 +25,8 @@ the conversation.
 | 06 | [AI Pipelines & Observability](./06-ai-pipelines.md) | GPT-5.6 tiering, structured outputs, Langfuse under a no-PHI telemetry contract, evaluation |
 | 07 | [Cleanup Plan](./07-cleanup-plan.md) | The deletion inventory — ~9,300 LOC and 25.9 MB, with verdicts and risk |
 | 08 | [Migration Plan](./08-migration-plan.md) | Build order, what gets ported, the non-engineering gates |
-| 09 | [Decision Log](./09-decision-log.md) | Twelve ADRs, and what they supersede |
+| 09 | [Decision Log](./09-decision-log.md) | Thirteen ADRs, and what they supersede |
+| 10 | [Clinical Content & Evaluation](./10-clinical-content.md) | Where exercises come from, the metadata that gates rather than displays, templated plans, and the eval strategy |
 
 **Reading order.** For the shape of the thing: 01 → 09 → 08. For implementation:
 03 → 04 → the relevant pipeline doc. 02 and 07 are reference — read them when you
