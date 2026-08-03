@@ -22,6 +22,7 @@
 | [013](#adr-013) | Self-hosted speech in `ca-central-1`, on cloud credits | **Proposed** — gated on model availability |
 | [014](#adr-014) | Two deadlines; three concurrent tracks | Accepted |
 | [015](#adr-015) | First vertical slice: voice intake to plan generation | Accepted |
+| [016](#adr-016) | Python AI service; TypeScript keeps all database access | Accepted |
 
 ### Superseded from `docs/redesign/`
 
@@ -616,6 +617,76 @@ complete stage, and there is a real risk of building throwaway scaffolding at ea
 layer. The mitigation is that the slice follows the *same* architecture as the full
 build — thin is not the same as temporary. Anything genuinely disposable should be
 named as such when it is written.
+
+---
+
+## ADR-016 — Python AI service; TypeScript keeps all database access {#adr-016}
+
+**Date** 2026-08-02 · **Status** Accepted
+
+**Context.** Every document before this one assumed a single TypeScript runtime.
+That assumption was inherited from the existing Next.js app rather than chosen.
+
+Two things reopened it. The engineer building this is **materially faster in
+Python**, which for a solo build is not a preference but a schedule input. And
+three of the four workstreams in [ADR-015](#adr-015)'s slice — the voice gateway,
+structured extraction, and the eval harness — are in Python's strongest territory:
+Pydantic is a better structured-output target than Zod, FastAPI's WebSocket
+handling suits a Deepgram relay, and the evaluation ecosystem is Python-native.
+
+The cost is concentrated in one place. [03 §4](./03-data-architecture.md)'s
+`db.rls`/`db.admin` split is enforced by an **ESLint rule**, and ESLint does not
+run on Python. Naively porting the data layer would mean rebuilding the most
+security-critical boundary in the stack in a language where its enforcement
+mechanism does not exist.
+
+**Decision.** Two runtimes, split so that the boundary does not have to be
+duplicated:
+
+| | Owns |
+|---|---|
+| **Next.js / TypeScript** | Web app, auth, and **all database access** — Drizzle, RLS, migrations, the `db.admin` guard |
+| **Python / FastAPI** | Stateless AI service: voice gateway, extraction, plan composition, evals |
+
+**The Python service holds no database connection and no database credentials.**
+It receives context, returns validated Pydantic models, and the TypeScript tier
+persists them.
+
+Rejected alongside: **LangChain and LangGraph.** LangGraph is a real conceptual
+match for an intake question graph, and it loses on the product's central
+constraint — in LangGraph the model routes, and [01](./01-product-definition.md)
+forbids the model from routing. Adopting it would mean installing a framework and
+then spending the effort to constrain it back to a dictionary lookup. The question
+graph must also be **reviewable and signable by a physiotherapist** (gate 9), which
+a data file is and a program is not. Langfuse is unaffected — it is observability,
+unrelated to LangChain, and wraps whatever is underneath.
+
+**Consequences.** The security argument came out *better* than the single-runtime
+design it replaces. "All database access goes through one boundary" stops being a
+lint rule and becomes a property of the deployment: the AI service cannot reach
+Postgres because it has no credentials to reach it with. That is the same move as
+[08 §3a](./08-migration-plan.md)'s two Langfuse projects and 05's single
+`mip_opt_out` builder — **make the unsafe thing unreachable rather than
+forbidden.** It is now the fifth such choke point, and the first one that was free.
+
+What got harder, and none of it is cheap:
+
+- **Two deploy targets**, two dependency stories, two CI pipelines. Real overhead
+  for a solo engineer, and the main argument against.
+- **[ADR-012](#adr-012)'s "modular monolith" is now two services.** The spirit
+  holds — one web app, one AI service, no mesh — but the label is no longer
+  literally accurate.
+- **Contract drift** between Pydantic models and TypeScript types becomes a
+  standing hazard. One side must be generated from the other; deciding which is a
+  prerequisite to any parallel work, not a later cleanup.
+- **A network hop** enters the voice turn budget. Colocate the services in
+  `ca-central-1`; it is single-digit milliseconds against a budget measured in
+  hundreds, but it is not zero.
+- Docs 03, 05, and 06 were written single-runtime and are amended, not rewritten.
+
+Revisit if the operational overhead of two runtimes costs more than the velocity
+Python buys. That is a real possibility, and it should be judged in month three
+rather than argued now.
 
 ---
 

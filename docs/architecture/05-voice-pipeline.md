@@ -46,19 +46,28 @@ browser
   mic → AudioWorklet → linear16 @ 16 kHz
     │
     └──WSS──► Rehabify voice gateway  ◄── the PHI boundary starts here
-                 │
+                 │                        (Python / FastAPI — ADR-016)
                  ├──WSS──► Deepgram /v1/listen   (nova-3-medical, mip_opt_out=true)
                  │            └─ turn commit (§4)
                  │
                  ├── deterministic question-graph transition   ← no LLM
                  ├── GPT-5.6 Luna: phrase the allowed question / extract structured answer
-                 ├── Zod validation + clinical-rule checks
+                 ├── Pydantic validation + clinical-rule checks
                  │
                  ├── static approved-question audio (cache hit, ~90% of turns)
-                 └──WSS──► Deepgram /v1/speak    (aura-2, mip_opt_out=true)
+                 ├──WSS──► Deepgram /v1/speak    (aura-2, mip_opt_out=true)
+                 │
+                 └──HTTPS─► Next.js API — persist the turn  ◄── no DB client here
                  │
   ◄──WSS─────────┘  PCM frames + the visible text that produced them
 ```
+
+**The gateway is Python and has no database credentials**
+([ADR-016](./09-decision-log.md#adr-016)). It hands each validated turn to the
+TypeScript tier, which writes it through `db.rls`. That is one extra hop per
+turn — single-digit milliseconds within a region, against a turn budget measured
+in hundreds — and it is what keeps every database write behind the single
+boundary in [03 §4](./03-data-architecture.md).
 
 **Browser → Deepgram direct is technically supported and we are not doing it.**
 Deepgram issues 30-second ephemeral JWTs from `POST /v1/auth/grant` that only

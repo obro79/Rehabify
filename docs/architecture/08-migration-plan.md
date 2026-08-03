@@ -57,6 +57,27 @@ Track C is measured in months and consumes almost no attention; Track B is
 measured in someone else's spare evenings. Both should be in flight long before
 Track A needs them.
 
+> **Track A parallelises further, along a language seam.** Under
+> [ADR-016](./09-decision-log.md#adr-016) stage 4 is TypeScript and stages 7, 9a,
+> and most of 6 are Python, and the two touch only through generated contract
+> types. That makes four concurrent workstreams viable rather than one:
+>
+> | Workstream | Stages | Language |
+> |---|---|---|
+> | Schema and RLS | 4 | TypeScript |
+> | Voice gateway | 7 | Python |
+> | Intake graph and extraction | 6, 8 (thin) | Python |
+> | Eval harness | 9a | Python |
+>
+> **One prerequisite gates all four: the shared contract types must exist and be
+> generated from a single source.** Without that, four workstreams invent four
+> incompatible shapes for the same object and the integration is a rewrite. It is
+> a half-day of work and it is not optional.
+>
+> The cleanup sweep (stage 2) must **not** run concurrently with these — it deletes
+> 103 files and would conflict with every branch, and it is the one job that could
+> wander into `src/lib/vision/`. Run it alone.
+
 ### Track A — Foundation
 
 | # | Stage | Depends on | Doc |

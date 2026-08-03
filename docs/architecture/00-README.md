@@ -25,7 +25,7 @@ the conversation.
 | 06 | [AI Pipelines & Observability](./06-ai-pipelines.md) | GPT-5.6 tiering, structured outputs, Langfuse under a no-PHI telemetry contract, evaluation |
 | 07 | [Cleanup Plan](./07-cleanup-plan.md) | The deletion inventory — ~9,300 LOC and 25.9 MB, with verdicts and risk |
 | 08 | [Migration Plan](./08-migration-plan.md) | Three concurrent tracks, what gets ported, the non-engineering gates |
-| 09 | [Decision Log](./09-decision-log.md) | Fifteen ADRs, and what they supersede |
+| 09 | [Decision Log](./09-decision-log.md) | Sixteen ADRs, and what they supersede |
 | 10 | [Clinical Content & Evaluation](./10-clinical-content.md) | Where exercises come from, the metadata that gates rather than displays, templated plans, and the eval strategy |
 | 11 | [Diagrams](./11-diagrams.md) | Where components live, one voice-intake turn, and what gets recorded where |
 
@@ -51,7 +51,9 @@ want to know why something is being replaced rather than fixed.
 | Sequencing | **Three concurrent tracks, two deadlines** — raise and first-patient are different dates ([ADR-014](./09-decision-log.md#adr-014)) |
 | Vision | **Retained, untouched, out of the first slice** — rebuilt from scratch later, never ported ([ADR-003](./09-decision-log.md#adr-003), [ADR-015](./09-decision-log.md#adr-015)) |
 | First slice | **Voice intake → plan generation → clinician approval**, cut thin through every layer ([ADR-015](./09-decision-log.md#adr-015)) |
-| Shape | Modular monolith + a durable worker |
+| Languages | **TypeScript owns the web app and *all* database access; Python owns the AI service** — no DB credentials in Python ([ADR-016](./09-decision-log.md#adr-016)) |
+| Frameworks | **No LangChain, no LangGraph** — the model is forbidden from routing, which is what they are for. Langfuse is unrelated and stays |
+| Shape | Modular monolith + a durable worker — **now two services** ([ADR-016](./09-decision-log.md#adr-016)) |
 
 Full context and consequences for each: [09](./09-decision-log.md).
 
@@ -84,12 +86,18 @@ open-ended wait. **The residency question is "where does the data sit," not
 "where does the vendor operate."**
 
 **3. A guarantee that depends on everyone remembering is not a guarantee.**
-Three places in this architecture replace a policy with a narrow, enforced choke
+Five places in this architecture replace a policy with a narrow, enforced choke
 point: the ESLint-guarded `db.admin` boundary ([03 §4](./03-data-architecture.md)),
-the single `mip_opt_out=true` URL builder ([05 §6](./05-voice-pipeline.md)), and
-the telemetry attribute allowlist test ([06 §3](./06-ai-pipelines.md)). Each is
-one function or one test, and each stands in for a rule that would otherwise be
-documentation.
+the single `mip_opt_out=true` URL builder ([05 §6](./05-voice-pipeline.md)), the
+telemetry attribute allowlist test ([06 §3](./06-ai-pipelines.md)), the two
+Langfuse projects with separate credentials ([08 §3a](./08-migration-plan.md)), and
+the Python service having no database credentials at all
+([ADR-016](./09-decision-log.md#adr-016)). Each is one function, one test, or one
+absence, and each stands in for a rule that would otherwise be documentation.
+
+The last two are the better kind. A lint rule can be disabled and a test can be
+deleted; **a credential you were never issued cannot be used.** Prefer that shape
+where the choice exists.
 
 **4. Silent failures are the recurring enemy.**
 The current repo's RLS policies parse and do nothing. `drizzle-kit push` reports

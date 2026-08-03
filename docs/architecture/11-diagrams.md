@@ -20,7 +20,8 @@ flowchart TB
     dev["Patient and clinician devices<br/><i>pose landmarks and audio capture only</i>"]
 
     subgraph ca["AWS ca-central-1 — all PHI at rest and in flight"]
-        app["App tier<br/><i>Next.js routes, durable worker, voice gateway</i>"]
+        web["Web tier — TypeScript<br/><i>Next.js, durable worker</i><br/><b>the only thing that touches the database</b>"]
+        ai["AI service — Python<br/><i>FastAPI voice gateway, extraction, evals</i><br/><b>no database credentials</b>"]
         sb["Supabase<br/><i>Postgres, storage, auth, forced RLS</i>"]
         dg["Deepgram, self-hosted<br/><i>STT and Aura TTS — proposed, ADR-013</i>"]
     end
@@ -30,19 +31,26 @@ flowchart TB
         lf["Langfuse cloud<br/><i>structure only, no content</i>"]
     end
 
-    dev --> app
-    app <--> sb
-    app <--> dg
-    app --> oai
-    app --> lf
+    dev --> web
+    dev -->|audio| ai
+    web <--> sb
+    ai -->|validated models| web
+    ai <--> dg
+    ai --> oai
+    ai --> lf
 ```
 
-Two things this shows by omission:
+Three things this shows by omission:
 
 - **No arrow from the device to any vendor.** Every third-party call is proxied
-  through the app tier. That is what keeps transcript and extraction inside the
+  through our own tiers. That is what keeps transcript and extraction inside the
   PHI boundary — today, extraction runs on the *client* and writes to Zustand
   ([02 §5](./02-current-state.md)).
+- **No arrow from the Python service to Supabase.** That absence is the security
+  boundary ([ADR-016](./09-decision-log.md#adr-016)): the AI service returns
+  validated models and the web tier persists them, so every write passes the
+  `db.rls` guard in [03 §4](./03-data-architecture.md). Adding that arrow to save a
+  round trip would quietly delete the guarantee.
 - **Vision does not appear at all**, because the pose pipeline runs entirely in
   the browser and never uploads video. What reaches a server is landmark
   confidence, joint angles, and rep counts — numbers, not imagery. It is also out
@@ -61,23 +69,32 @@ The busiest path in the system, and the first vertical slice.
 ```mermaid
 sequenceDiagram
     participant B as Browser
-    participant G as Voice gateway
+    participant G as Voice gateway (Python)
     participant D as Deepgram
     participant L as GPT-5.6 Luna
+    participant W as Web tier (TypeScript)
     participant P as Postgres
 
     B->>G: audio frames
     G->>D: stream, mip_opt_out=true
     D->>G: transcript + EndOfTurn
-    G->>L: extract to Zod schema
+    G->>L: extract to Pydantic model
     L->>G: validated structured answer
-    G->>P: write via db.rls, tenant-scoped
+    G->>W: POST the turn
+    W->>P: write via db.rls, tenant-scoped
     G->>B: next approved question
 ```
 
 **The last message carries the authority boundary.** The next question is selected
 by the intake question graph *in code*. The model phrases an already-approved
-question and never chooses one — [01](./01-product-definition.md).
+question and never chooses one — [01](./01-product-definition.md). This is also
+why LangGraph was rejected: it exists to let the model route
+([ADR-016](./09-decision-log.md#adr-016)).
+
+**The gateway does not write to Postgres**, and the hop through the web tier is
+not incidental — it is what keeps the database behind one boundary. It also runs
+*off* the reply path: the next question can go back to the browser without waiting
+on the write.
 
 **There is no TTS message**, because the approved question set is pre-rendered
 audio. That is not a cost optimisation: Aura's 45-concurrent-stream ceiling is

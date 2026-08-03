@@ -24,7 +24,7 @@ model's output reaches a clinician as prose.
 | Pipeline | Tier | Why |
 |---|---|---|
 | Intake question phrasing | **Luna** | Phrase one *approved* question. Bounded, high volume, ~40 turns/session. |
-| Structured answer extraction | **Luna** | Output is a Zod schema. The schema, not the model, carries the correctness burden. |
+| Structured answer extraction | **Luna** | Output is a Pydantic model. The schema, not the model, carries the correctness burden. |
 | Assessment dictation → proposed findings | **Luna** | Proposals are clinician-verified before they can drive a plan (stage E). |
 | Plan-item rationale & patient wording | **Sol** | Reaches the clinician as prose and the patient as instructions. Highest review cost if wrong. |
 | Pre-visit brief (stage D) & next-review briefing (stage I) | **Sol** | Synthesis across the full episode; every assertion must be attributable. |
@@ -131,6 +131,25 @@ Good failure mode, also verified in the bundle: if the mask function throws, the
 attribute becomes `"<fully masked due to failed mask function>"`. **It fails
 closed.**
 
+> **Amended 2026-08-02 — this finding partly resolves itself.** Under
+> [ADR-016](./09-decision-log.md#adr-016) the model calls move to the **Python**
+> SDK, which is the one that *has* `mask_otel_spans`. The gap described above is
+> JS-specific, and the tier that keeps it — the TypeScript web app — makes no
+> model calls.
+>
+> **Do not read that as safety.** The Python `@observe()` decorator captures
+> function arguments and return values **by default**, so a naively decorated
+> `extract_answer(transcript)` ships patient narrative to a US server on the happy
+> path, with no error. The defence is not masking:
+>
+> - **Production sets `capture_input=False, capture_output=False`.** Structure
+>   only, per §3.
+> - **Do not put PHI in a traced function's signature.** Pass an identifier and
+>   load the content inside. Then a capture default cannot leak anything, because
+>   there is nothing at the boundary to capture.
+>
+> Masking stays as the backstop it is in §3 layer 3. It is not the control.
+
 **3. Langfuse v4.0.0 shipped 2026-07-29 — four days ago.** v4.1.0 on 07-30,
 v4.2.0 on 07-31. **Pin to v3.224.x.** Revisit in roughly two quarters. v4 gates
 the faster Observations/Metrics v2 APIs and Monitors & Alerts, none of which we
@@ -213,12 +232,19 @@ The durable worker attaches to a trace opened in Next.js by supplying a
 
 ### Runtime placement
 
+> **Amended 2026-08-02 ([ADR-016](./09-decision-log.md#adr-016)).** Tracing now
+> lives in the **Python AI service**, which is a long-lived FastAPI process rather
+> than a serverless handler. That deletes the whole flush-race problem below
+> rather than mitigating it, and it is the same reason the paragraph already
+> preferred the durable worker. The Node notes are retained for the TypeScript
+> tier, which traces nothing today and may later trace HTTP spans only.
+
 `@langfuse/otel` requires **Node ≥20** (Node 22+ with AI SDK 7). **It is not an
 Edge-runtime library.** In serverless handlers, `forceFlush()` before exit (on
 Vercel, via `after()`). Flush never throws — it logs and retries.
 
-**Prefer tracing from the durable worker**: long-lived process, no flush race,
-and it is where the expensive pipelines already run.
+**Prefer tracing from a long-lived process**: no flush race, and it is where the
+expensive pipelines already run.
 
 ---
 
@@ -275,6 +301,22 @@ await otelSdk.shutdown();   // must flush before exit
 version"* — there is **no version pinning**. For a regulated regression suite
 that is unacceptable on its own, so **golden cases are versioned in git and
 pushed to Langfuse by CI**, never authored in the UI. Same principle as §4.
+
+> **Amended 2026-08-02 — own the loop; let Langfuse record it.** The snippet above
+> is the TypeScript SDK; the Python equivalent is what gets built
+> ([ADR-016](./09-decision-log.md#adr-016)). More importantly, the shape should
+> change.
+>
+> Langfuse's tracing is **OpenTelemetry**, so it is genuinely portable — spans go
+> to any OTel backend if the vendor changes. `runExperiment`, datasets, scores, and
+> prompt management are **not**. This document already refused the prompt CMS in §4
+> and already refuses UI-authored datasets above; both times the reason was
+> governance, and both times the side effect was portability.
+>
+> Extend it once more. The harness loads cases from git, calls the pipeline,
+> scores, and asserts — plain Python, no framework — and *reports* to Langfuse.
+> Slightly more code in stage 9a, and the CI gate stops being a vendor feature.
+> **The gate is the part that must not be someone else's product.**
 
 ### 🔴 LLM-as-a-judge is a PHI hazard
 

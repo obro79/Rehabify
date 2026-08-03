@@ -175,6 +175,18 @@ Add a test that runs a representative query through `db.rls` as tenant A and
 asserts zero rows from tenant B. **Per table.** RLS regressions are silent
 otherwise.
 
+> **The Python service is not in this table, and that is the point.**
+> Under [ADR-016](./09-decision-log.md#adr-016) the AI service holds no database
+> connection and no database credentials. It returns validated models; the
+> TypeScript tier persists them.
+>
+> This began as a workaround — the ESLint guard above cannot run on Python — and
+> ended up stronger than the design it replaces. "All database access goes through
+> one boundary" stops being a rule someone can forget: the AI service cannot reach
+> Postgres because it has nothing to reach it with. **Do not give the Python
+> service a database client to save a round trip.** That one change deletes the
+> guarantee.
+
 ### 🔴 `drizzle-kit push` is banned
 
 **`drizzle-kit push` silently skips RLS policy SQL.** It will report success and
@@ -198,8 +210,10 @@ current schema has zero enums and fourteen tables of `text` + check constraints,
 which gives no type safety at the Drizzle boundary and makes every status
 comparison a string comparison.
 
-**JSONB is for genuinely open payloads only, and is always Zod-validated at both
-boundaries.** Today plans, assessment results, and session metrics are unvalidated
+**JSONB is for genuinely open payloads only, and is always schema-validated at
+both boundaries** — Zod in the TypeScript tier, Pydantic in the AI service
+([ADR-016](./09-decision-log.md#adr-016)); the two are generated from one source
+so they cannot drift. Today plans, assessment results, and session metrics are unvalidated
 JSONB. A clinical plan is *structured* — it gets real columns and real foreign
 keys. If a thing has a schema, it gets a table.
 
