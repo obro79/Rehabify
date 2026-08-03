@@ -273,3 +273,97 @@ async def test_questions_are_served_from_the_pre_rendered_cache(
     assert channel.audio_bytes > 0
     assert all(t.tts_cache_hit for t in persistence.received)
     assert len(channel.of_type("audio_begin")) >= 2  # greeting + first question
+
+
+# --- a patient who keeps talking ------------------------------------------
+
+
+async def test_words_are_filed_under_the_question_they_were_spoken_against(
+    session: IntakeSession, channel: FakeChannel, persistence: RecordingPersistence
+) -> None:
+    """The failure this guards against put a wrong answer in a clinical record.
+
+    A turn is handled on a worker task, behind a persistence round trip and a
+    stretch of audio playback. A patient who carries on talking through that
+    window commits a second turn while the session is still on the first — and
+    if the question is read from session state at *handling* time rather than
+    stamped at *commit* time, those words are filed under a question the
+    patient has not yet been asked.
+    """
+    await session.start()
+    await channel.wait_for_listening_on("knee.onset")
+
+    # Both spoken while only knee.onset has been asked. The second is a
+    # well-formed severity answer, which is what makes the mis-filing silent:
+    # it passes the answer gate and reads as a real reply.
+    await session.push_text("it started about three weeks ago")
+    await session.push_text("i would say a seven")
+
+    await channel.wait_for_listening_on("knee.severity")
+    await channel.wait_for(
+        lambda events: any(
+            e.get("type") == "listening" and e.get("question_id") == "knee.severity"
+            for e in events
+        )
+    )
+
+    severity = [t for t in persistence.received if t.question_id == "knee.severity"]
+    assert not [t for t in severity if t.outcome is TurnOutcome.ANSWERED], (
+        "a question the patient had not heard yet was recorded as answered"
+    )
+
+    late = [t for t in persistence.received if t.outcome is TurnOutcome.LATE_UTTERANCE]
+    assert [t.question_id for t in late] == ["knee.onset"]
+    assert late[0].answer is not None
+    assert late[0].answer.transcript == "i would say a seven"
+
+
+async def test_a_late_utterance_does_not_advance_the_graph(
+    session: IntakeSession, channel: FakeChannel, persistence: RecordingPersistence
+) -> None:
+    """Keeping the words is right; letting them drive the next question is not.
+    The patient never heard severity, so severity must still be asked."""
+    await session.start()
+    await channel.wait_for_listening_on("knee.onset")
+
+    await session.push_text("it started about three weeks ago")
+    await session.push_text("i would say a seven")
+    await channel.wait_for_listening_on("knee.severity")
+
+    asked = [e["question_id"] for e in channel.of_type("listening")]
+    assert asked == ["knee.onset", "knee.severity"]
+
+
+# --- shutdown --------------------------------------------------------------
+
+
+async def test_closing_leaves_nothing_running(
+    settings: Settings,
+    channel: FakeChannel,
+    cache: PrerenderedAudioCache,
+    persistence: RecordingPersistence,
+) -> None:
+    """Reaching into `_tasks` because task lifetime has no public surface, and
+    this is the property that matters: reconnect supervision spawns its own
+    replacement from *inside* a supervisor task, so tracking only the latest
+    one leaves the previous still retrying against a channel that is gone.
+    """
+    import asyncio
+
+    s = IntakeSession(
+        settings=settings,
+        channel=channel,
+        tokens=EphemeralTokenProvider(settings),
+        cache=cache,
+        persistence=persistence,
+        session_id="closing",
+    )
+    await s.start()
+    await channel.wait_for_listening_on("knee.onset")
+    await s.aclose()
+
+    assert not [t for t in s._tasks if not t.done()]
+    assert s._worker is not None and s._worker.done()
+    assert not [
+        t for t in asyncio.all_tasks() if t is not asyncio.current_task() and not t.done()
+    ]

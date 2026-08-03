@@ -36,6 +36,14 @@ class TurnOutcome(StrEnum):
     REPROMPT = "reprompt"
     RECONNECT_REASK = "reconnect_reask"
 
+    LATE_UTTERANCE = "late_utterance"
+    """Spoken against a question the session has already moved past.
+
+    Kept rather than dropped: the patient said it, so it is part of the record.
+    Distinguished rather than merged into ANSWERED, because a clinician reading
+    the transcript needs to know these words did not decide the next question.
+    """
+
 
 class QuestionNode(BaseModel):
     model_config = ConfigDict(frozen=True)

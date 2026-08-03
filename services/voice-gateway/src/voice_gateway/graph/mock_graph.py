@@ -100,6 +100,19 @@ def all_prerenderable_nodes() -> tuple[QuestionNode, ...]:
     return (SESSION_GREETING, *MOCK_GRAPH.nodes, SESSION_CLOSING, RECONNECT_NOTICE)
 
 
+def node_by_id(question_id: str) -> QuestionNode | None:
+    """Resolve a question id back to its node, or None if it is not a question.
+
+    Unknown ids are a miss rather than an error: a turn can carry an id from a
+    graph version that has since been swapped, and losing one utterance is a
+    better failure than dropping the session.
+    """
+    try:
+        return MOCK_GRAPH.node(question_id)
+    except KeyError:
+        return None
+
+
 def next_node(current_id: str) -> QuestionNode | None:
     """Deterministic transition. No LLM, no network, no I/O."""
     node = MOCK_GRAPH.node(current_id)

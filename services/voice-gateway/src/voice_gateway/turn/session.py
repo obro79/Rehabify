@@ -20,6 +20,7 @@ import contextlib
 import logging
 import time
 import uuid
+from collections.abc import Coroutine
 from typing import Protocol
 
 from voice_gateway.audio.cache import CacheKey, PrerenderedAudioCache
@@ -42,6 +43,7 @@ from voice_gateway.graph.mock_graph import (
     SESSION_CLOSING,
     SESSION_GREETING,
     next_node,
+    node_by_id,
 )
 from voice_gateway.persistence.client import TurnPersistenceClient
 from voice_gateway.telemetry import traced
@@ -52,6 +54,9 @@ logger = logging.getLogger(__name__)
 
 _PCM_CHUNK_BYTES = 8192
 MAX_REPROMPTS = 2
+
+MAX_QUEUED_TURNS = 64
+"""Committed turns awaiting the worker. See `IntakeSession._turns`."""
 
 
 @traced("intake.turn")
@@ -116,13 +121,25 @@ class IntakeSession:
         self._connection_index = 0
         self._started_at = time.monotonic()
 
-        self._turns: asyncio.Queue[CommittedTurn] = asyncio.Queue()
-        self._detector = TurnDetector(self._turns.put_nowait)
+        # Bounded. A turn is handled behind a persistence round trip and a
+        # stretch of playback, so a patient who never stops talking commits
+        # faster than the worker drains — and the queue is fed from the socket
+        # reader, which cannot block. The cap is far above any real exchange;
+        # reaching it means something is wrong, and shedding is better than
+        # growing without limit.
+        self._turns: asyncio.Queue[CommittedTurn] = asyncio.Queue(maxsize=MAX_QUEUED_TURNS)
+        self._detector = TurnDetector(self._enqueue_turn)
         self._stt: ListenConnection | None = None
         self._tts: SpeakConnection | None = None
 
         self._worker: asyncio.Task[None] | None = None
-        self._supervisor: asyncio.Task[None] | None = None
+        # Every task the session spawns, not just the latest one. `_recover`
+        # runs *inside* a supervisor task and starts its replacement, so a
+        # single `_supervisor` slot loses the old task while it is still
+        # running — and `aclose()` would then leave it retrying against a
+        # channel that is already gone. A strong reference also keeps
+        # fire-and-forget tasks from being collected mid-flight.
+        self._tasks: set[asyncio.Task[None]] = set()
         self._stopping = asyncio.Event()
         self._finished = asyncio.Event()
         self._speaking = False
@@ -176,13 +193,32 @@ class IntakeSession:
         # clinical record needs per-answer timing for provenance. Rebase.
         self._detector.time_offset = time.monotonic() - self._started_at
 
-        self._supervisor = asyncio.create_task(self._supervise(connection))
+        self._spawn(self._supervise(connection))
+
+    def _spawn(self, coro: Coroutine[None, None, None]) -> asyncio.Task[None]:
+        task = asyncio.create_task(coro)
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        return task
+
+    def _enqueue_turn(self, turn: CommittedTurn) -> None:
+        """Called from the socket reader, so it must not block and must not raise."""
+        try:
+            self._turns.put_nowait(turn)
+        except asyncio.QueueFull:
+            logger.error(
+                "committed-turn queue is full (%d); shedding a turn for %s",
+                MAX_QUEUED_TURNS,
+                turn.question_id,
+            )
 
     async def aclose(self) -> None:
         self._stopping.set()
-        for task in (self._supervisor, self._worker):
+        for task in (*self._tasks, self._worker):
             if task is not None:
                 task.cancel()
+        for task in (*self._tasks, self._worker):
+            if task is not None:
                 with contextlib.suppress(asyncio.CancelledError):
                     await task
         if self._stt is not None:
@@ -242,7 +278,7 @@ class IntakeSession:
         # The primitives, wired: SpeechStarted from STT pairs with Aura's
         # `Clear` to drop queued audio (05 §7). Off by default — see
         # Settings.barge_in_enabled for why the policy is not ours to pick.
-        asyncio.create_task(self._barge_in())
+        self._spawn(self._barge_in())
 
     async def _barge_in(self) -> None:
         if self._tts is not None:
@@ -323,8 +359,27 @@ class IntakeSession:
                 logger.exception("turn handling failed")
 
     async def _handle_turn(self, turn: CommittedTurn) -> None:
-        node = self._current
+        node = node_by_id(turn.question_id) if turn.question_id else None
         if node is None:
+            # Nothing was on the floor when these words were spoken — the
+            # patient talked over the greeting or the closing.
+            logger.info("discarding a turn committed with no question on the floor")
+            return
+
+        if self._current is None or node.id != self._current.id:
+            # The patient kept talking while this turn was still behind a
+            # persistence round trip and a stretch of playback, so we have
+            # already moved on. The words belong to the question they were
+            # spoken against — record them there, truthfully, but do not let
+            # them drive a transition for a question the patient has not heard.
+            logger.info("late utterance for %s; already on %s", node.id, self._current)
+            await self._record_turn(
+                node,
+                outcome=TurnOutcome.LATE_UTTERANCE,
+                answer=self._answer_for(node, turn),
+                commit_reason=turn.reason.value,
+                tts_cache_hit=self._last_tts_cache_hit,
+            )
             return
 
         await self._channel.send_event(
@@ -354,7 +409,14 @@ class IntakeSession:
             await self._advance(node)
             return
 
-        answer = IntakeAnswer(
+        await self._record_turn(
+            node, outcome=TurnOutcome.ANSWERED, answer=self._answer_for(node, turn),
+            commit_reason=turn.reason.value, tts_cache_hit=self._last_tts_cache_hit,
+        )
+        await self._advance(node)
+
+    def _answer_for(self, node: QuestionNode, turn: CommittedTurn) -> IntakeAnswer:
+        return IntakeAnswer(
             question_id=node.id,
             prompt_version=node.prompt_version,
             answer_type=node.answer_type,
@@ -366,17 +428,15 @@ class IntakeSession:
                 connection_index=self._connection_index,
             ),
         )
-        await self._record_turn(
-            node, outcome=TurnOutcome.ANSWERED, answer=answer,
-            commit_reason=turn.reason.value, tts_cache_hit=self._last_tts_cache_hit,
-        )
-        await self._advance(node)
 
     async def _advance(self, node: QuestionNode) -> None:
         self._reprompts = 0
         nxt = next_node(node.id)
         self._current = nxt
         if nxt is None:
+            # Nothing is on the floor any more; anything said over the closing
+            # is not an answer to the last question.
+            self._detector.question_id = None
             await self._speak(SESSION_CLOSING)
             await self._channel.send_event({"type": "session_complete"})
             self._finished.set()
@@ -385,6 +445,9 @@ class IntakeSession:
 
     async def _ask(self, node: QuestionNode) -> None:
         await self._speak(node)
+        # This is the moment the question is on the floor, so it is the moment
+        # anything committed from here on belongs to.
+        self._detector.question_id = node.id
         await self._channel.send_event({"type": "listening", "question_id": node.id})
 
     # --- output -----------------------------------------------------------
