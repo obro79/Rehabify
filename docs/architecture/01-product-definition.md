@@ -176,12 +176,17 @@ scheduling, an exercise marketplace, recovery prediction, provider ranking,
 population-level recommendations, microservices, Kubernetes, a custom foundation
 model.
 
-> **Note on vision.** The vision *code* is retained in full
-> ([ADR-003](./09-decision-log.md)) — nothing is deleted or refactored. What
-> stays deferred is the **clinical claim**: stage G below still says the product
-> never claims to observe or correct form. Whether a retained vision feature is
-> allowed to make that claim is an open question ADR-003 records and does not
-> settle.
+> **Note on vision — updated 2026-08-02.** The vision *code* is retained in full
+> ([ADR-003](./09-decision-log.md#adr-003)) — nothing is deleted or refactored.
+> It is also **out of scope for the first vertical slice**
+> ([ADR-015](./09-decision-log.md#adr-015)), and will be **rebuilt from scratch**
+> when it returns rather than ported onto the new foundation.
+>
+> That resolves the tension this note previously recorded. Stage G's *"never
+> claims to observe or correct form"* was in conflict with a live
+> form-correction feature; with vision outside the slice there is no such feature
+> in the first release, so the clause is **accurate as written**. Renegotiate it
+> when vision re-enters product scope — not before the pilot.
 
 ---
 

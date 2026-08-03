@@ -25,8 +25,9 @@ the conversation.
 | 06 | [AI Pipelines & Observability](./06-ai-pipelines.md) | GPT-5.6 tiering, structured outputs, Langfuse under a no-PHI telemetry contract, evaluation |
 | 07 | [Cleanup Plan](./07-cleanup-plan.md) | The deletion inventory — ~9,300 LOC and 25.9 MB, with verdicts and risk |
 | 08 | [Migration Plan](./08-migration-plan.md) | Three concurrent tracks, what gets ported, the non-engineering gates |
-| 09 | [Decision Log](./09-decision-log.md) | Fourteen ADRs, and what they supersede |
+| 09 | [Decision Log](./09-decision-log.md) | Fifteen ADRs, and what they supersede |
 | 10 | [Clinical Content & Evaluation](./10-clinical-content.md) | Where exercises come from, the metadata that gates rather than displays, templated plans, and the eval strategy |
+| 11 | [Diagrams](./11-diagrams.md) | Where components live, one voice-intake turn, and what gets recorded where |
 
 **Reading order.** For the shape of the thing: 01 → 09 → 08. For implementation:
 03 → 04 → the relevant pipeline doc. 02 and 07 are reference — read them when you
@@ -48,7 +49,8 @@ want to know why something is being replaced rather than fixed.
 | LLM | **GPT-5.6** — Luna for bounded work, Sol for clinician-facing prose. Residency is an open fork ([ADR-008](./09-decision-log.md#adr-008)) |
 | Observability | **Langfuse Cloud** — no-PHI on real traffic, **full content on synthetic**, split across two projects ([08 §3a](./08-migration-plan.md)) |
 | Sequencing | **Three concurrent tracks, two deadlines** — raise and first-patient are different dates ([ADR-014](./09-decision-log.md#adr-014)) |
-| Vision | **Retained in full** — excluded from cleanup ([ADR-003](./09-decision-log.md)) |
+| Vision | **Retained, untouched, out of the first slice** — rebuilt from scratch later, never ported ([ADR-003](./09-decision-log.md#adr-003), [ADR-015](./09-decision-log.md#adr-015)) |
+| First slice | **Voice intake → plan generation → clinician approval**, cut thin through every layer ([ADR-015](./09-decision-log.md#adr-015)) |
 | Shape | Modular monolith + a durable worker |
 
 Full context and consequences for each: [09](./09-decision-log.md).
@@ -103,7 +105,7 @@ after.
 
 Specification. No rebuild code has been written.
 
-The eleven documents are complete. Open items live at the end of each doc; the
+The twelve documents are complete. Open items live at the end of each doc; the
 ones that block the pilot are consolidated in [08 §4](./08-migration-plan.md) —
 and three of them (Supabase's PIPEDA representation, Deepgram's Canadian
 residency, OpenAI's DPA coverage) are conversations with other organizations that

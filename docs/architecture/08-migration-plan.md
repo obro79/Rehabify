@@ -162,8 +162,15 @@ assets (25.9 MB, including a 5.1 MB favicon that is not even wired up), the
 unreferenced-file sweep (**103 files, ~9,300 LOC**, knip-confirmed), then the
 unused-export sweep and the odds and ends.
 
-**Vision is retained in full ([ADR-003](./09-decision-log.md)) and is excluded
-from every phase** — including the ~1,099 LOC inside it that has no importers.
+**Vision is retained in full ([ADR-003](./09-decision-log.md#adr-003)) and is
+excluded from every phase** — including the ~1,099 LOC inside it that has no
+importers.
+
+That exclusion got *stronger*, not weaker, when vision left the first slice
+([ADR-015](./09-decision-log.md#adr-015)). Being out of scope is not a licence to
+sweep it: the code is a working reference for the eventual rebuild, and it still
+runs in the frozen demo. Nothing under `src/lib/vision/` is deleted, moved, or
+refactored by any stage in this plan.
 
 Vapi and database work are *not* cleanup — they are stages 7 and 4 here, and they
 happen with the rebuild rather than before it. Deleting the live Vapi path before

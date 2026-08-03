@@ -21,6 +21,7 @@
 | [012](#adr-012) | Modular monolith + durable worker | Accepted |
 | [013](#adr-013) | Self-hosted speech in `ca-central-1`, on cloud credits | **Proposed** — gated on model availability |
 | [014](#adr-014) | Two deadlines; three concurrent tracks | Accepted |
+| [015](#adr-015) | First vertical slice: voice intake to plan generation | Accepted |
 
 ### Superseded from `docs/redesign/`
 
@@ -116,6 +117,27 @@ before vision ships to real patients:
 
 Note that the `docs/redesign/` billing-verification premise still dies — not on
 vision grounds but on [ADR-011](#adr-011), since CPT codes do not exist in Canada.
+
+**Amended 2026-08-02 — retained, but out of the first slice, and to be rebuilt
+rather than ported.** The retention decision stands exactly as written: no vision
+code is deleted, refactored, or touched. What changed is its *future*. Vision is
+excluded from the first vertical slice ([ADR-015](#adr-015)) and, when it returns,
+it will be **rebuilt from scratch rather than migrated** onto the new foundation.
+
+This has a consequence worth stating plainly, because it closes an open item this
+ADR left dangling: **[01 stage G](./01-product-definition.md)'s "never claims to
+observe or correct form" is simply true for the first release.** The tension
+recorded above was between that language and a live form-correction feature — and
+there is no form-correction feature in the slice. The clause stops being a
+contradiction and becomes an accurate scope statement. It has to be renegotiated
+before vision re-enters product scope, not before the pilot.
+
+The second dangling item does *not* resolve. `__tests__/form-engine-flexion.test.ts`
+still has two genuinely failing assertions in code that still runs in the frozen
+demo. "Rebuild later" is not a reason to fix the engine now, and retention is not a
+reason to leave a red test in the baseline. Quarantine it with a pointer to this
+ADR — that touches a test file, not vision code — and let the rebuild carry the
+real fix.
 
 ---
 
@@ -545,6 +567,55 @@ depends on a person who has not committed. If B0 fails, stages 8 and 9b have no
 schedule at all and the knee scope in [01](./01-product-definition.md) is
 aspirational. **That failure is worth surfacing early rather than discovering at
 stage 8**, which is the second reason Track B starts now.
+
+---
+
+## ADR-015 — First vertical slice: voice intake to plan generation {#adr-015}
+
+**Date** 2026-08-02 · **Status** Accepted
+
+**Context.** [08](./08-migration-plan.md) is organised by layer — data, then auth,
+then observability, then voice, then clinical surfaces. That is the right order for
+building a *foundation* and the wrong shape for proving a *product*. Finishing
+every layer before anything works end to end means the first demonstrable moment
+arrives at stage 8, and [ADR-014](#adr-014) established that the nearer deadline
+needs something demonstrable well before then.
+
+**Decision.** The first vertical slice is **voice intake → structured findings →
+plan generation → clinician approval**, cut thin through every layer rather than
+completing any one of them.
+
+In scope: the voice gateway and turn loop, the intake question graph, structured
+extraction, the constrained plan composer, the approval gate, and the eval harness
+that scores the output. Enough auth to have a real tenant and a real episode.
+Enough schema to store the episode, the findings, and a versioned plan.
+
+**Out of scope, explicitly:**
+
+- **Vision.** Retained and untouched ([ADR-003](#adr-003)), not ported, not
+  refactored, not in the slice. It will be rebuilt from scratch when it returns.
+- The pre-visit brief, next-review briefing, check-ins, and the assessment
+  workspace — all real product, none of them needed to prove the core loop.
+- Everything already excluded by [01](./01-product-definition.md).
+
+**Consequences.** The slice crosses every layer, so it surfaces integration
+problems early — which is the point, and also the cost: nothing in it can be
+finished in isolation. It needs a thin version of stages 4, 5, 6, 7, 8, and 9a
+rather than a complete version of any.
+
+It also **relocates the bottleneck to a visible place.** The slice cannot run
+without an intake question graph and an approved exercise library, and neither
+exists. That is Track B, and building the slice first means discovering that in
+week one rather than at stage 8.
+
+Vision being out of scope is what makes [01 stage G](./01-product-definition.md)
+accurate rather than contradictory — see the amendment on [ADR-003](#adr-003).
+
+What we accepted: a thin slice through six stages is harder to review than one
+complete stage, and there is a real risk of building throwaway scaffolding at each
+layer. The mitigation is that the slice follows the *same* architecture as the full
+build — thin is not the same as temporary. Anything genuinely disposable should be
+named as such when it is written.
 
 ---
 

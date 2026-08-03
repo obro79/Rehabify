@@ -39,6 +39,14 @@ database" are sized for a product we are not building yet.
 > pathway 1, and the orphaned lumbar analyzers are pathway 4's. Retaining them
 > under [ADR-003](./09-decision-log.md#adr-003) now reads as sequencing rather
 > than sentiment.
+>
+> **Updated 2026-08-02.** Vision is out of the first vertical slice
+> ([ADR-015](./09-decision-log.md#adr-015)) and will be rebuilt from scratch
+> rather than ported. That does not change the retention decision — the code and
+> the images stay untouched — but it does change what this document owes them.
+> **Nothing in the clinical-content track is blocked on vision, and no
+> physiotherapist hour should be spent on pose-observable metadata until vision
+> re-enters scope.** See the pose-trackability row in §9.
 
 ---
 
@@ -126,7 +134,10 @@ unsigned exercise cannot enter a plan, enforced by FK, not by policy.
 start: name, slug, category, body region, difficulty, tier, description,
 instructions, common mistakes, contraindications, dosage defaults, equipment,
 media, and — usefully — `formDetectionEnabled` + `detectionConfig` wiring to the
-retained vision engine ([ADR-003](./09-decision-log.md#adr-003)).
+retained vision engine ([ADR-003](./09-decision-log.md#adr-003)). Those two
+columns carry forward as **inert** in the first slice: nothing reads them until
+vision is rebuilt ([ADR-015](./09-decision-log.md#adr-015)), and no clinician
+fills them in.
 
 ### The five gaps that block the product
 
@@ -339,7 +350,7 @@ and not missing anything dangerous. What makes a pathway hard for *this* product
 |---|---|
 | **Red-flag burden** | How catastrophic is a miss? This is the safety ceiling on the entire product, and it is not correlated with joint complexity |
 | **Classification tractability** | Can subjective + basic objective route reliably to one template? If not, §5 layer 2 has nothing to score against |
-| **Pose trackability** | Vision is retained. MediaPipe yields body keypoints; some joints are observable in them and some are not |
+| **Pose trackability** | MediaPipe yields body keypoints; some joints are observable in them and some are not. **Deferred, not dropped** — vision is out of the first slice ([ADR-015](./09-decision-log.md#adr-015)), so this axis orders pathways 2–4 and does not gate pathway 1 |
 | **Clinic volume** | 20–50 episodes across 1–2 clinics has to be reachable |
 
 ### Order
