@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rehabify voice gateway — slice 2</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --line: #262b36;
+    --text: #e6e9ef; --muted: #8b93a7; --accent: #5b9dff; --warn: #f0a848;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2rem 1.5rem; background: var(--bg); color: var(--text);
+    font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 1.15rem; margin: 0 0 .25rem; font-weight: 600; }
+  .sub { color: var(--muted); margin: 0 0 1.5rem; font-size: .9rem; }
+  .row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; }
+  button {
+    background: var(--panel); color: var(--text); border: 1px solid var(--line);
+    border-radius: 7px; padding: .5rem .9rem; font: inherit; font-size: .9rem; cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #06101f; font-weight: 600; }
+  input[type=text] {
+    flex: 1; min-width: 260px; background: var(--panel); color: var(--text);
+    border: 1px solid var(--line); border-radius: 7px; padding: .5rem .7rem; font: inherit;
+  }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 1rem; }
+  section h2 { font-size: .72rem; text-transform: uppercase; letter-spacing: .09em;
+    color: var(--muted); margin: 0 0 .7rem; font-weight: 600; }
+  #conversation { min-height: 240px; max-height: 420px; overflow-y: auto; }
+  .msg { margin-bottom: .8rem; }
+  .msg .who { font-size: .7rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+  .msg.assistant .body { color: var(--text); }
+  .msg.patient .body { color: var(--accent); }
+  .msg.system .body { color: var(--warn); font-size: .85rem; }
+  #log { font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+    min-height: 240px; max-height: 420px; overflow-y: auto; color: var(--muted); white-space: pre-wrap; }
+  .pill { display: inline-block; font-size: .72rem; padding: .15rem .5rem; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--muted); }
+  .pill.live { color: #7ee0a2; border-color: #2c5741; }
+  footer { margin-top: 1.5rem; color: var(--muted); font-size: .8rem; }
+  code { background: #0b0d12; padding: .1rem .3rem; border-radius: 4px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Voice gateway — multi-turn intake</h1>
+  <p class="sub">
+    Browser → WSS → gateway → Deepgram. Turn detection per 05 §4, mocked three-question graph.
+    <span id="mode" class="pill">disconnected</span>
+  </p>
+
+  <div class="row">
+    <button id="connect" class="primary">Connect</button>
+    <button id="mic" disabled>Enable microphone</button>
+    <button id="drop" disabled>Simulate connection drop</button>
+    <button id="hangup" disabled>Disconnect</button>
+  </div>
+
+  <div class="row" id="textRow">
+    <input type="text" id="textInput" placeholder="Transcript mode — type an answer and press Enter" disabled />
+    <button id="send" disabled>Send</button>
+  </div>
+
+  <div class="grid">
+    <section>
+      <h2>Conversation</h2>
+      <div id="conversation"></div>
+    </section>
+    <section>
+      <h2>Gateway events</h2>
+      <div id="log"></div>
+    </section>
+  </div>
+
+  <footer>
+    Transcript mode exists so the turn loop, graph transition, audio cache and persistence hop
+    are exercisable without Deepgram credentials. It is a development path, not a product one.
+  </footer>
+</main>
+
+<script>
+const els = {
+  connect: document.getElementById("connect"),
+  mic: document.getElementById("mic"),
+  drop: document.getElementById("drop"),
+  hangup: document.getElementById("hangup"),
+  textInput: document.getElementById("textInput"),
+  send: document.getElementById("send"),
+  conversation: document.getElementById("conversation"),
+  log: document.getElementById("log"),
+  mode: document.getElementById("mode"),
+};
+
+let ws = null;
+let audioCtx = null;
+let micStream = null;
+let micNode = null;
+let playbackRate = 24000;
+let incoming = [];       // PCM chunks between audio_begin and audio_end
+let receiving = false;
+let playAt = 0;
+
+function log(line) {
+  const stamp = new Date().toLocaleTimeString([], { hour12: false });
+  els.log.textContent += `${stamp}  ${line}\n`;
+  els.log.scrollTop = els.log.scrollHeight;
+}
+
+function say(who, text) {
+  const div = document.createElement("div");
+  div.className = `msg ${who}`;
+  div.innerHTML = `<div class="who">${who}</div><div class="body"></div>`;
+  div.querySelector(".body").textContent = text;
+  els.conversation.appendChild(div);
+  els.conversation.scrollTop = els.conversation.scrollHeight;
+}
+
+// --- playback: linear16 PCM through Web Audio -----------------------------
+// The streaming TTS surface emits raw audio only, so there is no <audio src>
+// path here (05 §7).
+async function ensureAudioContext() {
+  if (!audioCtx) audioCtx = new AudioContext();
+  if (audioCtx.state === "suspended") await audioCtx.resume();
+  return audioCtx;
+}
+
+async function playBufferedPcm() {
+  if (!incoming.length) return;
+  const ctx = await ensureAudioContext();
+  const total = incoming.reduce((n, c) => n + c.byteLength, 0);
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of incoming) { merged.set(new Uint8Array(chunk), offset); offset += chunk.byteLength; }
+  incoming = [];
+
+  const samples = new Int16Array(merged.buffer, 0, Math.floor(total / 2));
+  const buffer = ctx.createBuffer(1, samples.length, playbackRate);
+  const channel = buffer.getChannelData(0);
+  for (let i = 0; i < samples.length; i++) channel[i] = samples[i] / 0x8000;
+
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(ctx.destination);
+  const startAt = Math.max(ctx.currentTime, playAt);
+  source.start(startAt);
+  playAt = startAt + buffer.duration;
+}
+
+// --- capture --------------------------------------------------------------
+async function enableMic() {
+  const ctx = await ensureAudioContext();
+  micStream = await navigator.mediaDevices.getUserMedia({
+    audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
+  });
+  await ctx.audioWorklet.addModule("/demo/worklet.js");
+  const source = ctx.createMediaStreamSource(micStream);
+  micNode = new AudioWorkletNode(ctx, "linear16-worklet");
+  micNode.port.onmessage = (event) => {
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(event.data);
+  };
+  source.connect(micNode);
+  els.mic.disabled = true;
+  els.mode.textContent = "microphone live";
+  els.mode.classList.add("live");
+  log("microphone enabled — linear16 @ 16 kHz");
+}
+
+function stopMic() {
+  if (micNode) { micNode.disconnect(); micNode = null; }
+  if (micStream) { micStream.getTracks().forEach((t) => t.stop()); micStream = null; }
+}
+
+// --- socket ---------------------------------------------------------------
+function connect() {
+  const scheme = location.protocol === "https:" ? "wss" : "ws";
+  ws = new WebSocket(`${scheme}://${location.host}/v1/intake/stream`);
+  ws.binaryType = "arraybuffer";
+
+  ws.onopen = () => {
+    log("connected to /v1/intake/stream");
+    els.connect.disabled = true;
+    els.hangup.disabled = false;
+    els.drop.disabled = false;
+  };
+
+  ws.onmessage = async (event) => {
+    if (event.data instanceof ArrayBuffer) {
+      if (receiving) incoming.push(event.data);
+      return;
+    }
+    const msg = JSON.parse(event.data);
+    switch (msg.type) {
+      case "session_started":
+        playbackRate = msg.tts_sample_rate;
+        log(`session ${msg.session_id.slice(0, 8)}… graph=${msg.graph_version} stt=${msg.stt_available}`);
+        if (msg.stt_available) {
+          els.mic.disabled = false;
+        } else {
+          els.textInput.disabled = false;
+          els.send.disabled = false;
+          els.mode.textContent = "transcript mode";
+          log("no Deepgram credentials — transcript mode. Type answers instead of speaking.");
+        }
+        break;
+      case "assistant_text": say("assistant", msg.text); break;
+      case "transcript": say("patient", msg.text); break;
+      case "audio_begin": receiving = true; incoming = []; break;
+      case "audio_end": receiving = false; await playBufferedPcm(); break;
+      case "audio_clear": incoming = []; playAt = 0; log("barge-in: queued audio cleared"); break;
+      case "listening": log(`listening for ${msg.question_id}`); break;
+      case "reconnected":
+        say("system", "— connection recovered, question re-asked —");
+        log(`reconnected (connection_index=${msg.connection_index})`);
+        break;
+      case "session_complete": log("session complete"); els.mode.textContent = "complete"; break;
+      case "fatal": say("system", `session ended: ${msg.reason}`); log(`FATAL ${msg.reason}`); break;
+      default: log(`event ${msg.type}`);
+    }
+  };
+
+  ws.onclose = () => {
+    log("socket closed");
+    els.connect.disabled = false;
+    els.hangup.disabled = true;
+    els.drop.disabled = true;
+    els.mic.disabled = true;
+    els.send.disabled = true;
+    els.textInput.disabled = true;
+    els.mode.textContent = "disconnected";
+    els.mode.classList.remove("live");
+    stopMic();
+  };
+
+  ws.onerror = () => log("socket error");
+}
+
+function sendText() {
+  const text = els.textInput.value.trim();
+  if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({ type: "text", text }));
+  els.textInput.value = "";
+}
+
+els.connect.onclick = connect;
+els.mic.onclick = () => enableMic().catch((e) => log(`mic failed: ${e.message}`));
+els.hangup.onclick = () => ws && ws.close();
+els.drop.onclick = () => {
+  ws.send(JSON.stringify({ type: "simulate_drop" }));
+  log("asked the gateway to drop its Deepgram socket");
+};
+els.send.onclick = sendText;
+els.textInput.onkeydown = (e) => { if (e.key === "Enter") sendText(); };
+</script>
+</body>
+</html>
