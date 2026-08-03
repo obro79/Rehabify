@@ -654,6 +654,13 @@ and the `.gitignore` dot fix, and the four `.gitkeep` placeholder dirs.
 **Do not touch the other 30 `exercise-images/*.jpg`** — they resolve dynamically
 at `lib/exercise-utils.tsx:254,259`.
 
+> **Pathway note (2026-08-02).** Pathway 1 is knee and low back is pathway 4
+> ([10 §9](./10-clinical-content.md)), so roughly half these images are *reserved*
+> rather than live. They stay: a few hundred KB against 25.9 MB, and they are
+> self-made assets we will want back. `standing-back-extension.jpg` is still
+> deleted here — it is genuinely unreferenced, and git history is the archive if
+> pathway 4 wants it.
+
 ### Phase 4 — the unreferenced-file sweep
 
 **103 files, ~9,300 LOC** — knip's 116, minus 12 vision files and one false positive. Full list in

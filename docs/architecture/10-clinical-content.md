@@ -20,18 +20,25 @@ the content problem is **days of clinical authoring, not a licensing
 negotiation** — and that most of the instincts imported from "we need an exercise
 database" are sized for a product we are not building yet.
 
-> ⚠️ **Asset/scope mismatch.** `public/exercise-images/` holds 31 self-made
-> images, but roughly half are lumbar-specific (cat-camel, cobra, sphinx, prone
-> press-up, standing lumbar flexion/extension/side-bending, knee-to-chest).
-> Around 8–10 are knee-relevant — and they are the hip/glute ones (clamshell,
-> glute bridge, single-leg bridge, fire hydrant, quadruped/prone hip extension,
-> figure-four, 90-90), which is correct, since hip abductor and external rotator
-> work is central to patellofemoral rehab. The live vision analyzer is squat,
-> which is knee-relevant; the orphaned analyzers are lumbar.
+> ✅ **Pathway 1 is knee. Decided 2026-08-02.** Reasoning in §9.
 >
-> Resolve before authoring: is the pilot pathway knee (per 01) or low back (per
-> the assets)? Everything below is written pathway-agnostically, but the
-> authoring list is not.
+> **Asset consequence.** `public/exercise-images/` holds 31 self-made images, and
+> only 8–10 are knee-relevant — the hip/glute ones (clamshell, glute bridge,
+> single-leg bridge, fire hydrant, quadruped/prone hip extension, figure-four,
+> 90-90), which is right, since hip abductor and external rotator work is central
+> to patellofemoral rehab. Roughly half are lumbar-specific (cat-camel, cobra,
+> sphinx, prone press-up, standing lumbar flexion/extension/side-bending,
+> knee-to-chest).
+>
+> **Keep the lumbar images.** Low back is pathway 4, not cancelled, and they are
+> a few hundred KB against the 25.9 MB the cleanup is already removing. They are
+> *reserved*, not dead — and [07](./07-cleanup-plan.md) phase 3 should not sweep
+> them.
+>
+> Same logic applies to vision: the live analyzer is squat, which is exactly
+> pathway 1, and the orphaned lumbar analyzers are pathway 4's. Retaining them
+> under [ADR-003](./09-decision-log.md#adr-003) now reads as sequencing rather
+> than sentiment.
 
 ---
 
@@ -319,16 +326,76 @@ enforcement story rests on.
 
 ---
 
-## 8. Open questions
+## 9. Pathway roadmap
 
-1. **Knee or low back?** 01 says non-acute knee; the assets are largely lumbar.
-   Blocks the authoring list. *(→ clinical lead + product)*
-2. **Who is the clinical lead, and what hours are actually committed?** This
+### The wrong axis, and the right one
+
+The intuitive ordering is by joint complexity — degrees of freedom, elbow before
+hip. That is sound biomechanics and the wrong variable here. **The system is not
+modelling the joint.** It is classifying a presentation, selecting a template,
+and not missing anything dangerous. What makes a pathway hard for *this* product:
+
+| Axis | Why it dominates |
+|---|---|
+| **Red-flag burden** | How catastrophic is a miss? This is the safety ceiling on the entire product, and it is not correlated with joint complexity |
+| **Classification tractability** | Can subjective + basic objective route reliably to one template? If not, §5 layer 2 has nothing to score against |
+| **Pose trackability** | Vision is retained. MediaPipe yields body keypoints; some joints are observable in them and some are not |
+| **Clinic volume** | 20–50 episodes across 1–2 clinics has to be reachable |
+
+### Order
+
+| # | Pathway | Rationale |
+|---|---|---|
+| 1 | **Knee** *(locked)* | Low red-flag burden when non-acute; genuinely distinct categories (patellofemoral, meniscal, ligamentous, OA, tendinopathy) with established special tests; high volume; **the best joint on the board for pose estimation** — knee angle from hip/knee/ankle landmarks is what MediaPipe is good at, and the squat analyzer is already live |
+| 2 | **Shoulder** | The deliberate stress test — see below |
+| 3 | **Hip** | Structurally close to knee, so it should be fast once the model is proven. Complicated by hip/spine differential |
+| 4 | **Low back** | The prize, not the entry point — see below |
+| 5 | Elbow, wrist, distal | Low volume, small HEP, worst case for pose tracking. Simple ≠ valuable |
+
+### Why shoulder second rather than hip
+
+Hip is the easier second pathway and that is the argument against it: it is
+similar enough to knee that shipping it would teach us almost nothing about
+whether the content model in §3 actually generalizes. Shoulder classifies
+differently enough that it will break some abstraction — and **that is worth
+discovering at pathway two, not pathway five**, when far more is built on top of
+the assumption.
+
+### Why low back is last-but-one despite being the most common complaint
+
+Three independent reasons, any one of which would be enough:
+
+- **The highest red-flag burden in musculoskeletal care.** Cauda equina is a
+  surgical emergency; fracture, malignancy, and infection all present as back
+  pain. A miss here is both a clinical catastrophe and the most litigable event
+  available to this product.
+- **Classification is contested.** The large majority of presentations are
+  non-specific low back pain, and the competing classification systems disagree
+  with one another — so there may be no reliable routing target, which breaks
+  §5 layer 2 at its foundation.
+- **The lumbar spine is close to unobservable from 2D pose landmarks.** Segmental
+  motion is not in a set of body keypoints. `analyzeStandingLumbarFlexion` infers
+  lumbar flexion from a hip angle, which is precisely why its threshold is
+  arguable and why [07 §0f](./07-cleanup-plan.md) is a real bug rather than a
+  bad constant.
+
+Back is where the volume is, so it stays on the roadmap — behind a proven triage
+and escalation path, and only once the clinical trust to justify it exists.
+
+> These are clinical claims about risk and classification. They are the clinical
+> lead's domain to confirm, not engineering's to assert. Route §9 to them with
+> the pathway boundary in gate 9.
+
+---
+
+## 10. Open questions
+
+1. **Who is the clinical lead, and what hours are actually committed?** This
    document assumes a real allocation, not goodwill.
-3. **Contraindication vocabulary** — the closed finding list must be enumerated
+2. **Contraindication vocabulary** — the closed finding list must be enumerated
    and agreed before predicates can be authored or tested.
-4. **Does any template need a licensed program** (e.g. GLA:D for knee OA)? If so
+3. **Does any template need a licensed program** (e.g. GLA:D for knee OA)? If so
    that is a licensing conversation, not an authoring one.
-5. **Layer 2 pass thresholds** — what recall on `must_include` items, and what
+4. **Layer 2 pass thresholds** — what recall on `must_include` items, and what
    dosage delta, constitutes a release gate? Should be set by the clinical lead
    before the first run, not tuned to whatever the first run produces.
