@@ -49,6 +49,18 @@ class CommittedTurn:
     start_seconds: float
     end_seconds: float
 
+    question_id: str | None = None
+    """Which question was on the floor when these words were spoken.
+
+    Stamped here, at commit time, and not read from session state later. A turn
+    is handled on a worker task behind a persistence round trip and a stretch of
+    audio playback, so by the time it is handled the session has often moved on
+    — and a patient who keeps talking through that window would otherwise have
+    their words filed under a question they had not yet been asked. `None` means
+    nothing was on the floor, which happens if the patient talks over the
+    greeting.
+    """
+
 
 @dataclass(slots=True)
 class _Accumulator:
@@ -78,13 +90,16 @@ class _Accumulator:
         # whitespace-only buffer is not a turn here either.
         return not self.text.strip()
 
-    def drain(self, reason: CommitReason, time_offset: float) -> CommittedTurn:
+    def drain(
+        self, reason: CommitReason, time_offset: float, question_id: str | None
+    ) -> CommittedTurn:
         turn = CommittedTurn(
             transcript=self.text.strip(),
             reason=reason,
             segment_count=self.segment_count,
             start_seconds=(self.start_seconds or 0.0) + time_offset,
             end_seconds=self.end_seconds + time_offset,
+            question_id=question_id,
         )
         self.reset()
         return turn
@@ -114,6 +129,11 @@ class TurnDetector:
         # provenance stays continuous across a reconnect.
         self._time_offset = 0.0
 
+        # Additive: the question currently on the floor. Set by the session at
+        # the moment it starts listening, read at the moment a turn commits.
+        # See CommittedTurn.question_id for why it is captured this early.
+        self._question_id: str | None = None
+
     # --- 05 §4, verbatim ---------------------------------------------------
 
     def on_results(self, msg: Results) -> None:
@@ -135,10 +155,11 @@ class TurnDetector:
     # --- additive ----------------------------------------------------------
 
     def _commit(self, reason: CommitReason) -> None:
-        turn = self._buffer.drain(reason, self._time_offset)
+        turn = self._buffer.drain(reason, self._time_offset, self._question_id)
         logger.debug(
-            "turn committed via %s: %d segments, %.2fs-%.2fs",
+            "turn committed via %s for %s: %d segments, %.2fs-%.2fs",
             reason,
+            turn.question_id,
             turn.segment_count,
             turn.start_seconds,
             turn.end_seconds,
@@ -152,6 +173,14 @@ class TurnDetector:
     @time_offset.setter
     def time_offset(self, value: float) -> None:
         self._time_offset = value
+
+    @property
+    def question_id(self) -> str | None:
+        return self._question_id
+
+    @question_id.setter
+    def question_id(self, value: str | None) -> None:
+        self._question_id = value
 
     @property
     def has_pending_audio(self) -> bool:
