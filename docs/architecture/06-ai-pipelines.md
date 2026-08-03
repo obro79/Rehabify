@@ -140,6 +140,17 @@ need at pilot scale.
 
 ## 3. The no-PHI telemetry contract
 
+> **Scope, added 2026-08-02.** Everything in this section governs **real patient
+> traffic only.** Synthetic and golden-case runs are traced with **full content** —
+> prompts, completions, tool calls, judge reasoning — in a *separate Langfuse
+> project with separate credentials* that production cannot reach. There is no PHI
+> in a synthetic case, so there is no contract to violate, and an eval harness you
+> cannot read traces from cannot debug a regression.
+>
+> The split, and why the discriminator is two projects rather than a boolean flag:
+> [08 §3a](./08-migration-plan.md). This section is unchanged for the path that
+> matters.
+
 Four layers, in order of load-bearing. **Masking is layer three, not the design.**
 
 ### Layer 1 — deny-by-default span export (primary control)

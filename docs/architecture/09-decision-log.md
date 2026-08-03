@@ -20,6 +20,7 @@
 | [011](#adr-011) | Target market: British Columbia, Canada | Accepted |
 | [012](#adr-012) | Modular monolith + durable worker | Accepted |
 | [013](#adr-013) | Self-hosted speech in `ca-central-1`, on cloud credits | **Proposed** — gated on model availability |
+| [014](#adr-014) | Two deadlines; three concurrent tracks | Accepted |
 
 ### Superseded from `docs/redesign/`
 
@@ -300,6 +301,30 @@ trade than the CI-enforced allowlist.** Revisit only if the no-PHI contract
 proves too lossy to debug real incidents against; that is the failure mode to
 watch for, not cost.
 
+**Amended 2026-08-02 — the contract is scoped to real traffic; synthetic runs are
+fully verbose.** The failure mode named in the paragraph above arrived immediately
+and from an unexpected direction: not incident debugging, but *evaluation*. A
+harness that must prove clinical plans are accurate cannot work against
+structure-only traces — a regression tells you the score dropped and nothing about
+why.
+
+The resolution is not to weaken the contract but to **notice that it was never
+about synthetic data.** Golden cases contain no PHI. So golden-case and eval runs
+trace with full content — prompts, completions, tool calls, judge reasoning — and
+real patient traffic keeps every layer above, unchanged.
+
+The discriminator is deliberately **not** a runtime boolean. It is **two Langfuse
+projects with separate credentials**, chosen by deployment context, so the
+production runtime does not possess the verbose project's key and cannot write to
+it regardless of program state. A boolean here would be a single mutable value
+standing between patient narrative and a US vendor, failing open and silently —
+the exact shape this doc set treats as the recurring enemy. Full design:
+[08 §3a](./08-migration-plan.md).
+
+This makes self-hosting *less* likely to be revisited, not more: the debuggability
+argument was the strongest case for it, and it has been answered without operating
+ClickHouse.
+
 Caveats: Langfuse was **acquired by ClickHouse 2026-01-16** — the BAA
 counterparty changed and the published BAA predates it. The **JS masking hook
 covers only six `langfuse.*` attributes** (verified in the shipped bundle); the
@@ -477,6 +502,49 @@ residency costs us the medical model.
   would be buying a discount on something we already have, at the cost of the
   foundation [03](./03-data-architecture.md) and [04](./04-auth-access-control.md)
   are built on. **Use credits for capability, never for discount.**
+
+---
+
+## ADR-014 — Two deadlines; three concurrent tracks {#adr-014}
+
+**Date** 2026-08-02 · **Status** Accepted
+
+**Context.** [08](./08-migration-plan.md) was written as ten sequential stages
+with a single implicit finish line, and asserted that vendor gates were *the*
+critical path. Two facts changed that. The old app is a **frozen reference with no
+users**, so nothing in front of a customer is at risk and cleanup carries no merge
+cost. And the near-term forcing function is a **funding milestone**, not a clinical
+pilot.
+
+Every 🔴 gate — Supabase's PIPEDA representation, Deepgram's Canadian residency,
+OpenAI's DPA coverage — blocks **real patient data**. A demo runs on synthetic
+data. So the gates are not between us and a raise; they are between us and the
+first real patient, which is a later and separate event.
+
+**Decision.** Three tracks run concurrently, paced independently: **A** foundation
+(engineering capacity), **B** clinical content (physiotherapist hours), **C**
+vendor gates (other organizations' calendars). Two deadlines are tracked
+separately — *raise* is gated on Track A plus a credible slice of Track B; *first
+real patient* is gated on Track C. Stage 9 splits: the eval **harness** moves from
+last to immediately after stage 6; the golden **cases** stay where Track B can
+reach them.
+
+**Consequences.** Track C starts today and costs almost nothing to run in the
+background, which is the entire point of separating it. Track B gains a row in the
+plan it never had, and its first item is *recruiting a clinical lead* — as of this
+date "kinda identified," which is the largest unpriced risk in the project.
+
+Moving the eval harness forward is the load-bearing part. It is the only work item
+that is both durable architecture and legible to a non-engineer: an investor
+cannot evaluate an RLS policy but can evaluate a harness that demonstrates the
+generated plans are clinically accurate. Building it early also stops the eval
+system from being constructed after the things it evaluates.
+
+What we accepted: three tracks is more coordination than one ladder, and Track B
+depends on a person who has not committed. If B0 fails, stages 8 and 9b have no
+schedule at all and the knee scope in [01](./01-product-definition.md) is
+aspirational. **That failure is worth surfacing early rather than discovering at
+stage 8**, which is the second reason Track B starts now.
 
 ---
 

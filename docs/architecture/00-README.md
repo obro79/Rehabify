@@ -24,8 +24,8 @@ the conversation.
 | 05 | [Voice Pipeline](./05-voice-pipeline.md) | Composed Deepgram STT → LLM → TTS: topology, turn detection, failure modes, capacity |
 | 06 | [AI Pipelines & Observability](./06-ai-pipelines.md) | GPT-5.6 tiering, structured outputs, Langfuse under a no-PHI telemetry contract, evaluation |
 | 07 | [Cleanup Plan](./07-cleanup-plan.md) | The deletion inventory — ~9,300 LOC and 25.9 MB, with verdicts and risk |
-| 08 | [Migration Plan](./08-migration-plan.md) | Build order, what gets ported, the non-engineering gates |
-| 09 | [Decision Log](./09-decision-log.md) | Thirteen ADRs, and what they supersede |
+| 08 | [Migration Plan](./08-migration-plan.md) | Three concurrent tracks, what gets ported, the non-engineering gates |
+| 09 | [Decision Log](./09-decision-log.md) | Fourteen ADRs, and what they supersede |
 | 10 | [Clinical Content & Evaluation](./10-clinical-content.md) | Where exercises come from, the metadata that gates rather than displays, templated plans, and the eval strategy |
 
 **Reading order.** For the shape of the thing: 01 → 09 → 08. For implementation:
@@ -46,7 +46,8 @@ want to know why something is being replaced rather than fixed.
 | Voice | **Composed** Deepgram STT → GPT-5.6 → Aura TTS. We own the turn loop |
 | Speech hosting | **Self-hosted in `ca-central-1`**, on cloud credits — *proposed*, gated on model availability ([ADR-013](./09-decision-log.md#adr-013)) |
 | LLM | **GPT-5.6** — Luna for bounded work, Sol for clinician-facing prose. Residency is an open fork ([ADR-008](./09-decision-log.md#adr-008)) |
-| Observability | **Langfuse Cloud** under a no-PHI telemetry contract, CI-enforced |
+| Observability | **Langfuse Cloud** — no-PHI on real traffic, **full content on synthetic**, split across two projects ([08 §3a](./08-migration-plan.md)) |
+| Sequencing | **Three concurrent tracks, two deadlines** — raise and first-patient are different dates ([ADR-014](./09-decision-log.md#adr-014)) |
 | Vision | **Retained in full** — excluded from cleanup ([ADR-003](./09-decision-log.md)) |
 | Shape | Modular monolith + a durable worker |
 
@@ -102,12 +103,21 @@ after.
 
 Specification. No rebuild code has been written.
 
-The nine documents are complete. Open items live at the end of each doc; the ones
-that block the pilot are consolidated in
-[08 §4](./08-migration-plan.md) — and three of them (Supabase's PIPEDA
-representation, Deepgram's Canadian residency, OpenAI's DPA coverage) are
-conversations with other organizations that should start before the first line of
-rebuild code.
+The eleven documents are complete. Open items live at the end of each doc; the
+ones that block the pilot are consolidated in [08 §4](./08-migration-plan.md) —
+and three of them (Supabase's PIPEDA representation, Deepgram's Canadian
+residency, OpenAI's DPA coverage) are conversations with other organizations that
+should start today.
+
+**They should start today because they are cheap to run in the background, not
+because they block the next thing.** All three gate *real patient data*, and the
+nearer milestone runs on synthetic data ([ADR-014](./09-decision-log.md#adr-014)).
+Work proceeds on three tracks that do not wait on each other.
+
+The largest unpriced risk in the project is not technical: **Track B0, committing a
+clinical lead.** Stages 8 and 9b, gate 9, and the entire scope of
+[10](./10-clinical-content.md) rest on physiotherapist hours that are not yet
+promised.
 
 Two decisions remain explicitly **Proposed** rather than Accepted, and they are
 the same question seen twice:
