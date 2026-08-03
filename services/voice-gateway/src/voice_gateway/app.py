@@ -103,10 +103,36 @@ class _WebSocketChannel:
         await self._ws.send_bytes(chunk)
 
 
+def _origin_is_allowed(origin: str | None, allowed: list[str]) -> bool:
+    """CORS does not cover this. The middleware above guards `fetch`; a browser
+    sends no preflight for a WebSocket handshake and applies no same-origin rule
+    to it, so an unchecked `accept()` lets any page on the internet open an
+    intake session. The Origin header is set by the browser and cannot be forged
+    from script, which is exactly the attacker this check is for — it is not a
+    substitute for the session auth that arrives with the real deployment.
+    """
+    if "*" in allowed:
+        return True
+    if origin is None:
+        # Not a browser. Native clients are the deployment's problem to
+        # authenticate, and here that means "not yet".
+        return False
+    return origin in allowed
+
+
 @app.websocket("/v1/intake/stream")
 async def intake_stream(websocket: WebSocket) -> None:
-    await websocket.accept()
     settings = app.state.settings
+
+    origin = websocket.headers.get("origin")
+    if not _origin_is_allowed(origin, settings.allowed_origins):
+        logger.warning("rejected an intake handshake from origin %r", origin)
+        # Before accept(), so the handshake fails outright rather than opening
+        # and immediately closing.
+        await websocket.close(code=1008, reason="origin not allowed")
+        return
+
+    await websocket.accept()
 
     session = IntakeSession(
         settings=settings,
