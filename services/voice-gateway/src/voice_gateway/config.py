@@ -37,6 +37,13 @@ class Settings(BaseSettings):
     # holds is not a guarantee.
     deepgram_host: str = "api.deepgram.com"
 
+    # Setting a host the builder does not recognise is an error unless the
+    # operator says the unfamiliar host is deliberate. Off by default so a typo
+    # in `deepgram_host` fails loudly instead of quietly sending audio somewhere
+    # unintended; on, it is what makes the ADR-013 deployment configurable at
+    # all rather than a parameter nothing passes.
+    deepgram_allow_self_hosted_host: bool = False
+
     # Ephemeral tokens only need to be valid at handshake time (05 §2).
     deepgram_token_ttl_seconds: int = 30
 
@@ -88,7 +95,16 @@ class Settings(BaseSettings):
     # --- Server -----------------------------------------------------------
     host: str = "127.0.0.1"
     port: int = 8080
-    allowed_origins: list[str] = Field(default_factory=lambda: ["http://127.0.0.1:8080"])
+    # Gates both CORS and the WebSocket handshake. `localhost` is listed
+    # alongside `127.0.0.1` because they are different origins to a browser and
+    # the demo page is reachable at either — a check that rejects half the URLs
+    # the developer actually types gets widened to `*` and stays there.
+    allowed_origins: list[str] = Field(
+        default_factory=lambda: [
+            "http://127.0.0.1:8080",
+            "http://localhost:8080",
+        ]
+    )
 
     @field_validator("deepgram_host")
     @classmethod

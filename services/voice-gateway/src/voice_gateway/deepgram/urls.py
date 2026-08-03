@@ -88,7 +88,7 @@ def build_deepgram_url(
     params: dict[str, str | int | float | bool] | None = None,
     keyterms: tuple[str, ...] | list[str] = (),
     host: str | None = None,
-    allow_self_hosted_host: bool = False,
+    allow_self_hosted_host: bool | None = None,
     over_http: bool = False,
 ) -> str:
     """Build a Deepgram URL. Always opted out of model training.
@@ -107,18 +107,27 @@ def build_deepgram_url(
             unless `allow_self_hosted_host` is set.
         allow_self_hosted_host: permits a private host for the ADR-013
             self-hosted deployment. Note that the opt-out flag is still applied
-            — it is inert there, and harmless.
+            — it is inert there, and harmless. Defaults to the configured
+            setting, so the deployment is reachable by configuration rather than
+            only by a keyword argument every call site would have to remember to
+            thread through; pass it explicitly to override.
 
     Raises:
         DeepgramUrlError: on a keyterm or parameter that would fail silently.
     """
     from voice_gateway.config import get_settings
 
-    resolved_host = host or get_settings().deepgram_host
-    if resolved_host not in DEEPGRAM_HOSTS and not allow_self_hosted_host:
+    settings = get_settings()
+    resolved_host = host or settings.deepgram_host
+    allow_self_hosted = (
+        settings.deepgram_allow_self_hosted_host
+        if allow_self_hosted_host is None
+        else allow_self_hosted_host
+    )
+    if resolved_host not in DEEPGRAM_HOSTS and not allow_self_hosted:
         raise DeepgramUrlError(
             f"{resolved_host!r} is not a known Deepgram host. If this is the "
-            "self-hosted deployment, pass allow_self_hosted_host=True."
+            "self-hosted deployment, set deepgram_allow_self_hosted_host."
         )
 
     supplied = dict(params or {})
@@ -166,7 +175,7 @@ def build_listen_url(
     utterance_end_ms: int,
     keyterms: tuple[str, ...] = (),
     host: str | None = None,
-    allow_self_hosted_host: bool = False,
+    allow_self_hosted_host: bool | None = None,
 ) -> str:
     """Streaming STT connection parameters, exactly as pinned in 05 §3."""
     if not 1000 <= utterance_end_ms <= 5000:
@@ -207,7 +216,7 @@ def build_speak_url(
     container: str | None = None,
     over_http: bool = False,
     host: str | None = None,
-    allow_self_hosted_host: bool = False,
+    allow_self_hosted_host: bool | None = None,
 ) -> str:
     """TTS URL, for both the streaming socket and the REST pre-render.
 
@@ -238,7 +247,7 @@ def build_speak_url(
 
 
 def build_auth_grant_url(
-    *, host: str | None = None, allow_self_hosted_host: bool = False
+    *, host: str | None = None, allow_self_hosted_host: bool | None = None
 ) -> str:
     """Ephemeral token grant. Also goes through the builder — "all API
     requests" in 05 §6 has no carve-out for the ones that do not carry audio,

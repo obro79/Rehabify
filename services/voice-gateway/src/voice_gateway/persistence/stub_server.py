@@ -17,10 +17,12 @@ from __future__ import annotations
 
 import argparse
 import logging
+import secrets
 
 import uvicorn
 from fastapi import FastAPI, Header, HTTPException
 
+from voice_gateway.config import get_settings
 from voice_gateway.contracts import TurnEvent
 
 logger = logging.getLogger(__name__)
@@ -39,6 +41,14 @@ async def persist_turn(
     """Validate and acknowledge. The real route writes through db.rls."""
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="missing bearer token")
+
+    # Compare it, rather than merely observing that it is shaped like a token.
+    # A stub that accepts any bearer teaches the shape of the check without the
+    # substance of it, and the TypeScript route gets written from this file.
+    # `compare_digest` because the comparison is against a shared secret.
+    expected = get_settings().persist_turn_token
+    if not secrets.compare_digest(authorization.removeprefix("Bearer "), expected):
+        raise HTTPException(status_code=401, detail="invalid bearer token")
 
     _received.append(event)
     # Identifiers only, matching what the real route may log. The transcript is
