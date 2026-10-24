@@ -11,8 +11,8 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/api/auth";
-import { success, error } from "@/lib/api/response";
-import { ErrorCode, handleAPIError } from "@/lib/api/errors";
+import { success } from "@/lib/api/response";
+import { handleAPIError } from "@/lib/api/errors";
 import { validateBody } from "@/lib/api/validation";
 import { db, assessments, plans } from "@/db";
 import { generatePlan } from "@/lib/gemini/plan-generator";
@@ -143,7 +143,6 @@ export async function POST(request: NextRequest) {
 
     if (newAssessment.completed) {
       let planResponse: GeminiPlanResponse | null = null;
-      let usedFallback = false;
 
       // Try to generate plan with Gemini (with 1 retry)
       for (let attempt = 1; attempt <= 2; attempt++) {
@@ -174,7 +173,6 @@ export async function POST(request: NextRequest) {
               | "extension"
               | "neutral",
           });
-          usedFallback = true;
         } catch (fallbackErr) {
           console.error("Fallback plan generation failed:", fallbackErr);
           // Continue without a plan - user can still see assessment

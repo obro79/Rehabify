@@ -7,6 +7,8 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    // Unit tests never need real credentials; env.ts validation is covered by env.test.ts
+    env: { SKIP_ENV_VALIDATION: 'true' },
     setupFiles: ['./__tests__/setup.ts'],
     include: [
       'src/**/*.test.{ts,tsx}',

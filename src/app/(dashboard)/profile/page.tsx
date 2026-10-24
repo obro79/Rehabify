@@ -288,7 +288,7 @@ export default function ProfilePage() {
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="Enter your name"
               />
-              <Button onClick={handleSaveDisplayName} variant="secondary">
+              <Button onClick={handleSaveDisplayName} variant="secondary" disabled={saving}>
                 Save
               </Button>
             </div>

@@ -21,12 +21,12 @@ const credentials = [
       <div>
         <p className="text-lg font-bold text-sage-900 mb-2">NASM Protocol</p>
         <p className="text-sm text-sage-600 mb-3">
-          Our exercise library is built on the National Academy of Sports Medicine's
+          Our exercise library is built on the National Academy of Sports Medicine&apos;s
           Corrective Exercise Continuum (CEx), a systematic approach to addressing
           movement compensations and muscle imbalances.
         </p>
         <p className="text-xs text-sage-500">
-          All exercises follow NASM's evidence-based protocols for injury prevention
+          All exercises follow NASM&apos;s evidence-based protocols for injury prevention
           and rehabilitation, ensuring safe and effective movement patterns.
         </p>
       </div>
@@ -66,12 +66,12 @@ const credentials = [
         <p className="text-lg font-bold text-sage-900 mb-2">PIPEDA Compliant</p>
         <p className="text-sm text-sage-600 mb-3">
           We comply with the Personal Information Protection and Electronic Documents
-          Act (PIPEDA), Canada's federal privacy law. Your health data is processed
+          Act (PIPEDA), Canada&apos;s federal privacy law. Your health data is processed
           locally in your browser and never leaves your device without your explicit consent.
         </p>
         <p className="text-xs text-sage-500">
           All data transmission is encrypted, and we follow strict data minimization
-          principles - we only collect what's necessary for your rehabilitation journey.
+          principles - we only collect what&apos;s necessary for your rehabilitation journey.
         </p>
       </div>
     ),

@@ -27,7 +27,7 @@ function InterviewInstructions(): React.ReactElement {
         Answer naturally - there are no wrong answers.
       </p>
       <div className="space-y-2 text-sm">
-        <p className="text-muted-foreground">We'll cover:</p>
+        <p className="text-muted-foreground">We&apos;ll cover:</p>
         <NumberedList items={["What's bothering you", "Pain levels and triggers", "Your goals"]} />
       </div>
     </div>

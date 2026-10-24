@@ -1,8 +1,15 @@
 import type { FormError } from "@/types";
 import type { Landmark } from "@/types/vision";
 import { compareSquatRep } from "../movement-comparison";
+import {
+  LANDMARKS,
+  angleBetween,
+  averageVisibility,
+  baseFormScore,
+  distance2D,
+  midpoint,
+} from "../geometry";
 
-// Re-export types needed by form-engine
 export interface SquatDebug {
   kneeAngle: number;
   trunkLean: number;
@@ -31,69 +38,6 @@ export interface SquatResult {
   repIncremented: boolean;
   confidence: number;
   debug: SquatDebug;
-}
-
-const LANDMARKS = {
-  leftEar: 7,
-  rightEar: 8,
-  leftShoulder: 11,
-  rightShoulder: 12,
-  leftWrist: 15,
-  rightWrist: 16,
-  leftHip: 23,
-  rightHip: 24,
-  leftKnee: 25,
-  rightKnee: 26,
-  leftAnkle: 27,
-  rightAnkle: 28,
-};
-
-function midpoint(a: Landmark, b: Landmark): Landmark {
-  return {
-    x: (a.x + b.x) / 2,
-    y: (a.y + b.y) / 2,
-    z: (a.z + b.z) / 2,
-    visibility: (a.visibility + b.visibility) / 2,
-  };
-}
-
-function distance2D(a: Landmark, b: Landmark) {
-  const dx = a.x - b.x;
-  const dy = a.y - b.y;
-  return Math.sqrt(dx * dx + dy * dy);
-}
-
-function angleBetween(a: Landmark, b: Landmark, c: Landmark) {
-  const abx = a.x - b.x;
-  const aby = a.y - b.y;
-  const cbx = c.x - b.x;
-  const cby = c.y - b.y;
-  const dot = abx * cbx + aby * cby;
-  const mag = Math.sqrt(abx * abx + aby * aby) * Math.sqrt(cbx * cbx + cby * cby);
-  if (mag === 0) return 0;
-  const cos = Math.min(1, Math.max(-1, dot / mag));
-  return Math.acos(cos) * (180 / Math.PI);
-}
-
-function averageVisibility(landmarks: Landmark[], indices: number[]) {
-  const total = indices.reduce((sum, index) => sum + (landmarks[index]?.visibility ?? 0), 0);
-  return total / indices.length;
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function baseFormScore(landmarks: Landmark[]) {
-  const visibility = averageVisibility(landmarks, [
-    LANDMARKS.leftShoulder,
-    LANDMARKS.rightShoulder,
-    LANDMARKS.leftHip,
-    LANDMARKS.rightHip,
-    LANDMARKS.leftKnee,
-    LANDMARKS.rightKnee,
-  ]);
-  return clamp(Math.round(visibility * 100), 0, 100);
 }
 
 export function createSquatState(): SquatState {
@@ -155,7 +99,6 @@ export function analyzeSquat(
   // 5. Hands on Legs
   const leftHandKneeDist = Math.min(distance2D(leftWrist, leftKnee), distance2D(leftWrist, rightKnee));
   const rightHandKneeDist = Math.min(distance2D(rightWrist, leftKnee), distance2D(rightWrist, rightKnee));
-  const isHandOnLeg = leftHandKneeDist < 0.15 || rightHandKneeDist < 0.15;
 
   // 6. Speed detection - hip Y velocity
   const now = Date.now();

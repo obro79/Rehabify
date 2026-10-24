@@ -11,7 +11,6 @@
 
 import type {
   FormEvent,
-  FormEventType,
   FormErrorType,
   EventPriority,
   FormErrorDetails,

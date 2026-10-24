@@ -8,7 +8,7 @@ describe('Privacy Policy Page', () => {
     expect(metadata.title).toBe('Privacy Policy - Rehabify');
     expect(metadata.description).toBeDefined();
     expect(typeof metadata.description).toBe('string');
-    expect(metadata.description.toLowerCase()).toContain('privacy');
+    expect(String(metadata.description).toLowerCase()).toContain('privacy');
   });
 
   it('should render page component without errors', async () => {

@@ -6,7 +6,6 @@
  */
 
 import { db, exercises } from '@/db';
-import { eq } from 'drizzle-orm';
 import type { GeminiPlanResponse } from './types';
 
 // Core exercises for lower back by directional preference

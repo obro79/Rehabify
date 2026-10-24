@@ -45,13 +45,11 @@ export function useFormEventBridge(options: UseFormEventBridgeOptions): void {
     injectContext,
     isConnected,
     isSpeaking,
-    isAnalyzing,
     exerciseName = 'exercise',
     targetReps = 10,
     nextExercise = null,
     planName,
     commonMistakes = [],
-    exerciseInstructions = [],
     debug = true,
   } = options;
 

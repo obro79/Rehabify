@@ -46,17 +46,6 @@ export interface UseAssessmentVapiReturn {
   currentPhase: "interview" | "movement" | "summary";
 }
 
-// Node IDs that indicate movement phase is active
-const MOVEMENT_NODES = [
-  "movement_intro",
-  "flexion_test",
-  "extension_test",
-  "sidebend_test",
-];
-
-// Node IDs that indicate summary phase
-const SUMMARY_NODES = ["summary", "plan_generation", "complete"];
-
 /**
  * System prompt - SHORT version (~4 min)
  */
@@ -441,7 +430,7 @@ const ASSESSMENT_ASSISTANT_CONFIG = {
 export function useAssessmentVapi(
   options: UseAssessmentVapiOptions = {}
 ): UseAssessmentVapiReturn {
-  const { workflowId, onComplete, onRedFlag } = options;
+  const { onComplete, onRedFlag } = options;
 
   // Assessment store actions
   const {
@@ -459,7 +448,6 @@ export function useAssessmentVapi(
     updateMovementScreen,
     setSummaryConfirmed,
     setWantsToStart,
-    addTranscript,
     reset: resetAssessment,
   } = useAssessmentStore();
 

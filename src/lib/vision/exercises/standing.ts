@@ -126,17 +126,18 @@ export function analyzeLunge(
 
   const errors: FormError[] = [];
 
+  // Always computed so the debug overlay can show them
+  const trunkLean = trunkLeanAngle(midShoulder, midHip);
+  const leftThighAngle = thighAngleFromVertical(leftHip, leftKnee);
+  const rightThighAngle = thighAngleFromVertical(rightHip, rightKnee);
+  const bestDepthAngle = Math.min(leftThighAngle, rightThighAngle);
+
+  const isLeftFront = leftThighAngle < rightThighAngle;
+  const frontKnee = isLeftFront ? leftKnee : rightKnee;
+  const frontAnkle = isLeftFront ? leftAnkle : rightAnkle;
+  const shinAngle = shinAngleFromVertical(frontKnee, frontAnkle);
+
   if (isInLunge) {
-    const trunkLean = trunkLeanAngle(midShoulder, midHip);
-    const leftThighAngle = thighAngleFromVertical(leftHip, leftKnee);
-    const rightThighAngle = thighAngleFromVertical(rightHip, rightKnee);
-    const bestDepthAngle = Math.min(leftThighAngle, rightThighAngle);
-
-    const isLeftFront = leftThighAngle < rightThighAngle;
-    const frontKnee = isLeftFront ? leftKnee : rightKnee;
-    const frontAnkle = isLeftFront ? leftAnkle : rightAnkle;
-    const shinAngle = shinAngleFromVertical(frontKnee, frontAnkle);
-
     if (trunkLean > 20) {
       errors.push(createError("forward_lean", "Keep chest up", "warning", "torso"));
     }
@@ -165,6 +166,15 @@ export function analyzeLunge(
     isCorrect: errors.length === 0,
     repIncremented,
     confidence: coreConfidence(landmarks),
+    debug: {
+      phase,
+      leftThighAngle,
+      rightThighAngle,
+      bestDepthAngle,
+      trunkLean,
+      shinAngle,
+      queuedErrors: errors.map((e) => e.type),
+    },
   };
 }
 
@@ -248,5 +258,12 @@ export function analyzeLungeWithRotation(
     isCorrect: true,
     repIncremented,
     confidence: coreConfidence(landmarks),
+    debug: {
+      phase,
+      torsion,
+      shoulderYaw,
+      hipYaw,
+      queuedErrors: [],
+    },
   };
 }
