@@ -63,15 +63,17 @@ stateDiagram-v2
     descending --> standing: shallow rep
 ```
 
-Two rules apply to every exercise and live in the engine rather than the analyzers:
+Rep counting combines one engine-wide rule with analyzer-specific ones:
 
-- **Hysteresis.** Enter and exit thresholds differ (lumbar flexion enters at a 90° hip angle
-  and exits at 160°), so noise near a threshold cannot double count a rep.
-- **Warnings block reps.** If the frame that completes a rep carries a warning-level error
-  (bent knees, wrong orientation), the rep is not counted.
+- **Warnings block reps (engine).** If the frame that completes a rep carries a warning-level
+  error (bent knees, wrong orientation), the engine does not count the rep.
+- **Hysteresis (some analyzers).** Several analyzers use different entry and exit thresholds so
+  noise near a threshold cannot double count a rep. Lumbar flexion, for example, enters at a 90°
+  hip angle and exits at 160°. Others, such as lumbar extension, use a single cutoff.
 
-Thresholds have defaults in code and can be overridden per exercise through
-`detection_config.thresholds` in the exercise library.
+The squat and floor analyzers (cat-camel, cobra, dead bug) read overrides from
+`detection_config.thresholds` in the exercise library and fall back to defaults in code. The
+lumbar and standing analyzers (lunge, RDL) use fixed thresholds and ignore those overrides.
 
 Supported analyzers: squat, Romanian deadlift, lunge, lunge with rotation, standing lumbar
 flexion, extension and side bend, cat-camel, cobra and dead bug. Exercises without an analyzer
