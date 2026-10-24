@@ -12,6 +12,10 @@ import { requireAuth } from '@/lib/auth';
 
 const mockRequireAuth = vi.mocked(requireAuth);
 
+// Tests only need the fields auth.ts reads, not a full session user
+type AuthUser = Awaited<ReturnType<typeof requireAuth>>;
+const asAuthUser = (user: Record<string, unknown>) => user as unknown as AuthUser;
+
 describe('getCurrentUser', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -19,7 +23,7 @@ describe('getCurrentUser', () => {
 
   it('returns authenticated user', async () => {
     const mockUser = { id: 'user-123', email: 'test@example.com', name: 'Test User' };
-    mockRequireAuth.mockResolvedValue(mockUser);
+    mockRequireAuth.mockResolvedValue(asAuthUser(mockUser));
 
     const user = await getCurrentUser();
 
@@ -49,7 +53,7 @@ describe('withAuth', () => {
 
   it('calls handler with user context when authenticated', async () => {
     const mockUser = { id: 'user-123', email: 'test@example.com', name: 'Test User' };
-    mockRequireAuth.mockResolvedValue(mockUser);
+    mockRequireAuth.mockResolvedValue(asAuthUser(mockUser));
 
     const handler = vi.fn().mockResolvedValue(NextResponse.json({ success: true }));
     const wrappedHandler = withAuth(handler);
@@ -82,7 +86,7 @@ describe('withAuth', () => {
 
   it('enforces role restriction', async () => {
     const mockUser = { id: 'user-123', email: 'test@example.com', role: 'patient' };
-    mockRequireAuth.mockResolvedValue(mockUser);
+    mockRequireAuth.mockResolvedValue(asAuthUser(mockUser));
 
     const handler = vi.fn();
     const wrappedHandler = withAuth(handler, { roles: ['admin'] });
@@ -99,7 +103,7 @@ describe('withAuth', () => {
 
   it('allows access when user has required role', async () => {
     const mockUser = { id: 'user-123', email: 'test@example.com', role: 'admin' };
-    mockRequireAuth.mockResolvedValue(mockUser);
+    mockRequireAuth.mockResolvedValue(asAuthUser(mockUser));
 
     const handler = vi.fn().mockResolvedValue(NextResponse.json({ success: true }));
     const wrappedHandler = withAuth(handler, { roles: ['admin'] });
@@ -113,7 +117,7 @@ describe('withAuth', () => {
 
   it('allows multiple roles', async () => {
     const mockUser = { id: 'user-123', email: 'test@example.com', role: 'pt' };
-    mockRequireAuth.mockResolvedValue(mockUser);
+    mockRequireAuth.mockResolvedValue(asAuthUser(mockUser));
 
     const handler = vi.fn().mockResolvedValue(NextResponse.json({ success: true }));
     const wrappedHandler = withAuth(handler, { roles: ['pt', 'admin'] });
@@ -127,7 +131,7 @@ describe('withAuth', () => {
 
   it('defaults to patient role when none specified', async () => {
     const mockUser = { id: 'user-123', email: 'test@example.com' }; // No role
-    mockRequireAuth.mockResolvedValue(mockUser);
+    mockRequireAuth.mockResolvedValue(asAuthUser(mockUser));
 
     const handler = vi.fn().mockResolvedValue(NextResponse.json({ success: true }));
     const wrappedHandler = withAuth(handler, { roles: ['patient'] });
@@ -144,7 +148,7 @@ describe('withAuth', () => {
 
   it('handles handler errors', async () => {
     const mockUser = { id: 'user-123', email: 'test@example.com' };
-    mockRequireAuth.mockResolvedValue(mockUser);
+    mockRequireAuth.mockResolvedValue(asAuthUser(mockUser));
 
     const handler = vi.fn().mockRejectedValue(
       new APIError(ErrorCode.NOT_FOUND, 'Resource not found')
@@ -162,7 +166,7 @@ describe('withAuth', () => {
 
   it('handles unexpected handler errors', async () => {
     const mockUser = { id: 'user-123', email: 'test@example.com' };
-    mockRequireAuth.mockResolvedValue(mockUser);
+    mockRequireAuth.mockResolvedValue(asAuthUser(mockUser));
 
     const handler = vi.fn().mockRejectedValue(new Error('Unexpected error'));
     const wrappedHandler = withAuth(handler);

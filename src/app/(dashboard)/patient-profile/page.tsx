@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
-import { Calendar, User, Phone, MapPin, Stethoscope, Pill, FileText, AlertCircle, Heart, Activity, FileCheck, Settings } from "lucide-react";
+import { User, Stethoscope, FileText, AlertCircle, Heart, Activity, FileCheck, Settings } from "lucide-react";
 import Link from "next/link";
 
 interface PatientMedicalInfo {
@@ -31,10 +31,10 @@ interface PatientMedicalInfo {
   diagnosisDate?: string | null;
   primaryPhysician?: string | null;
   physicianPhone?: string | null;
-  pastMedicalHistory?: any[];
-  surgeries?: any[];
-  allergies?: any[];
-  medications?: any[];
+  pastMedicalHistory?: unknown[];
+  surgeries?: unknown[];
+  allergies?: unknown[];
+  medications?: unknown[];
   insuranceProvider?: string | null;
   insurancePolicyNumber?: string | null;
   emergencyContactName?: string | null;
@@ -44,9 +44,9 @@ interface PatientMedicalInfo {
 }
 
 interface PatientRecord {
-  assessments: any[];
-  plans: any[];
-  sessions: any[];
+  assessments: { id: string; createdAt: string; completed: boolean }[];
+  plans: { id: string; name: string; createdAt: string; status: string }[];
+  sessions: { id: string; date: string; durationSeconds: number | null; status: string }[];
 }
 
 export default function PatientProfilePage() {
@@ -116,7 +116,7 @@ export default function PatientProfilePage() {
         description: "Medical information updated successfully",
         variant: "success",
       });
-    } catch (error) {
+    } catch {
       addToast({
         title: "Error",
         description: "Failed to save medical information",

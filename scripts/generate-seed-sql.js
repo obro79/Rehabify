@@ -28,7 +28,6 @@ function escapeSQL(str) {
 // Helper to convert array to PostgreSQL array literal
 function toSQLArray(arr) {
   if (!arr || arr.length === 0) return "'{}'";
-  const escaped = arr.map(item => `"${String(item).replace(/"/g, '\\"').replace(/'/g, "''")}"`);
   return `ARRAY[${arr.map(item => escapeSQL(item)).join(', ')}]`;
 }
 

@@ -73,7 +73,6 @@ export function useVapi(options: UseVapiOptions = {}): UseVapiReturn {
     connectionState,
     speakingStatus,
     volumeLevel,
-    isMuted,
     setConnectionState,
     setSpeakingStatus,
     setVolumeLevel,

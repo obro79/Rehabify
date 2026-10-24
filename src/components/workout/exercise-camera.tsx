@@ -50,7 +50,8 @@ export function ExerciseCamera({
   const [status, setStatus] = React.useState<CameraStatus>("loading");
   const [feedback, setFeedback] = React.useState<CameraFeedback>(null);
   const [formFeedback, setFormFeedback] = React.useState<CameraFeedback>(null);
-  const [debugValues, setDebugValues] = React.useState<{
+  // Debug overlay below is commented out; keep the state so it can be re-enabled
+  const [_debugValues, setDebugValues] = React.useState<{
     // Squat fields
     kneeAngle?: number;
     trunkLean?: number;

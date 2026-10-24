@@ -101,7 +101,7 @@ export async function PUT(request: NextRequest) {
 
     if (existing) {
       // Update existing record
-      const updateData: any = {};
+      const updateData: Partial<typeof patientMedicalInfo.$inferInsert> = {};
 
       // Only include fields that are provided
       if (body.dateOfBirth !== undefined) updateData.dateOfBirth = body.dateOfBirth;

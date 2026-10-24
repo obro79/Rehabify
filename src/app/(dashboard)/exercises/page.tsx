@@ -19,7 +19,7 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import exerciseData from "@/lib/exercises/data.json";
 import { useDebounce } from "@/hooks/use-debounce";
-import { Exercise, DIFFICULTY_LEVELS } from "@/lib/exercises/types";
+import { Exercise } from "@/lib/exercises/types";
 import {
   getCategoryIcon,
   getCategoryBadgeVariant,
@@ -34,10 +34,6 @@ import {
   DIFFICULTIES,
   ITEMS_PER_PAGE,
 } from "./_components/constants";
-
-function getDifficultyLevel(difficulty: string): number {
-  return DIFFICULTY_LEVELS[difficulty as keyof typeof DIFFICULTY_LEVELS] ?? 2;
-}
 
 function getDifficultyBadgeVariant(difficulty: string): "easy" | "medium" | "hard" {
   switch (difficulty) {

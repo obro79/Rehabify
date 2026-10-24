@@ -11,10 +11,8 @@ import { RepCounter } from "@/components/ui/rep-counter";
 import { VoiceIndicator } from "@/components/ui/voice-indicator";
 import { StepIndicator } from "@/components/assessment/step-indicator";
 import { ExerciseCamera } from "@/components/workout";
-import { cn } from "@/lib/utils";
 import { useAssessmentStore } from "@/stores/assessment-store";
 import {
-  selectShouldShowCamera,
   selectAssessmentIsComplete,
   selectHasRedFlag,
 } from "@/stores";
@@ -97,38 +95,6 @@ const MOVEMENT_KEYWORDS = [
 // ============================================================================
 // Left Panel - Assessment Instructions
 // ============================================================================
-interface AssessmentInstructionsPanelProps {
-  currentPhase: "interview" | "movement" | "summary";
-  isMovementPhase: boolean;
-  currentExercise?: Exercise;
-}
-
-function AssessmentInstructionsPanel({
-  currentPhase,
-  isMovementPhase,
-  currentExercise,
-}: AssessmentInstructionsPanelProps) {
-  return (
-    <div className="flex flex-col h-full gap-4">
-      {/* Step Indicator */}
-      <Card className="p-4 flex-shrink-0">
-        <StepIndicator steps={STEPS} currentStep={currentPhase} />
-      </Card>
-
-      {/* Phase Content */}
-      <Card className="flex-1 p-4 overflow-y-auto">
-        {isMovementPhase && currentExercise ? (
-          <MovementInstructions exercise={currentExercise} />
-        ) : currentPhase === "summary" ? (
-          <SummaryInstructions />
-        ) : (
-          <InterviewInstructions />
-        )}
-      </Card>
-    </div>
-  );
-}
-
 function InterviewInstructions() {
   return (
     <div>
@@ -140,13 +106,13 @@ function InterviewInstructions() {
         activities. Answer naturally - there are no wrong answers.
       </p>
       <div className="space-y-2 text-sm">
-        <p className="text-muted-foreground">We'll cover:</p>
+        <p className="text-muted-foreground">We&apos;ll cover:</p>
         <ul className="space-y-2 ml-1">
           <li className="flex items-start gap-2">
             <span className="w-5 h-5 rounded-full bg-sage-100 text-sage-700 flex items-center justify-center text-xs font-semibold flex-shrink-0">
               1
             </span>
-            <span className="text-muted-foreground">What's bothering you</span>
+            <span className="text-muted-foreground">What&apos;s bothering you</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="w-5 h-5 rounded-full bg-sage-100 text-sage-700 flex items-center justify-center text-xs font-semibold flex-shrink-0">
@@ -275,7 +241,7 @@ function AssessmentStatsPanel({
         {/* Transcript */}
         <div className="bg-muted/50 rounded-lg p-3 mb-3 min-h-[60px]">
           <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
-            "{transcript}"
+            &quot;{transcript}&quot;
           </p>
         </div>
 
@@ -426,7 +392,7 @@ export default function LowerBackAssessmentPage() {
   const router = useRouter();
   const [isSaving, setIsSaving] = React.useState(false);
   const [saveError, setSaveError] = React.useState<string | null>(null);
-  const [currentMovementIndex, setCurrentMovementIndex] = React.useState(0);
+  const [currentMovementIndex] = React.useState(0);
   const [isMovementPhase, setIsMovementPhase] = React.useState(false);
   const [showDescribeModal, setShowDescribeModal] = React.useState(false);
   const [describeText, setDescribeText] = React.useState(
@@ -461,7 +427,6 @@ Goals: `
   const resetExercise = useExerciseStore((state) => state.reset);
 
   // Assessment store
-  const shouldShowCamera = useAssessmentStore(selectShouldShowCamera);
   const isComplete = useAssessmentStore(selectAssessmentIsComplete);
   const hasRedFlag = useAssessmentStore(selectHasRedFlag);
   const resetAssessment = useAssessmentStore((state) => state.reset);
@@ -502,8 +467,6 @@ Goals: `
         throw new Error(error.message || "Failed to save assessment");
       }
 
-      const result = await response.json();
-
       // Navigate to dashboard or results
       router.push("/dashboard");
     } catch (err) {
@@ -519,7 +482,6 @@ Goals: `
     start: startVapi,
     stop: stopVapi,
     isConnected,
-    isSpeaking,
     setMuted,
     injectContext,
     currentPhase,
@@ -693,7 +655,6 @@ Goals: `
         throw new Error(err.error?.message || "Failed to generate plan");
       }
 
-      const result = await response.json();
       router.push("/dashboard");
     } catch (err) {
       console.error("[DescribeModal] Submit error:", err);
@@ -897,7 +858,7 @@ Goals: `
 
             <p className="text-sm text-muted-foreground mb-4">
               Skip the voice assessment and describe your condition below.
-              We'll generate a personalized rehab plan from your description.
+              We&apos;ll generate a personalized rehab plan from your description.
             </p>
 
             <textarea

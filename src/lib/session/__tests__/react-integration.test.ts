@@ -151,7 +151,7 @@ describe('React Integration', () => {
   describe('useSessionResume', () => {
     it('returns correct modal state when recoverable session exists', async () => {
       // Import the hook after mocks are set up
-      const { useSessionResume } = await import('@/hooks/useSessionResume');
+      const { useSessionResume } = await import('@/hooks/use-session-resume');
 
       // Set up a valid persisted session
       const mockSession = {
@@ -186,7 +186,7 @@ describe('React Integration', () => {
     });
 
     it('returns no recoverable session when storage is empty', async () => {
-      const { useSessionResume } = await import('@/hooks/useSessionResume');
+      const { useSessionResume } = await import('@/hooks/use-session-resume');
 
       const { result } = renderHook(() => useSessionResume());
 
@@ -206,7 +206,7 @@ describe('React Integration', () => {
       vi.resetModules();
 
       // Re-import after reset to get fresh session guard
-      const { useMultiTabGuard } = await import('@/hooks/useMultiTabGuard');
+      const { useMultiTabGuard } = await import('@/hooks/use-multi-tab-guard');
       const { SessionGuard } = await import('@/lib/session/session-guard');
 
       // Simulate another tab owning the session

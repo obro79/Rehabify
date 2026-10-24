@@ -10,15 +10,15 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
+import { useOnboardingStore } from '../onboarding-store';
 import {
-  useOnboardingStore,
   selectCurrentStep,
   selectAssessmentDraft,
   selectCameraPermission,
   selectMicPermission,
   selectHasAllPermissions,
   selectProgressPercentage,
-} from '../onboarding-store';
+} from '../onboarding-store-selectors';
 
 describe('onboarding-store', () => {
   beforeEach(() => {

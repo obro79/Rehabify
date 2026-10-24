@@ -67,7 +67,7 @@ export function WorkoutStatsPanel({
         {/* Transcript - compact */}
         <div className="bg-muted/50 rounded-lg p-3 mb-3 min-h-[60px]">
           <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
-            "{transcript}"
+            &quot;{transcript}&quot;
           </p>
         </div>
 
